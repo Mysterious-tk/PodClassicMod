@@ -1,0 +1,33 @@
+apply plugin: 'com.android.application'
+
+apply plugin: 'kotlin-android'
+
+apply plugin: 'kotlin-android-extensions'
+
+android {
+    compileSdkVersion 28
+    defaultConfig {
+        applicationId "com.example.podclassic"
+        minSdkVersion 21
+        targetSdkVersion 28
+        versionCode 4
+        versionName "1.2.1"
+        testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
+        resConfigs "en", "zh"
+    }
+    buildTypes {
+        release {
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            zipAlignEnabled true
+            shrinkResources true
+        }
+    }
+    buildToolsVersion = '30.0.2'
+}
+
+dependencies {
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
+    implementation 'androidx.appcompat:appcompat:1.2.0'
+}

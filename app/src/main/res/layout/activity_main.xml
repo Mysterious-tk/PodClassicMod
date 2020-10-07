@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/colorPrimary"
+    tools:context=".activity.MainActivity">
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentTop="true"
+        android:layout_marginLeft="12dp"
+        android:layout_marginRight="12dp"
+        android:layout_marginBottom="12dp"
+        android:layout_above="@id/slide_controller"
+        android:id="@+id/frame_layout">
+
+        <com.example.podclassic.view.TitleBar
+            android:layout_width="match_parent"
+            android:layout_height="24dp"
+            android:id="@+id/title_bar" />
+
+        <com.example.podclassic.view.Screen
+            android:layout_marginTop="24dp"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:id="@+id/screen" />
+    </FrameLayout>
+
+    <com.example.podclassic.view.SlideController
+        android:layout_alignParentBottom="true"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_margin="48dp"
+        android:id="@+id/slide_controller" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/colorPrimaryDark"
+        android:id="@+id/dark_mode"/>
+
+</RelativeLayout>
