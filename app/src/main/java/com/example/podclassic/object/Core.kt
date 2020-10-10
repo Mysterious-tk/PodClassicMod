@@ -88,12 +88,8 @@ object Core {
     }
 
     fun home() {
+        setTitle(screen!!.currentView)
         screen!!.clearViews()
-        if (SPManager.getBoolean(SPManager.SP_SHOW_TIME)) {
-            titleBar!!.showTime()
-        } else {
-            titleBar!!.showTitle(screen!!.currentView.getTitle())
-        }
     }
 
     fun refresh() {
@@ -107,10 +103,12 @@ object Core {
         context.stopService(Intent(context, MediaPlayerService::class.java))
         exitProcess(0)
          */
+
         val context = BaseApplication.getContext()
         context.stopService(Intent(context, MediaPlayerService::class.java))
         MediaPlayer.clearPlayList()
         home()
+
 
     }
 

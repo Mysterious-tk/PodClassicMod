@@ -298,10 +298,10 @@ class MusicPlayerView(context: Context) : RelativeLayout(context), ScreenView, M
                 singer.gravity = Gravity.LEFT
                 album.gravity = Gravity.LEFT
                 lyric.gravity = Gravity.LEFT
-                if (imageHeight == 0f) {
-                    post { loadImage(bitmap) }
-                } else {
+                if (hasHeight) {
                     loadImage(bitmap)
+                } else {
+                    post { loadImage(bitmap) }
                 }
             }
             name.text = music.name
@@ -319,9 +319,10 @@ class MusicPlayerView(context: Context) : RelativeLayout(context), ScreenView, M
     }
 
     private fun loadImage(bitmap: Bitmap) {
-        if (imageHeight == 0f) {
+        if (!hasHeight) {
             return
         }
+        val imageHeight = measuredHeight / 2f
         val scaleWidth : Float = imageHeight / bitmap.width
         val scaleHeight : Float= imageHeight / bitmap.height
         val matrix = Matrix()
@@ -342,13 +343,11 @@ class MusicPlayerView(context: Context) : RelativeLayout(context), ScreenView, M
         }
     }
 
-    private var imageHeight = 0f
+    private var hasHeight = false
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec)
-        if (measuredHeight != 0) {
-            imageHeight = measuredHeight / 2f
-        }
+        hasHeight = hasWindowFocus() && measuredHeight != 0
     }
 
     class ImageView(context: Context) : androidx.appcompat.widget.AppCompatImageView(context) {
