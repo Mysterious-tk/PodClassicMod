@@ -6,6 +6,7 @@ import android.content.Intent
 import android.view.KeyEvent
 import com.example.podclassic.`object`.Core
 import com.example.podclassic.`object`.MediaPlayer
+import com.example.podclassic.util.MediaUtil
 
 class MediaBroadcastReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context?, intent: Intent?) {
@@ -19,8 +20,20 @@ class MediaBroadcastReceiver : BroadcastReceiver() {
             }
             when (keyEvent.keyCode) {
                 KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.KEYCODE_HEADSETHOOK -> MediaPlayer.pause()
-                KeyEvent.KEYCODE_MEDIA_NEXT -> MediaPlayer.next()
-                KeyEvent.KEYCODE_MEDIA_PREVIOUS -> MediaPlayer.prev()
+                KeyEvent.KEYCODE_MEDIA_NEXT -> {
+                    if (MediaPlayer.getPlayListSize() == 0) {
+                        MediaPlayer.shufflePlay(MediaUtil.musics)
+                    } else {
+                        MediaPlayer.next()
+                    }
+                }
+                KeyEvent.KEYCODE_MEDIA_PREVIOUS -> {
+                    if (MediaPlayer.getPlayListSize() == 0) {
+                        MediaPlayer.shufflePlay(MediaUtil.musics)
+                    } else {
+                        MediaPlayer.prev()
+                    }
+                }
                 KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> MediaPlayer.forward()
                 KeyEvent.KEYCODE_MEDIA_REWIND -> MediaPlayer.backward()
                 KeyEvent.KEYCODE_MEDIA_CLOSE -> Core.exit()
