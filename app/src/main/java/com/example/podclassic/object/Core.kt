@@ -21,10 +21,7 @@ import com.example.podclassic.fragment.SplashFragment
 import com.example.podclassic.service.MediaPlayerService
 import com.example.podclassic.storage.SPManager
 import com.example.podclassic.storage.SaveMusics
-import com.example.podclassic.util.Colors
-import com.example.podclassic.util.FileUtil
-import com.example.podclassic.util.PinyinUtil
-import com.example.podclassic.util.ThreadUtil
+import com.example.podclassic.util.*
 import com.example.podclassic.view.*
 import java.lang.Exception
 import java.util.*
@@ -97,18 +94,18 @@ object Core {
     }
 
     fun exit() {
-        /*
         MediaPlayer.release()
         val context = BaseApplication.getContext()
         context.stopService(Intent(context, MediaPlayerService::class.java))
+        VolumeUtil.releaseSoundPool()
         exitProcess(0)
-         */
 
+        /*
         val context = BaseApplication.getContext()
         context.stopService(Intent(context, MediaPlayerService::class.java))
         MediaPlayer.clearPlayList()
         home()
-
+         */
 
     }
 

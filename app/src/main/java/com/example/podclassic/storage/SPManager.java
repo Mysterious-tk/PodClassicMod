@@ -12,6 +12,7 @@ public class SPManager {
     public static final String SP_STARTED = "started";
     public static final String SP_AUDIO_FOCUS = "audio_focus";
     public static final String SP_VIBRATE = "vibrate";
+    public static final String SP_SOUND = "sound";
     public static final String SP_THEME = "theme";
     public static final String SP_RESET_COUNT = "reset_count";
     public static final String SP_SHOW_TIME = "show_time";
@@ -63,6 +64,7 @@ public class SPManager {
 
     public static void reset() {
         setBoolean(SP_VIBRATE, true);
+        setBoolean(SP_SOUND, true);
         setBoolean(SP_AUDIO_FOCUS, true);
         setBoolean(SP_SHOW_TIME, true);
         setBoolean(SP_SHOW_LYRIC, true);

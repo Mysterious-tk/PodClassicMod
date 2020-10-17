@@ -120,6 +120,16 @@ class SettingsView(context: Context) : ListView(context), ScreenView {
 
             Item("按键音", object : OnItemClickListener {
                 override fun onItemClick(index : Int, listView: ListView) : Boolean {
+                    val sound = SPManager.getBoolean(SPManager.SP_SOUND)
+                    SPManager.setBoolean(SPManager.SP_SOUND, !sound)
+                    listView.getCurrentItem().rightText = if (sound) "关闭" else "打开"
+                    return true
+                }
+
+            }, if (SPManager.getBoolean(SPManager.SP_SOUND))  "打开" else "关闭" ),
+
+            Item("振动", object : OnItemClickListener {
+                override fun onItemClick(index : Int, listView: ListView) : Boolean {
                     val vibrate = SPManager.getBoolean(SPManager.SP_VIBRATE)
                     SPManager.setBoolean(SPManager.SP_VIBRATE, !vibrate)
                     listView.getCurrentItem().rightText = if (vibrate) "关闭" else "打开"

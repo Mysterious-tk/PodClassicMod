@@ -3,20 +3,35 @@ package com.example.podclassic.util
 import android.app.Service
 import android.content.Context
 import android.media.AudioManager
+import android.media.SoundPool
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
+import com.example.podclassic.R
 import com.example.podclassic.base.BaseApplication
 import com.example.podclassic.storage.SPManager
 
 object VolumeUtil {
-    private val audioManager by lazy { BaseApplication.getContext().getSystemService(Context.AUDIO_SERVICE) as AudioManager }
+    private val audioManager by lazy {
+        BaseApplication.getContext().getSystemService(Context.AUDIO_SERVICE) as AudioManager
+    }
 
     val maxVolume by lazy { audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC) }
 
-    private val vibrator by lazy { BaseApplication.getContext().getSystemService(Service.VIBRATOR_SERVICE) as Vibrator }
+    private val vibrator by lazy {
+        BaseApplication.getContext().getSystemService(Service.VIBRATOR_SERVICE) as Vibrator
+    }
 
     private var lastVibrateTime = 0L
+
+    private var streamId = 0
+    private val soundPool = SoundPool.Builder()
+            .setMaxStreams(1)
+            .build()
+
+    fun loadSound() {
+        streamId = soundPool.load(BaseApplication.getContext(), R.raw.click, 0)
+    }
 
     private const val VIBRATE_TIME = 40L
 
@@ -38,6 +53,10 @@ object VolumeUtil {
 
     @Suppress("DEPRECATION")
     fun vibrate() {
+        if (SPManager.getBoolean(SPManager.SP_SOUND)) {
+            soundPool.play(streamId, 1f, 1f, 0, 0, 1f)
+        }
+
         if (!SPManager.getBoolean(SPManager.SP_VIBRATE)) {
             return
         }
@@ -53,5 +72,9 @@ object VolumeUtil {
         } else {
             vibrator.vibrate(VIBRATE_TIME)
         }
+    }
+
+    fun releaseSoundPool() {
+        soundPool.release()
     }
 }

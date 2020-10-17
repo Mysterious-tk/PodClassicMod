@@ -15,10 +15,7 @@ import com.example.podclassic.`object`.Core
 import com.example.podclassic.`object`.MediaPlayer
 import com.example.podclassic.storage.SaveMusicLists
 import com.example.podclassic.storage.SaveMusics
-import com.example.podclassic.util.Colors
-import com.example.podclassic.util.FileUtil
-import com.example.podclassic.util.MediaUtil
-import com.example.podclassic.util.PinyinUtil
+import com.example.podclassic.util.*
 import java.lang.Exception
 
 class SplashFragment : Fragment() {
@@ -26,6 +23,7 @@ class SplashFragment : Fragment() {
     private val asyncTask = @SuppressLint("StaticFieldLeak")
     object : AsyncTask<Unit, Unit, Unit>() {
         override fun doInBackground(vararg params: Unit?) {
+            VolumeUtil.loadSound()
             MediaUtil.prepare()
         }
 

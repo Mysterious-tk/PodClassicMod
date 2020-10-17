@@ -22,6 +22,7 @@ import com.example.podclassic.fragment.SplashFragment
 import com.example.podclassic.service.MediaPlayerService
 import com.example.podclassic.storage.SPManager
 import com.example.podclassic.util.Values
+import com.example.podclassic.util.VolumeUtil
 import com.example.podclassic.view.MusicPlayerView
 import kotlinx.android.synthetic.main.activity_main.*
 import kotlin.system.exitProcess
@@ -42,6 +43,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         initScreen()
+
         setContentView(R.layout.activity_main)
 
         if (!SPManager.getBoolean(SPManager.SP_STARTED)) {
@@ -56,7 +58,7 @@ class MainActivity : AppCompatActivity() {
 
         initMediaPlayer(intent)
 
-        initObject()
+        startService(Intent(this, MediaPlayerService::class.java))
     }
 
     private fun prepare() {
@@ -84,10 +86,6 @@ class MainActivity : AppCompatActivity() {
         if ((uri != null || intent?.action == MediaPlayerService.ACTION_MAIN) && Core.getView() !is MusicPlayerView) {
             Core.addView(MusicPlayerView(this))
         }
-    }
-
-    private fun initObject() {
-        startService(Intent(this, MediaPlayerService::class.java))
     }
 
     private fun initScreen() {
