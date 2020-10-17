@@ -13,6 +13,7 @@ import com.example.podclassic.`object`.Core
 import com.example.podclassic.`object`.MediaPlayer
 import com.example.podclassic.base.ScreenView
 import com.example.podclassic.game.Brick
+import com.example.podclassic.storage.SPManager
 import com.example.podclassic.storage.SaveMusics
 import com.example.podclassic.util.FileUtil
 import com.example.podclassic.util.MediaUtil
@@ -228,7 +229,7 @@ class MainView(context: Context) : ListView(context), ScreenView {
             }, true),
             Item("随机播放歌曲", object : OnItemClickListener {
                 override fun onItemClick(index: Int, listView: ListView): Boolean {
-                    val list = MediaUtil.musics
+                    val list = if (SPManager.getBoolean(SPManager.SP_PLAY_ALL)) MediaUtil.musics else SaveMusics.loveList.getList()
                     return if (list.isEmpty()) {
                         false
                     } else {

@@ -86,6 +86,15 @@ class SettingsView(context: Context) : ListView(context), ScreenView {
                 }
             }, MediaPlayer.getPlayModeString()),
 
+            Item("随机播放", object : OnItemClickListener {
+                override fun onItemClick(index : Int, listView : ListView) : Boolean {
+                    val playAll = SPManager.getBoolean(SPManager.SP_PLAY_ALL)
+                    SPManager.setBoolean(SPManager.SP_PLAY_ALL, !playAll)
+                    listView.getCurrentItem().rightText = if (playAll) "收藏歌曲" else "全部歌曲"
+                    return true
+                }
+            }, if (SPManager.getBoolean(SPManager.SP_SHOW_LYRIC))  "全部歌曲" else "收藏歌曲" ),
+
             Item("夜间模式", object : OnItemClickListener {
                 override fun onItemClick(index : Int, listView : ListView) : Boolean {
                     val darkMode = !SPManager.getBoolean(SPManager.SP_DARK_MODE)

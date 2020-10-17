@@ -275,6 +275,10 @@ class MusicPlayerView(context: Context) : RelativeLayout(context), ScreenView, M
         if (!hasWindowFocus()) {
             return
         }
+        val progress = MediaPlayer.getProgress()
+        progressBar.setCurrent(progress)
+        progressBar.setMax(MediaPlayer.getDuration())
+
         val music = MediaPlayer.getCurrent()
         if (music == null) {
             name.text = Values.NULL
@@ -308,14 +312,13 @@ class MusicPlayerView(context: Context) : RelativeLayout(context), ScreenView, M
             singer.text = music.singer
             album.text = music.album
 
-            lyricSet = music.getLyric()
+            if (SPManager.getBoolean(SPManager.SP_SHOW_LYRIC)) {
+                lyricSet = music.getLyric()
+                lyric.text = lyricSet?.getLyric(progress)
+            }
         }
 
         index.text = (MediaPlayer.getCurrentIndex() + 1).toString() + "/" + MediaPlayer.getPlayListSize().toString()
-        val progress = MediaPlayer.getProgress()
-        progressBar.setCurrent(progress)
-        lyric.text = lyricSet?.getLyric(progress)
-        progressBar.setMax(MediaPlayer.getDuration())
     }
 
     private fun loadImage(bitmap: Bitmap) {

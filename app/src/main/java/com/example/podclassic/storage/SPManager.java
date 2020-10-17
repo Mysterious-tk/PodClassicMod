@@ -23,6 +23,7 @@ public class SPManager {
     public static final String SP_EQUALIZER = "equalizer";
     public static final String SP_PLAY_MODE = "play_mode";
     public static final String SP_DARK_MODE = "dark_mode";
+    public static final String SP_PLAY_ALL = "play_all";
 
     private static SharedPreferences getSharedPreferences() {
         return PreferenceManager.getDefaultSharedPreferences(BaseApplication.getContext());
@@ -63,6 +64,7 @@ public class SPManager {
     }
 
     public static void reset() {
+        setBoolean(SP_PLAY_ALL, true);
         setBoolean(SP_VIBRATE, true);
         setBoolean(SP_SOUND, true);
         setBoolean(SP_AUDIO_FOCUS, true);

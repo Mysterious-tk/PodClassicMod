@@ -85,8 +85,8 @@ object Core {
     }
 
     fun home() {
-        setTitle(screen!!.currentView)
         screen!!.clearViews()
+        setTitle(screen!!.currentView)
     }
 
     fun refresh() {
