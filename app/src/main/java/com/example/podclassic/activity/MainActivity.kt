@@ -62,7 +62,7 @@ class MainActivity : AppCompatActivity() {
 
         val autoStop = SPManager.getInt(SPManager.AutoStop.SP_NAME)
         if (autoStop != 0) {
-            MediaPlayer.scheduleToStop(autoStop)
+            MediaPlayer.scheduleToStop(SPManager.AutoStop.getMinute(autoStop))
         }
     }
 
