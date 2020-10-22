@@ -25,12 +25,12 @@ object VolumeUtil {
     private var lastVibrateTime = 0L
 
     private var streamId = 0
-    private val soundPool = SoundPool.Builder()
+    private val soundPool by lazy {
+        val pool = SoundPool.Builder()
             .setMaxStreams(1)
             .build()
-
-    fun loadSound() {
-        streamId = soundPool.load(BaseApplication.getContext(), R.raw.click, 0)
+        streamId = pool.load(BaseApplication.getContext(), R.raw.click, 0)
+        pool
     }
 
     private const val VIBRATE_TIME = 40L
@@ -53,24 +53,23 @@ object VolumeUtil {
 
     @Suppress("DEPRECATION")
     fun vibrate() {
-        if (SPManager.getBoolean(SPManager.SP_SOUND)) {
+        val sound = SPManager.getInt(SPManager.Sound.SP_NAME)
+        if (sound and SPManager.Sound.SOUND_ID != 0) {
             soundPool.play(streamId, 1f, 1f, 0, 0, 1f)
         }
-
-        if (!SPManager.getBoolean(SPManager.SP_VIBRATE)) {
-            return
-        }
-        val currentMillis = System.currentTimeMillis()
-        if ((currentMillis - lastVibrateTime) < VIBRATE_TIME) {
-            return
-        } else {
-            lastVibrateTime = currentMillis
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val vibrationEffect = VibrationEffect.createOneShot(VIBRATE_TIME, 15)
-            vibrator.vibrate(vibrationEffect)
-        } else {
-            vibrator.vibrate(VIBRATE_TIME)
+        if (sound and SPManager.Sound.VIBRATE_ID != 0) {
+            val currentMillis = System.currentTimeMillis()
+            if ((currentMillis - lastVibrateTime) < VIBRATE_TIME) {
+                return
+            } else {
+                lastVibrateTime = currentMillis
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val vibrationEffect = VibrationEffect.createOneShot(VIBRATE_TIME, 15)
+                vibrator.vibrate(vibrationEffect)
+            } else {
+                vibrator.vibrate(VIBRATE_TIME)
+            }
         }
     }
 

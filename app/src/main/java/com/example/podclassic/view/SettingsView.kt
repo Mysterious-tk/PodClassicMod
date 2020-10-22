@@ -93,18 +93,20 @@ class SettingsView(context: Context) : ListView(context), ScreenView {
                     listView.getCurrentItem().rightText = if (playAll) "收藏歌曲" else "全部歌曲"
                     return true
                 }
-            }, if (SPManager.getBoolean(SPManager.SP_SHOW_LYRIC))  "全部歌曲" else "收藏歌曲" ),
+            }, if (SPManager.getBoolean(SPManager.SP_PLAY_ALL))  "全部歌曲" else "收藏歌曲" ),
 
             Item("夜间模式", object : OnItemClickListener {
                 override fun onItemClick(index : Int, listView : ListView) : Boolean {
-                    val darkMode = !SPManager.getBoolean(SPManager.SP_DARK_MODE)
-                    Core.setDarkMode(darkMode)
-                    SPManager.setBoolean(SPManager.SP_DARK_MODE, darkMode)
-                    listView.getCurrentItem().rightText = if (darkMode) "打开" else "关闭"
+                    var nightMode = SPManager.getInt(SPManager.NightMode.SP_NAME)
+                    nightMode ++
+                    nightMode %= SPManager.NightMode.values
+                    Core.setNightMode(SPManager.NightMode.nightMode(nightMode))
+                    SPManager.setInt(SPManager.NightMode.SP_NAME, nightMode)
+                    listView.getCurrentItem().rightText = SPManager.NightMode.getString(nightMode)
                     return true
                 }
 
-            }, if (SPManager.getBoolean(SPManager.SP_DARK_MODE)) "打开" else "关闭"),
+            }, SPManager.NightMode.getString(SPManager.getInt(SPManager.NightMode.SP_NAME))),
 
             Item("显示歌词", object : OnItemClickListener {
                 override fun onItemClick(index : Int, listView : ListView) : Boolean {
@@ -123,29 +125,19 @@ class SettingsView(context: Context) : ListView(context), ScreenView {
                     listView.getCurrentItem().rightText = if (audioFocus) "打开" else "关闭"
                     return true
                 }
-
             }, if (SPManager.getBoolean(SPManager.SP_AUDIO_FOCUS))  "关闭" else "打开" ),
 
 
             Item("按键音", object : OnItemClickListener {
                 override fun onItemClick(index : Int, listView: ListView) : Boolean {
-                    val sound = SPManager.getBoolean(SPManager.SP_SOUND)
-                    SPManager.setBoolean(SPManager.SP_SOUND, !sound)
-                    listView.getCurrentItem().rightText = if (sound) "关闭" else "打开"
+                    var sound = SPManager.getInt(SPManager.Sound.SP_NAME)
+                    sound ++
+                    sound %= SPManager.Sound.values
+                    SPManager.setInt(SPManager.Sound.SP_NAME, sound)
+                    listView.getCurrentItem().rightText = SPManager.Sound.getString(sound)
                     return true
                 }
-
-            }, if (SPManager.getBoolean(SPManager.SP_SOUND))  "打开" else "关闭" ),
-
-            Item("振动", object : OnItemClickListener {
-                override fun onItemClick(index : Int, listView: ListView) : Boolean {
-                    val vibrate = SPManager.getBoolean(SPManager.SP_VIBRATE)
-                    SPManager.setBoolean(SPManager.SP_VIBRATE, !vibrate)
-                    listView.getCurrentItem().rightText = if (vibrate) "关闭" else "打开"
-                    return true
-                }
-
-            }, if (SPManager.getBoolean(SPManager.SP_VIBRATE))  "打开" else "关闭" ),
+            }, SPManager.Sound.getString(SPManager.getInt(SPManager.Sound.SP_NAME))),
 
             Item("主题", object : OnItemClickListener {
                 override fun onItemClick(index : Int, listView: ListView) : Boolean {
@@ -155,9 +147,7 @@ class SettingsView(context: Context) : ListView(context), ScreenView {
                     listView.getCurrentItem().rightText = if (theme) "黑色" else "红色"
                     return true
                 }
-
-            }, if (SPManager.getBoolean(
-                    SPManager.SP_THEME))  "红色" else "黑色" ),
+            }, if (SPManager.getBoolean(SPManager.SP_THEME))  "红色" else "黑色" ),
 
             Item("显示时间", object : OnItemClickListener {
                 override fun onItemClick(index : Int, listView: ListView) : Boolean {
@@ -167,6 +157,17 @@ class SettingsView(context: Context) : ListView(context), ScreenView {
                     return true
                 }
             }, if (SPManager.getBoolean(SPManager.SP_SHOW_TIME))  "打开" else "关闭" ),
+
+            Item("启动后自动停止播放", object : OnItemClickListener {
+                override fun onItemClick(index : Int, listView: ListView) : Boolean {
+                    var autoStop = SPManager.getInt(SPManager.AutoStop.SP_NAME)
+                    autoStop ++
+                    autoStop %= SPManager.AutoStop.values
+                    SPManager.setInt(SPManager.AutoStop.SP_NAME, autoStop)
+                    listView.getCurrentItem().rightText = SPManager.AutoStop.getString(autoStop)
+                    return true
+                }
+            }, SPManager.AutoStop.getString(SPManager.getInt(SPManager.AutoStop.SP_NAME))),
 
             Item("Reset All Settings", object : OnItemClickListener {
                 override fun onItemClick(index : Int, listView: ListView) : Boolean {

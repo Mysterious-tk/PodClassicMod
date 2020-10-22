@@ -52,13 +52,18 @@ class MainActivity : AppCompatActivity() {
         }
         initView()
 
-        Core.init(slide_controller, screen, title_bar, dark_mode, this)
+        Core.init(slide_controller, screen, title_bar, night_mode, this)
 
         checkPermission()
 
         initMediaPlayer(intent)
 
         startService(Intent(this, MediaPlayerService::class.java))
+
+        val autoStop = SPManager.getInt(SPManager.AutoStop.SP_NAME)
+        if (autoStop != 0) {
+            MediaPlayer.scheduleToStop(autoStop)
+        }
     }
 
     private fun prepare() {

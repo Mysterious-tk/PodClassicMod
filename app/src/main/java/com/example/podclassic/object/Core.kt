@@ -1,29 +1,14 @@
 package com.example.podclassic.`object`
 
-import android.annotation.SuppressLint
-import android.content.Context
 import android.content.Intent
-import android.os.AsyncTask
-import android.os.Bundle
-import android.util.Log
-import android.view.LayoutInflater
 import android.view.View
-import android.view.ViewGroup
-import android.widget.ImageView
-import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.widget.AppCompatImageView
-import androidx.fragment.app.Fragment
-import com.example.podclassic.R
 import com.example.podclassic.activity.MainActivity
 import com.example.podclassic.base.BaseApplication
 import com.example.podclassic.base.ScreenView
-import com.example.podclassic.fragment.SplashFragment
 import com.example.podclassic.service.MediaPlayerService
 import com.example.podclassic.storage.SPManager
-import com.example.podclassic.storage.SaveMusics
 import com.example.podclassic.util.*
 import com.example.podclassic.view.*
-import java.lang.Exception
 import java.util.*
 import kotlin.system.exitProcess
 
@@ -33,7 +18,7 @@ object Core {
     private var controller : SlideController? = null
     private var titleBar : TitleBar? = null
     private var screen : Screen? = null
-    private var darkMode : View? = null
+    private var nightMode : View? = null
     private var context : MainActivity? = null
 
     fun init(controller: SlideController, screen: Screen, titleBar: TitleBar, darkMode: View, context: MainActivity) {
@@ -41,9 +26,9 @@ object Core {
         this.screen = screen
         this.titleBar = titleBar
         this.context = context
-        this.darkMode = darkMode
+        this.nightMode = darkMode
         setTitle(screen.currentView)
-        setDarkMode(SPManager.getBoolean(SPManager.SP_DARK_MODE))
+        setNightMode(SPManager.NightMode.nightMode(SPManager.getInt(SPManager.NightMode.SP_NAME)))
         controller.onTouchListener = object : SlideController.OnTouchListener {
             override fun onEnterClick(): Boolean { return Core.screen!!.getView().enter() }
             override fun onEnterLongClick(): Boolean { return Core.screen!!.getView().enterLongClick() }
@@ -109,8 +94,8 @@ object Core {
 
     }
 
-    fun setDarkMode(darkMode: Boolean) {
-        this.darkMode?.visibility = if (darkMode) View.VISIBLE else View.GONE
+    fun setNightMode(darkMode: Boolean) {
+        this.nightMode?.visibility = if (darkMode) View.VISIBLE else View.GONE
     }
 
     private var timer : Timer? = null

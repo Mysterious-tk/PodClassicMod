@@ -23,7 +23,6 @@ class SplashFragment : Fragment() {
     private val asyncTask = @SuppressLint("StaticFieldLeak")
     object : AsyncTask<Unit, Unit, Unit>() {
         override fun doInBackground(vararg params: Unit?) {
-            VolumeUtil.loadSound()
             MediaUtil.prepare()
         }
 

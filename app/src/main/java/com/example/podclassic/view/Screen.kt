@@ -21,7 +21,7 @@ class Screen(context: Context, attributeSet: AttributeSet?) : FrameLayout(contex
     private var addAnimator : ObjectAnimator? = null
     private var removeAnimator : ObjectAnimator? = null
 
-    var mainView : ScreenView = MainView(context)
+    private var mainView : ScreenView = MainView(context)
     var currentView : ScreenView = mainView
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
@@ -49,7 +49,6 @@ class Screen(context: Context, attributeSet: AttributeSet?) : FrameLayout(contex
         }
         layoutTransition.setAnimator(LayoutTransition.APPEARING, addAnimator)
         addView(view as View)
-        view.onWindowFocusChanged(true)
     }
 
 
@@ -73,7 +72,6 @@ class Screen(context: Context, attributeSet: AttributeSet?) : FrameLayout(contex
             }
             layoutTransition.setAnimator(LayoutTransition.APPEARING, removeAnimator)
             addView(currentView as View)
-            (currentView as View).onWindowFocusChanged(true)
             return currentView
         }
         return null
@@ -85,7 +83,12 @@ class Screen(context: Context, attributeSet: AttributeSet?) : FrameLayout(contex
         removeAllViews()
         currentView = mainView
         layoutTransition.setAnimator(LayoutTransition.APPEARING, null)
-        addView(currentView as View)
+        addView(mainView as View)
+    }
+
+    override fun addView(child: View?) {
+        super.addView(child)
+        child?.onWindowFocusChanged(true)
     }
 
 }

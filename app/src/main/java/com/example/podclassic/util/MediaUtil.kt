@@ -129,7 +129,7 @@ object MediaUtil {
     private var photoSize: Int? = null
     val photoList by lazy {
         val uri = MediaStore.Images.Media.EXTERNAL_CONTENT_URI
-        val cursor = contentResolver.query(uri, null, null, null, MediaStore.Images.Media.TITLE)
+        val cursor = contentResolver.query(uri, null, null, null, null)
         val list = ArrayList<File>()
         while (cursor!!.moveToNext()) {
             list.add(File(cursor.getString(cursor.getColumnIndex(MediaStore.Images.Media.DATA))))
@@ -142,7 +142,7 @@ object MediaUtil {
     private var videoSize: Int? = null
     val videoList by lazy {
         val uri = MediaStore.Video.Media.EXTERNAL_CONTENT_URI
-        val cursor = contentResolver.query(uri, null, null, null, MediaStore.Video.Media.TITLE)
+        val cursor = contentResolver.query(uri, null, null, null, null)
         val list = arrayListOf<File>()
         while (cursor!!.moveToNext()) {
             list.add(File(cursor.getString(cursor.getColumnIndex(MediaStore.Video.Media.DATA))))
