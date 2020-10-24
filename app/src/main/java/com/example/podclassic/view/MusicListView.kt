@@ -9,14 +9,13 @@ import com.example.podclassic.`object`.MusicList
 import com.example.podclassic.base.ScreenView
 import com.example.podclassic.storage.SaveMusics
 
-class MusicListView(context: Context, private val musicList: ArrayList<Music>, private val name : String) : ListView(context), ScreenView, MediaPlayer.OnMediaChangeListener {
-    constructor(context: Context, musicList : MusicList) : this(context, musicList.list, musicList.name)
+class MusicListView(context: Context, private val musicList: ArrayList<Music>, private val name : String, private val onLongClick : Int = LONG_CLICK_SET_LOVE) : ListView(context), ScreenView, MediaPlayer.OnMediaChangeListener {
+    constructor(context: Context, musicList : MusicList, onLongClick: Int = LONG_CLICK_REMOVE_LOVE) : this(context, musicList.list, musicList.name, onLongClick)
     constructor(context: Context, onLongClick : Int) : this(context, when (onLongClick) {
         LONG_CLICK_REMOVE_LOVE -> SaveMusics.loveList.getMusicList()
         LONG_CLICK_REMOVE_CURRENT -> MusicList("正在播放", MediaPlayer.getPlayList())
         else -> throw Exception()
-    }) {
-        this.onLongClick = onLongClick
+    }, onLongClick) {
         sorted = onLongClick == LONG_CLICK_SET_LOVE
     }
 
@@ -27,8 +26,6 @@ class MusicListView(context: Context, private val musicList: ArrayList<Music>, p
     }
 
     override fun getTitle(): String { return name }
-
-    private var onLongClick = LONG_CLICK_SET_LOVE
 
     init {
         for (music in musicList) {
