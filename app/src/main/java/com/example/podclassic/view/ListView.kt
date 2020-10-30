@@ -11,6 +11,7 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.LinearLayout.VERTICAL
+import com.example.podclassic.storage.SPManager
 import com.example.podclassic.util.Colors
 import com.example.podclassic.util.Icons
 import com.example.podclassic.util.PinyinUtil

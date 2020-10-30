@@ -7,6 +7,7 @@ import com.example.podclassic.`object`.MediaPlayer
 import com.example.podclassic.`object`.Music
 import com.example.podclassic.`object`.MusicList
 import com.example.podclassic.base.ScreenView
+import com.example.podclassic.storage.SPManager
 import com.example.podclassic.storage.SaveMusics
 
 class MusicListView(context: Context, private val musicList: ArrayList<Music>, private val name : String, private val onLongClick : Int = LONG_CLICK_SET_LOVE) : ListView(context), ScreenView, MediaPlayer.OnMediaChangeListener {
@@ -20,7 +21,7 @@ class MusicListView(context: Context, private val musicList: ArrayList<Music>, p
     }
 
     companion object {
-        private const val LONG_CLICK_SET_LOVE = 0
+        const val LONG_CLICK_SET_LOVE = 0
         const val LONG_CLICK_REMOVE_LOVE = 1
         const val LONG_CLICK_REMOVE_CURRENT = 2
     }
@@ -28,9 +29,17 @@ class MusicListView(context: Context, private val musicList: ArrayList<Music>, p
     override fun getTitle(): String { return name }
 
     init {
-        for (music in musicList) {
-            itemList.add(Item(music.name, null, false))
+        val showInfo = SPManager.getBoolean(SPManager.SP_SHOW_INFO)
+        if (showInfo) {
+            for (music in musicList) {
+                itemList.add(Item("${music.name} - ${music.singer} - ${music.album}", null, false))
+            }
+        } else {
+            for (music in musicList) {
+                itemList.add(Item(music.name, null, false))
+            }
         }
+
         sorted = onLongClick == LONG_CLICK_SET_LOVE
     }
 

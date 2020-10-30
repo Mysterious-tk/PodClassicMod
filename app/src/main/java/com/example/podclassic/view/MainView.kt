@@ -154,9 +154,11 @@ class MainView(context: Context) : ListView(context), ScreenView {
                             ); return true
                         }
 
-                    }, true),
+                    }, true)//,
 
-                    Item("所有程序", object : OnItemClickListener {
+
+
+                    /*Item("所有程序", object : OnItemClickListener {
                         inner class App(val name: String, val intent: Intent)
 
                         val appList by lazy {
@@ -209,6 +211,9 @@ class MainView(context: Context) : ListView(context), ScreenView {
                         }
 
                     }, true)
+
+                     */
+
                 )
 
                 override fun onItemClick(index: Int, listView: ListView): Boolean {
@@ -217,6 +222,8 @@ class MainView(context: Context) : ListView(context), ScreenView {
                 }
 
             }, true),
+
+
             Item("设置", object : OnItemClickListener {
                 override fun onItemClick(index: Int, listView: ListView): Boolean {
                     Core.addView(

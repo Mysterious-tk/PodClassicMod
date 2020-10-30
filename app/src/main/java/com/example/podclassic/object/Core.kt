@@ -85,12 +85,6 @@ object Core {
         VolumeUtil.releaseSoundPool()
         exitProcess(0)
 
-        /*
-        val context = BaseApplication.getContext()
-        context.stopService(Intent(context, MediaPlayerService::class.java))
-        MediaPlayer.clearPlayList()
-        home()
-         */
 
     }
 

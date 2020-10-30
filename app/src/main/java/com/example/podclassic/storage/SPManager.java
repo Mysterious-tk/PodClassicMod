@@ -139,6 +139,7 @@ public class SPManager {
     public static final String SP_RESET_COUNT = "reset_count";
     public static final String SP_SHOW_TIME = "show_time";
     public static final String SP_SHOW_LYRIC = "show_lyric";
+    public static final String SP_SHOW_INFO = "show_info";
     public static final String SP_SAVE_FOLDERS = "save_folders";
     public static final String SP_SAVE_SINGERS = "save_singers";
     public static final String SP_SAVE_ALBUMS = "save_albums";
@@ -166,15 +167,6 @@ public class SPManager {
         getSharedPreferences().edit().putInt(sp, value).apply();
     }
 
-    public static long getLong(String sp) {
-        return getSharedPreferences().getLong(sp, 0L);
-    }
-
-    public static void setLong(String sp, long value) {
-        getSharedPreferences().edit().putLong(sp, value).apply();
-    }
-
-
     public static String getString(String sp) {
         return getSharedPreferences().getString(sp, "");
     }
@@ -191,6 +183,7 @@ public class SPManager {
         setBoolean(SP_SHOW_TIME, true);
         setBoolean(SP_SHOW_LYRIC, true);
         setBoolean(SP_THEME, true);
+        setBoolean(SP_SHOW_INFO, false);
         setInt(NightMode.SP_NAME, NightMode.DISABLE_ID);
         setInt(Sound.SP_NAME, Sound.VIBRATE_ID);
         setInt(AutoStop.SP_NAME, AutoStop.DISABLE_ID);

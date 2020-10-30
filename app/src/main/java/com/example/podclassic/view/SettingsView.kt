@@ -149,6 +149,15 @@ class SettingsView(context: Context) : ListView(context), ScreenView {
                 }
             }, if (SPManager.getBoolean(SPManager.SP_THEME))  "红色" else "黑色" ),
 
+            Item("显示歌手及专辑信息", object : OnItemClickListener {
+                override fun onItemClick(index : Int, listView: ListView) : Boolean {
+                    val showInfo = SPManager.getBoolean(SPManager.SP_SHOW_INFO)
+                    SPManager.setBoolean(SPManager.SP_SHOW_INFO, !showInfo)
+                    listView.getCurrentItem().rightText = if (showInfo) "关闭" else "打开"
+                    return true
+                }
+            }, if (SPManager.getBoolean(SPManager.SP_SHOW_INFO))  "打开" else "关闭" ),
+
             Item("显示时间", object : OnItemClickListener {
                 override fun onItemClick(index : Int, listView: ListView) : Boolean {
                     val showTime = SPManager.getBoolean(SPManager.SP_SHOW_TIME)

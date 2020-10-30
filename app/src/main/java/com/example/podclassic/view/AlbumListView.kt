@@ -46,7 +46,7 @@ class AlbumListView : ListView, ScreenView {
         return if (itemList.isEmpty()) {
             false
         } else {
-            Core.addView(MusicListView(context, musicList[index]))
+            Core.addView(MusicListView(context, musicList[index], MusicListView.LONG_CLICK_SET_LOVE))
             true
         }
     }
