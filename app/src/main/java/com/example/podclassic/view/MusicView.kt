@@ -38,6 +38,7 @@ class MusicView(context: Context) : ListView(context), ScreenView {
     }
 
     init {
+
         itemList = arrayListOf(
             Item("歌曲", object : OnItemClickListener {
                 val musicList = MediaUtil.musics

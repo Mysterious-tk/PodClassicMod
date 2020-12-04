@@ -56,7 +56,29 @@ class Music {
 
     constructor(uri : Uri) {
         path = FileUtil.uriToPath(uri)
-        MediaMetadataUtil.getMusicInfo(this)
+        val mediaMetadataRetriever = MediaMetadataRetriever()
+        mediaMetadataRetriever.setDataSource(path)
+
+        val name = mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)
+        if (name == null) {
+            this.name = path.substring(path.lastIndexOf(File.separatorChar) + 1, path.lastIndexOf('.'))
+        } else {
+            this.name = name
+        }
+        val album = mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM)
+        if (album == null) {
+            this.album = Values.NULL
+        } else {
+            this.album = album
+        }
+        val singer = mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)
+        if (singer == null) {
+            this.singer = Values.NULL
+        } else {
+            this.singer = singer
+        }
+
+        mediaMetadataRetriever.release()
     }
 
     fun getLyric() : MediaMetadataUtil.LyricSet? {

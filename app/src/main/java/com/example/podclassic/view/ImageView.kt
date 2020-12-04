@@ -14,6 +14,7 @@ open class ImageView(context: Context, val list : ArrayList<File>, var index : I
     private var currentBitmap : Bitmap? = null
 
     init {
+
         setBackgroundColor(Colors.text)
     }
 
@@ -37,8 +38,8 @@ open class ImageView(context: Context, val list : ArrayList<File>, var index : I
     }
 
     override fun slide(slideVal: Int): Boolean {
-        val sv = (if (slideVal > 0) 1 else if (slideVal < 0) -1 else 0) + index
-        if (sv == index || sv >= list.size || sv < 0) {
+        val sv = slideVal + index
+        if (sv >= list.size || sv < 0) {
             return false
         }
         index = sv

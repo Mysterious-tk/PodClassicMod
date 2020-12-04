@@ -84,8 +84,6 @@ object Core {
         context.stopService(Intent(context, MediaPlayerService::class.java))
         VolumeUtil.releaseSoundPool()
         exitProcess(0)
-
-
     }
 
     fun setNightMode(darkMode: Boolean) {

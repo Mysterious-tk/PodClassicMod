@@ -44,6 +44,7 @@ class Screen(context: Context, attributeSet: AttributeSet?) : FrameLayout(contex
                 viewStack.push(prevView)
             }
             currentView = view
+            layoutTransition.setAnimator(LayoutTransition.DISAPPEARING, null)
             //layoutTransition.setAnimator(LayoutTransition.DISAPPEARING, ObjectAnimator.ofFloat(null, "translationX", 0f, -measuredWidth.toFloat()))
             removeViewAt(0)
         }

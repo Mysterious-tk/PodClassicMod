@@ -71,7 +71,7 @@ class MainActivity : AppCompatActivity() {
         supportFragmentManager
             .beginTransaction()
             .replace(R.id.frame_layout, SplashFragment())
-            .commitAllowingStateLoss()
+            .commit()
     }
 
     override fun onBackPressed() {

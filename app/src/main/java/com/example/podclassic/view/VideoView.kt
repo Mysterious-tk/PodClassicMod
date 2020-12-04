@@ -24,6 +24,8 @@ class VideoView(context: Context, val file : File) : FrameLayout(context), Scree
         addView(videoView, layoutParams)
 
         setBackgroundColor(Colors.text)
+
+        audioFocusManager.requestAudioFocus()
         videoView.setVideoPath(file.toString())
         videoView.setOnErrorListener { _, _, _ -> return@setOnErrorListener true }
         videoView.start()
@@ -62,10 +64,7 @@ class VideoView(context: Context, val file : File) : FrameLayout(context), Scree
     override fun enterLongClick() : Boolean { return false }
 
     override fun slide(slideVal: Int): Boolean {
-        val sv = (if (slideVal > 0) 1 else if (slideVal < 0) -1 else 0) * 10 * 1000
-        if (sv == 0) {
-            return false
-        }
+        val sv = slideVal * 10 * 1000
         var progress = videoView.currentPosition
         val duration = videoView.duration
         if ((progress <= 0 && sv < 0) || (progress >= duration && sv > 0)) {

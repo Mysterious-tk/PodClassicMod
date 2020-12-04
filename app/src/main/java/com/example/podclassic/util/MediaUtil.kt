@@ -1,8 +1,13 @@
 package com.example.podclassic.util
 
+import android.content.ContentResolver
 import android.database.Cursor
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.provider.MediaStore
 import android.text.TextUtils
+import android.util.Log
+import android.widget.Toast
 import com.example.podclassic.`object`.Music
 import com.example.podclassic.`object`.MusicList
 import com.example.podclassic.base.BaseApplication
@@ -10,6 +15,7 @@ import java.io.File
 import java.util.*
 import kotlin.collections.ArrayList
 import kotlin.collections.HashSet
+
 
 object MediaUtil {
     private const val MIN_DURATION = 10 * 1000
@@ -45,37 +51,42 @@ object MediaUtil {
             return
         }
         var uri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
-        var cursor = contentResolver.query(uri, null, null, null, null)
-        while (cursor!!.moveToNext()) {
+        var cursor = contentResolver.query(uri, null, null, null, /*null*/MediaStore.Audio.Media.TITLE + " collate localized")
+        musics.ensureCapacity(cursor!!.count)
+        while (cursor.moveToNext()) {
             val music = buildMusicFromCursor(cursor)
             if (music != null) {
                 musics.add(music)
             }
         }
         cursor.close()
-        musics.sortBy { PinyinUtil.getPinyin(it.name) }
+        //musics.sortBy { PinyinUtil.getPinyin(it.name) }
 
         uri = MediaStore.Audio.Albums.EXTERNAL_CONTENT_URI
-        cursor = contentResolver.query(uri, null, null, null, null)
-        var hashSet = HashSet<MusicList>()
-        while (cursor!!.moveToNext()) {
+        cursor = contentResolver.query(uri, null, null, null, MediaStore.Audio.Albums.ALBUM + " collate localized")
+        var hashSet = HashSet<MusicList>(cursor!!.count)
+        while (cursor.moveToNext()) {
             val name = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Albums.ALBUM))
+            //val id = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Albums.ALBUM_ID))
             if (TextUtils.isEmpty(name)) {
                 continue
             }
             val album = MusicList()
             album.type = MusicList.TYPE_ALBUM
             album.name = name
+            album.id = -1
             hashSet.add(album)
         }
         cursor.close()
-        albums.addAll(hashSet)
-        albums.sortBy { PinyinUtil.getPinyin(it.name) }
 
-        hashSet = HashSet<MusicList>()
+        albums.addAll(hashSet)
+        //albums.sortBy { PinyinUtil.getPinyin(it.name) }
+
+
         uri = MediaStore.Audio.Artists.EXTERNAL_CONTENT_URI
-        cursor = contentResolver.query(uri, null, null, null, null)
-        while (cursor!!.moveToNext()) {
+        cursor = contentResolver.query(uri, null, null, null, MediaStore.Audio.Artists.ARTIST + " collate localized")
+        hashSet = HashSet(cursor!!.count)
+        while (cursor.moveToNext()) {
             val name = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Artists.ARTIST))
             if (TextUtils.isEmpty(name)) {
                 continue
@@ -87,15 +98,17 @@ object MediaUtil {
         }
         cursor.close()
         singers.addAll(hashSet)
-        singers.sortBy { PinyinUtil.getPinyin(it.name) }
+        //singers.sortBy { PinyinUtil.getPinyin(it.name) }
         prepared = true
+
+        System.gc()
     }
 
     fun searchMusic(selection : String?, selectionArgs : Array<String>) : ArrayList<Music>{
         val uri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
-        val cursor = contentResolver.query(uri, null, selection, selectionArgs, null)
-        val result = ArrayList<Music>()
-        while (cursor!!.moveToNext()) {
+        val cursor = contentResolver.query(uri, null, selection, selectionArgs, MediaStore.Audio.Media.TITLE + " collate localized")
+        val result = ArrayList<Music>(cursor!!.count)
+        while (cursor.moveToNext()) {
             val music = buildMusicFromCursor(cursor)
             if (music != null) {
                 result.add(music)
@@ -107,17 +120,19 @@ object MediaUtil {
     }
 
     fun searchAlbum(by : String?, target: String?): ArrayList<MusicList> {
-        val list = HashSet<MusicList>()
         val uri = MediaStore.Audio.Albums.EXTERNAL_CONTENT_URI
-        val cursor = contentResolver.query(uri, null, if (by == null) null else "$by=?", if (target == null) null else arrayOf(target), null)
-        while (cursor!!.moveToNext()) {
+        val cursor = contentResolver.query(uri, null, if (by == null) null else "$by=?", if (target == null) null else arrayOf(target), MediaStore.Audio.Media.TITLE + " collate localized")
+        val list = HashSet<MusicList>(cursor!!.count)
+        while (cursor.moveToNext()) {
             val name = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Albums.ALBUM))
+            val id = cursor.getInt(cursor.getColumnIndex(MediaStore.Audio.Albums.ALBUM_ID))
             if (TextUtils.isEmpty(name)) {
                 continue
             }
             val album = MusicList()
             album.type = MusicList.TYPE_ALBUM
             album.name = name
+            album.id = id
             list.add(album)
         }
         cursor.close()
@@ -130,8 +145,8 @@ object MediaUtil {
     val photoList by lazy {
         val uri = MediaStore.Images.Media.EXTERNAL_CONTENT_URI
         val cursor = contentResolver.query(uri, null, null, null, null)
-        val list = ArrayList<File>()
-        while (cursor!!.moveToNext()) {
+        val list = ArrayList<File>(cursor!!.count)
+        while (cursor.moveToNext()) {
             list.add(File(cursor.getString(cursor.getColumnIndex(MediaStore.Images.Media.DATA))))
         }
         cursor.close()
@@ -143,8 +158,8 @@ object MediaUtil {
     val videoList by lazy {
         val uri = MediaStore.Video.Media.EXTERNAL_CONTENT_URI
         val cursor = contentResolver.query(uri, null, null, null, null)
-        val list = arrayListOf<File>()
-        while (cursor!!.moveToNext()) {
+        val list = ArrayList<File>(cursor!!.count)
+        while (cursor.moveToNext()) {
             list.add(File(cursor.getString(cursor.getColumnIndex(MediaStore.Video.Media.DATA))))
         }
         cursor.close()

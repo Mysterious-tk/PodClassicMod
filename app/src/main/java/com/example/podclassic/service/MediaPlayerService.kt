@@ -82,7 +82,7 @@ class MediaPlayerService : Service(), MediaPlayer.OnMediaChangeListener, AudioFo
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            val channel = NotificationChannel(packageName, packageName, NotificationManager.IMPORTANCE_LOW)
+            val channel = NotificationChannel(packageName, "播放控制", NotificationManager.IMPORTANCE_LOW)
             channel.setSound(null, null)
             notificationManager.createNotificationChannel(channel)
         }
@@ -167,7 +167,6 @@ class MediaPlayerService : Service(), MediaPlayer.OnMediaChangeListener, AudioFo
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             pendingIntent = PendingIntent.getForegroundService(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT)
             action = Notification.Action.Builder(Icon.createWithResource(this, R.drawable.ic_close_grey_800_24dp), "stop", pendingIntent).build()
-
         } else {
             pendingIntent = PendingIntent.getService(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT)
             action = Notification.Action.Builder(R.drawable.ic_close_grey_800_24dp, "stop", pendingIntent).build()
@@ -191,7 +190,6 @@ class MediaPlayerService : Service(), MediaPlayer.OnMediaChangeListener, AudioFo
                     }
                     sendNotification()
                 }
-
             }
             else -> sendNotification()
         }
@@ -244,6 +242,8 @@ class MediaPlayerService : Service(), MediaPlayer.OnMediaChangeListener, AudioFo
         builder.setContentText(music.singer)
 
         builder.setColor(Colors.color_primary)
+
+        builder.setVisibility(Notification.VISIBILITY_PUBLIC)
 
         val notification = builder.build()
         notification.flags = Notification.FLAG_ONGOING_EVENT

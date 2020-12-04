@@ -8,15 +8,12 @@ import android.content.IntentFilter
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.os.BatteryManager
-import android.os.Build
 import android.util.AttributeSet
-import android.util.Log
 import android.view.Gravity
 import android.view.View
 import android.widget.FrameLayout
 import android.widget.ImageView
 import com.example.podclassic.`object`.MediaPlayer
-import com.example.podclassic.activity.MainActivity
 import com.example.podclassic.util.Colors
 import com.example.podclassic.util.Icons
 import com.example.podclassic.util.ThreadUtil
@@ -37,10 +34,10 @@ class TitleBar(context: Context, attributeSet: AttributeSet) : FrameLayout(conte
     init {
         setBackgroundColor(Colors.white)
         val layoutParams1 = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT)
-        layoutParams1.gravity = Gravity.LEFT
+        layoutParams1.gravity = Gravity.START
         addView(playState, layoutParams1)
         val layoutParams2 = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT)
-        layoutParams2.gravity = Gravity.RIGHT
+        layoutParams2.gravity = Gravity.END
         addView(battery, layoutParams2)
         val layoutParams3 = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT)
         layoutParams3.gravity = Gravity.CENTER
@@ -49,32 +46,17 @@ class TitleBar(context: Context, attributeSet: AttributeSet) : FrameLayout(conte
         addView(title, layoutParams3)
     }
 
-    private var timer : Timer? = null
     @SuppressLint("SimpleDateFormat")
     private val simpleDateFormat = SimpleDateFormat("HH:mm")
 
-    private fun setTimer() {
-        if (timer == null) {
-            timer = Timer()
-            timer!!.schedule(object : TimerTask() {
-                override fun run() {
-                    ThreadUtil.runOnUiThread(Runnable { title.text = simpleDateFormat.format(Date()) })
-                }
-            }, 0, 60 * 1000)
-        }
-    }
-
-    private fun cancelTimer() {
-        timer?.cancel()
-        timer = null
-    }
-
     fun showTime() {
-        setTimer()
+        showTime = true
+        registerTimeBroadcastReceiver()
     }
 
     fun showTitle(title : String) {
-        cancelTimer()
+        showTime = false
+        unregisterTimeBroadcastReceiver()
         this.title.text = title
     }
 
@@ -87,19 +69,23 @@ class TitleBar(context: Context, attributeSet: AttributeSet) : FrameLayout(conte
             playState.setImageDrawable(if (MediaPlayer.getCurrent() == null) null else Icons.PAUSE_BLUE.drawable)
         }
     }
-    private var broadcastReceiverRegistered = false
+    private var batteryBroadcastReceiverRegistered = false
+    private var timeBroadcastReceiverRegistered = false
+    private var showTime = false
 
     private fun onStart() {
         MediaPlayer.addOnMediaChangeListener(this)
-        registerBroadcastReceiver()
-        setTimer()
+        registerBatteryBroadcastReceiver()
+        if (showTime) {
+            registerTimeBroadcastReceiver()
+        }
         onPlayStateChange()
     }
 
     private fun onStop() {
         MediaPlayer.removeOnMediaChangeListener(this)
-        unregisterBroadcastReceiver()
-        cancelTimer()
+        unregisterBatteryBroadcastReceiver()
+        unregisterTimeBroadcastReceiver()
     }
 
     override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
@@ -125,21 +111,43 @@ class TitleBar(context: Context, attributeSet: AttributeSet) : FrameLayout(conte
         canvas?.drawRect(0f, height - 1f, width.toFloat(), height.toFloat(), paint)
     }
 
-    private fun registerBroadcastReceiver() {
-        if (!broadcastReceiverRegistered) {
+    private fun registerBatteryBroadcastReceiver() {
+        if (!batteryBroadcastReceiverRegistered) {
             val intentFilter = IntentFilter()
             intentFilter.addAction(Intent.ACTION_BATTERY_CHANGED)
             context.registerReceiver(batteryBroadcastReceiver, intentFilter)
-            broadcastReceiverRegistered = true
+            batteryBroadcastReceiverRegistered = true
         }
     }
 
-    private fun unregisterBroadcastReceiver() {
-        if (broadcastReceiverRegistered) {
+    private fun unregisterBatteryBroadcastReceiver() {
+        if (batteryBroadcastReceiverRegistered) {
             context.unregisterReceiver(batteryBroadcastReceiver)
-            broadcastReceiverRegistered = false
+            batteryBroadcastReceiverRegistered = false
         }
+    }
 
+    private fun registerTimeBroadcastReceiver() {
+        if (!timeBroadcastReceiverRegistered) {
+            val intentFilter = IntentFilter()
+            intentFilter.addAction(Intent.ACTION_TIME_TICK)
+            context.registerReceiver(timeBroadcastReceiver, intentFilter)
+            timeBroadcastReceiverRegistered = true
+            title.text = simpleDateFormat.format(Date())
+        }
+    }
+
+    private fun unregisterTimeBroadcastReceiver() {
+        if (timeBroadcastReceiverRegistered) {
+            context.unregisterReceiver(timeBroadcastReceiver)
+            timeBroadcastReceiverRegistered = false
+        }
+    }
+
+    private val timeBroadcastReceiver : BroadcastReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            title.text = simpleDateFormat.format(Date())
+        }
     }
 
     private val batteryBroadcastReceiver : BroadcastReceiver = object : BroadcastReceiver() {

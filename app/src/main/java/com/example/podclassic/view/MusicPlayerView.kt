@@ -231,7 +231,6 @@ class MusicPlayerView(context: Context) : RelativeLayout(context), ScreenView, M
     }
 
     override fun slide(slideVal: Int) : Boolean {
-        val sv = if (slideVal > 0) 1 else if (slideVal < 0) -1 else 0
         val currentTime = System.currentTimeMillis()
 
         if (currentTime - prevTimerSetTime >= 1000) {
@@ -257,11 +256,11 @@ class MusicPlayerView(context: Context) : RelativeLayout(context), ScreenView, M
             var curVolume = VolumeUtil.getCurrentVolume()
             val maxVolume = VolumeUtil.maxVolume
 
-            if ((curVolume == 0 && sv < 0) || (curVolume == maxVolume && sv > 0)) {
+            if ((curVolume == 0 && slideVal < 0) || (curVolume == maxVolume && slideVal > 0)) {
                 return false
             }
 
-            curVolume += sv
+            curVolume += slideVal
             VolumeUtil.setCurrentVolume(curVolume)
             volumeBar.setCurrent(curVolume)
             return true

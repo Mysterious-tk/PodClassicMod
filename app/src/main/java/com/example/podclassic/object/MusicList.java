@@ -1,7 +1,17 @@
 package com.example.podclassic.object;
 
+import android.database.Cursor;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.net.Uri;
+import android.util.Log;
+
+import com.example.podclassic.R;
+import com.example.podclassic.base.BaseApplication;
 import com.example.podclassic.storage.SaveMusics;
 import com.example.podclassic.util.MediaUtil;
+
+import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
 
@@ -9,6 +19,8 @@ import java.util.ArrayList;
 
 public class MusicList {
     public String name;
+    public int id;
+
     public int size;
     public int type = 0;
 
@@ -16,7 +28,6 @@ public class MusicList {
     public static final int TYPE_ALBUM = 2;
 
     private ArrayList<Music> list;
-
     public ArrayList<Music> getList() {
         if (list == null) {
             if (type == TYPE_SINGER) {
@@ -46,6 +57,26 @@ public class MusicList {
         return size;
     }
 
+    public Bitmap getImage() {
+        String uriAlbums = "content://media/external/audio/albums";
+        String[] projection = new String[]{"album_art"};
+        Cursor cursor = BaseApplication.getContext().getContentResolver().query(Uri.parse(uriAlbums + "/" + id), projection, null, null, null);
+        String image = null;
+
+
+        if (cursor.getCount() > 0) {
+            cursor.moveToNext();
+            image = cursor.getString(0);
+            cursor.close();
+        }
+
+        if (image == null) {
+            return null;
+        }
+        return BitmapFactory.decodeFile(image);
+    }
+
+    @NotNull
     @Override
     public String toString() {
         return name + size;

@@ -221,6 +221,8 @@ public class MediaMetadataUtil {
         } catch (Exception ignored) { }
     }
 
+    // */
+
     public static int getIntForMp3(byte[] bytes) {
         return bytes[0] << 24 | bytes[1] << 16 | bytes[2] << 8 | bytes[3];
     }

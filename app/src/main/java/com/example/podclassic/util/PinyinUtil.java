@@ -3,7 +3,11 @@ package com.example.podclassic.util;
 import android.text.TextUtils;
 
 import java.text.Collator;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Locale;
 
 public class PinyinUtil {
@@ -451,11 +455,11 @@ public class PinyinUtil {
                     asc = bytes[0];
                 }
                 if (bytes.length == 2) {
-                    int hightByte = 256 + bytes[0];
+                    int highByte = 256 + bytes[0];
                     int lowByte = 256 + bytes[1];
-                    asc = (256 * hightByte + lowByte) - 256 * 256;
+                    asc = (256 * highByte + lowByte) - 256 * 256;
                 }
-            } catch (Exception e) { }
+            } catch (Exception ignored) { }
             return asc;
         }
 

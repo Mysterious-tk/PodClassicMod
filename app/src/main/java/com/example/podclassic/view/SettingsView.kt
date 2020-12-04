@@ -27,7 +27,7 @@ class SettingsView(context: Context) : ListView(context), ScreenView {
                     val statFs = StatFs(Environment.getDataDirectory().path)
                     val blockSizeLong = statFs.blockSizeLong
                     Core.addView(ItemListView(context, arrayListOf(
-                        Item(Values.IPOD, null, false),
+                        Item(Values.POD, null, false),
                         Item("歌曲", null, MediaUtil.musics.size.toString()),
                         Item("视频", null, MediaUtil.getVideoSize().toString()),
                         Item("照片", null, MediaUtil.getPhotoSize().toString()),
@@ -108,16 +108,6 @@ class SettingsView(context: Context) : ListView(context), ScreenView {
 
             }, SPManager.NightMode.getString(SPManager.getInt(SPManager.NightMode.SP_NAME))),
 
-            Item("显示歌词", object : OnItemClickListener {
-                override fun onItemClick(index : Int, listView : ListView) : Boolean {
-                    val showLyric = SPManager.getBoolean(SPManager.SP_SHOW_LYRIC)
-                    SPManager.setBoolean(SPManager.SP_SHOW_LYRIC, !showLyric)
-                    listView.getCurrentItem().rightText = if (showLyric) "关闭" else "打开"
-                    return true
-                }
-
-            }, if (SPManager.getBoolean(SPManager.SP_SHOW_LYRIC))  "打开" else "关闭" ),
-
             Item("与其它应用同时播放", object : OnItemClickListener {
                 override fun onItemClick(index : Int, listView : ListView) : Boolean {
                     val audioFocus = SPManager.getBoolean(SPManager.SP_AUDIO_FOCUS)
@@ -148,6 +138,16 @@ class SettingsView(context: Context) : ListView(context), ScreenView {
                     return true
                 }
             }, if (SPManager.getBoolean(SPManager.SP_THEME))  "红色" else "黑色" ),
+
+            Item("显示歌词", object : OnItemClickListener {
+                override fun onItemClick(index : Int, listView : ListView) : Boolean {
+                    val showLyric = SPManager.getBoolean(SPManager.SP_SHOW_LYRIC)
+                    SPManager.setBoolean(SPManager.SP_SHOW_LYRIC, !showLyric)
+                    listView.getCurrentItem().rightText = if (showLyric) "关闭" else "打开"
+                    return true
+                }
+
+            }, if (SPManager.getBoolean(SPManager.SP_SHOW_LYRIC))  "打开" else "关闭" ),
 
             Item("显示歌手及专辑信息", object : OnItemClickListener {
                 override fun onItemClick(index : Int, listView: ListView) : Boolean {
@@ -182,7 +182,7 @@ class SettingsView(context: Context) : ListView(context), ScreenView {
                 override fun onItemClick(index : Int, listView: ListView) : Boolean {
                     Core.addView(ItemListView(context, arrayListOf(
                         Item("Cancel", object : OnItemClickListener { override fun onItemClick(index: Int, listView: ListView) : Boolean { Core.removeView(); return true } }, false),
-                        Item("Reset", object : OnItemClickListener { override fun onItemClick(index: Int, listView: ListView) : Boolean { SPManager.reset();Core.removeView(); return true } }, false)
+                        Item("Reset", object : OnItemClickListener { override fun onItemClick(index: Int, listView: ListView) : Boolean { SPManager.reset();Core.exit(); return true } }, false)
                     ), "Reset All", null))
                     return true
                 }

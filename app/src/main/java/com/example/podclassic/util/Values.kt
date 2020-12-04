@@ -6,7 +6,7 @@ import com.example.podclassic.storage.SPManager
 
 
 object Values {
-    val IPOD = "iPod"
+    const val POD = "iPod"
 
     const val NULL = "空"
     const val RESOLUTION_HIGH = 1440

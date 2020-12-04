@@ -1,14 +1,7 @@
 package com.example.podclassic.view
 
-import android.annotation.SuppressLint
-import android.content.ComponentName
 import android.content.Context
-import android.content.Intent
-import android.content.pm.PackageInfo
-import android.content.pm.PackageManager
-import android.content.pm.ResolveInfo
 import android.os.Environment
-import android.text.TextUtils
 import com.example.podclassic.`object`.Core
 import com.example.podclassic.`object`.MediaPlayer
 import com.example.podclassic.base.ScreenView
@@ -22,7 +15,7 @@ import java.io.File
 
 
 class MainView(context: Context) : ListView(context), ScreenView {
-    companion object { val TITLE = Values.IPOD }
+    companion object { val TITLE = Values.POD }
 
     override fun getTitle(): String { return TITLE }
 
@@ -35,6 +28,14 @@ class MainView(context: Context) : ListView(context), ScreenView {
 
     init {
         itemList = arrayListOf(
+
+            Item("CoverFlow", object : OnItemClickListener {
+                override fun onItemClick(index: Int, listView: ListView): Boolean {
+                    Core.addView(CoverFlowView(context))
+                    return true
+                }
+            }, true),
+
             Item("音乐", object : OnItemClickListener {
                 override fun onItemClick(index: Int, listView: ListView): Boolean {
                     Core.addView(MusicView(context))

@@ -140,6 +140,7 @@ class SlideController : View {
                 val slideVal = if (prevPoint.isEmpty()) TouchPoint.calcSlideVal(startPoint, curPoint) else TouchPoint.calcSlideVal(prevPoint, curPoint)
                 if (startPoint.inCircle && curPoint.inCircle) {
                     if (!prevPoint.isEmpty() && slideVal != 0) {
+                        //如果slideVal = 0 不会调用slide方法
                         slide(slideVal)
                         startPoint.slided= true
                         cancelTimer()
@@ -197,7 +198,8 @@ class SlideController : View {
              * 大于0：next，等于0：未移动，小于0：prev
              */
             private fun calcSlideVal(prevDeg : Int, curDeg : Int) : Int {
-                if (abs(prevDeg - curDeg) >= SLIDE_VAL * 4) {
+                val minus = prevDeg - curDeg
+                if (abs(minus) >= SLIDE_VAL * 4 || minus == 0) {
                     return 0
                 }
                 if ((prevDeg == 360 - SLIDE_VAL || prevDeg == 360 - SLIDE_VAL * 2 || prevDeg == 360 - SLIDE_VAL * 3) && curDeg == 0) {
@@ -205,7 +207,7 @@ class SlideController : View {
                 } else if (prevDeg == 0 && (curDeg == 360 - SLIDE_VAL || curDeg == 360 - SLIDE_VAL * 2 || curDeg == 360 - SLIDE_VAL * 3)) {
                     return 1
                 }
-                return  prevDeg - curDeg
+                return if (minus > 0) 1 else -1
             }
 
             fun calcSlideVal(prevPoint : TouchPoint, curPoint : TouchPoint) : Int {
@@ -272,7 +274,7 @@ class SlideController : View {
             return
         }
         if (onTouchListener?.onEnterClick() == true) {
-            VolumeUtil.vibrate()
+            VolumeUtil.vibrate(this)
         }
     }
 
@@ -281,7 +283,7 @@ class SlideController : View {
             return
         }
         if (Core.removeView()) {
-            VolumeUtil.vibrate()
+            VolumeUtil.vibrate(this)
         }
     }
 
@@ -290,7 +292,7 @@ class SlideController : View {
             return
         }
         MediaPlayer.prev()
-        VolumeUtil.vibrate()
+        VolumeUtil.vibrate(this)
     }
 
     private fun onNextClicked() {
@@ -298,7 +300,7 @@ class SlideController : View {
             return
         }
         MediaPlayer.next()
-        VolumeUtil.vibrate()
+        VolumeUtil.vibrate(this)
     }
 
 
@@ -307,7 +309,7 @@ class SlideController : View {
             return
         }
         if (onTouchListener?.onSlide(slideVal) == true) {
-            VolumeUtil.vibrate()
+            VolumeUtil.vibrate(this)
         }
     }
 
@@ -317,7 +319,7 @@ class SlideController : View {
             return
         }
         MediaPlayer.pause()
-        VolumeUtil.vibrate()
+        VolumeUtil.vibrate(this)
     }
 
     private fun onEnterLongClicked() {
@@ -325,7 +327,7 @@ class SlideController : View {
             return
         }
         if (onTouchListener?.onEnterLongClick() == true) {
-            VolumeUtil.vibrate()
+            VolumeUtil.vibrate(this)
         }
     }
 
@@ -334,7 +336,7 @@ class SlideController : View {
             return
         }
         MediaPlayer.forward()
-        VolumeUtil.vibrate()
+        VolumeUtil.vibrate(this)
     }
 
     private fun onPauseLongClicked() {}
@@ -344,7 +346,7 @@ class SlideController : View {
             return
         }
         MediaPlayer.backward()
-        VolumeUtil.vibrate()
+        VolumeUtil.vibrate(this)
     }
 
     private fun onMenuLongClicked() {
@@ -353,7 +355,7 @@ class SlideController : View {
         }
         Core.home()
         cancelTimer()
-        VolumeUtil.vibrate()
+        VolumeUtil.vibrate(this)
     }
 
     var onTouchListener : OnTouchListener? = null

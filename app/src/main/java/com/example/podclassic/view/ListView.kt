@@ -33,7 +33,7 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
     constructor(context: Context) : this(context, DEFAULT_MAX_SIZE)
 
     private val linearLayout = LinearLayout(context)
-    private val itemViewList = ArrayList<ItemView>()
+    private val itemViewList = ArrayList<ItemView>(DEFAULT_MAX_SIZE)
 
     private val scrollBar = ScrollBar(context)
 
@@ -43,7 +43,7 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
         linearLayout.orientation = VERTICAL
         this.addView(linearLayout)
         val scrollBarLayoutParams = LayoutParams(LayoutParams.WRAP_CONTENT,LayoutParams.MATCH_PARENT)
-        scrollBarLayoutParams.gravity = Gravity.RIGHT
+        scrollBarLayoutParams.gravity = Gravity.END
         this.addView(scrollBar, scrollBarLayoutParams)
         for (i in 0 until MAX_SIZE) {
             val itemView = ItemView(context)
@@ -409,7 +409,7 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
             val layoutParams1 = LayoutParams(LayoutParams.MATCH_PARENT,LayoutParams.MATCH_PARENT)
             val layoutParams2 = LayoutParams(LayoutParams.WRAP_CONTENT,LayoutParams.MATCH_PARENT)
 
-            layoutParams2.gravity = Gravity.RIGHT
+            layoutParams2.gravity = Gravity.END
 
             addView(leftText, layoutParams1)
             addView(rightText, layoutParams2)
