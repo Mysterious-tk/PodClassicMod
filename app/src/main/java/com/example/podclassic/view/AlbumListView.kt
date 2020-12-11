@@ -5,6 +5,7 @@ import com.example.podclassic.`object`.Core
 import com.example.podclassic.`object`.MusicList
 import com.example.podclassic.base.ScreenView
 import com.example.podclassic.storage.SaveMusicLists
+import com.example.podclassic.widget.ListView
 
 class AlbumListView : ListView, ScreenView {
     companion object {

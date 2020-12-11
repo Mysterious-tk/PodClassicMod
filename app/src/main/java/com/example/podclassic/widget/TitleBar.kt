@@ -1,4 +1,4 @@
-package com.example.podclassic.view
+package com.example.podclassic.widget
 
 import android.annotation.SuppressLint
 import android.content.BroadcastReceiver
@@ -16,7 +16,6 @@ import android.widget.ImageView
 import com.example.podclassic.`object`.MediaPlayer
 import com.example.podclassic.util.Colors
 import com.example.podclassic.util.Icons
-import com.example.podclassic.util.ThreadUtil
 import com.example.podclassic.util.Values
 import com.example.podclassic.util.Values.DEFAULT_PADDING
 import java.text.SimpleDateFormat
@@ -29,7 +28,8 @@ class TitleBar(context: Context, attributeSet: AttributeSet) : FrameLayout(conte
 
     private var title = TextView(context)
     private var  playState = ImageView(context)
-    private var battery = BatteryView(context)
+    private var battery =
+        BatteryView(context)
 
     init {
         setBackgroundColor(Colors.white)

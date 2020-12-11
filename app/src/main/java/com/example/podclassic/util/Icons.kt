@@ -26,6 +26,7 @@ object Icons {
     val VOLUME_DOWN by lazy { Icon(BaseApplication.getContext().getDrawable(R.drawable.ic_volume_down_grey_600_18dp)!!) }
     val VOLUME_UP by lazy { Icon(BaseApplication.getContext().getDrawable(R.drawable.ic_volume_up_grey_600_18dp)!!) }
     val STOP_TIME by lazy { Icon(BaseApplication.getContext().getDrawable(R.drawable.ic_access_time_grey_600_18dp)!!) }
+    val DEFAULT by lazy {Icon(BaseApplication.getContext().getDrawable(R.drawable.ic_default)!!)}
 
 
 

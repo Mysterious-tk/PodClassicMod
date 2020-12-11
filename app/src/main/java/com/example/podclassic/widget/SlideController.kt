@@ -1,4 +1,4 @@
-package com.example.podclassic.view
+package com.example.podclassic.widget
 
 import android.annotation.SuppressLint
 import android.content.Context
@@ -17,7 +17,6 @@ import com.example.podclassic.util.Icons.PREV
 import com.example.podclassic.util.ThreadUtil
 import com.example.podclassic.util.VolumeUtil
 import java.util.*
-import kotlin.concurrent.timer
 import kotlin.math.abs
 import kotlin.math.sqrt
 
@@ -53,10 +52,12 @@ class SlideController : View {
         val x = MeasureSpec.getSize(widthMeasureSpec)
         //var y = MeasureSpec.getSize(heightMeasureSpec)
         centerX = x / 2f
-        centerY = centerX
+        centerY =
+            centerX
 
         minR = centerX / 16 * 5
-        maxR = centerX
+        maxR =
+            centerX
 
         setMeasuredDimension(x, x)
     }
@@ -66,19 +67,26 @@ class SlideController : View {
 
         paint.isAntiAlias = true
         paint.color = Colors.controller
-        canvas?.drawCircle(centerX, centerY, centerX, paint)
+        canvas?.drawCircle(
+            centerX,
+            centerY,
+            centerX, paint)
         paint.color = Colors.color_primary
-        canvas?.drawCircle(centerX, centerY, centerX / 16 * 5, paint)
+        canvas?.drawCircle(
+            centerX,
+            centerY, centerX / 16 * 5, paint)
 
         canvas?.drawBitmap(MENU.bitmap, centerX - MENU.width / 2, (centerY / 3) - MENU.height , paint)
         canvas?.drawBitmap(PREV.bitmap, (centerX / 4) - PREV.width, centerY - PREV.height / 2, paint)
-        canvas?.drawBitmap(NEXT.bitmap, ( - centerX / 4 + 2 * centerX), centerY - NEXT.height / 2, paint)
-        canvas?.drawBitmap(PAUSE.bitmap, centerX - PAUSE.width / 2, ( - centerY / 4 + 2 * centerY), paint)
+        canvas?.drawBitmap(NEXT.bitmap, ( -centerX / 4 + 2 * centerX), centerY - NEXT.height / 2, paint)
+        canvas?.drawBitmap(PAUSE.bitmap, centerX - PAUSE.width / 2, ( -centerY / 4 + 2 * centerY), paint)
 
     }
 
-    private var startPoint : TouchPoint = TouchPoint.emptyTouchPoint()
-    private var prevPoint : TouchPoint = TouchPoint.emptyTouchPoint()
+    private var startPoint : TouchPoint =
+        TouchPoint.emptyTouchPoint()
+    private var prevPoint : TouchPoint =
+        TouchPoint.emptyTouchPoint()
     private var touchTimer : Timer? = null
 
     private fun cancelTimer() {
@@ -123,7 +131,11 @@ class SlideController : View {
             return super.onTouchEvent(event)
         }
 
-        val curPoint = TouchPoint(event.x, event.y, System.currentTimeMillis())
+        val curPoint = TouchPoint(
+            event.x,
+            event.y,
+            System.currentTimeMillis()
+        )
 
         if (curPoint.r > maxR) {
             return super.onTouchEvent(event)
@@ -137,7 +149,13 @@ class SlideController : View {
             }
 
             MotionEvent.ACTION_MOVE -> {
-                val slideVal = if (prevPoint.isEmpty()) TouchPoint.calcSlideVal(startPoint, curPoint) else TouchPoint.calcSlideVal(prevPoint, curPoint)
+                val slideVal = if (prevPoint.isEmpty()) TouchPoint.calcSlideVal(
+                    startPoint,
+                    curPoint
+                ) else TouchPoint.calcSlideVal(
+                    prevPoint,
+                    curPoint
+                )
                 if (startPoint.inCircle && curPoint.inCircle) {
                     if (!prevPoint.isEmpty() && slideVal != 0) {
                         //如果slideVal = 0 不会调用slide方法
@@ -190,8 +208,12 @@ class SlideController : View {
 
         companion object {
 
-            fun emptyTouchPoint() : TouchPoint{
-                return TouchPoint(0f, 0f, 0L)
+            fun emptyTouchPoint() : TouchPoint {
+                return TouchPoint(
+                    0f,
+                    0f,
+                    0L
+                )
             }
 
             /**
@@ -212,7 +234,10 @@ class SlideController : View {
 
             fun calcSlideVal(prevPoint : TouchPoint, curPoint : TouchPoint) : Int {
 
-                return calcSlideVal(prevPoint.deg, curPoint.deg)
+                return calcSlideVal(
+                    prevPoint.deg,
+                    curPoint.deg
+                )
             }
         }
 

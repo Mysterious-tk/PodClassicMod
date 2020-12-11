@@ -1,23 +1,24 @@
 package com.example.podclassic.view
 
 import android.content.Context
-import android.content.Intent
-import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.FileProvider
 import com.example.podclassic.`object`.Core
 import com.example.podclassic.`object`.MediaPlayer
 import com.example.podclassic.`object`.Music
-import com.example.podclassic.activity.MainActivity
 import com.example.podclassic.base.ScreenView
 import com.example.podclassic.storage.SaveMusicLists
 import com.example.podclassic.storage.SaveMusics
 import com.example.podclassic.util.FileUtil
+import com.example.podclassic.util.MediaUtil
+import com.example.podclassic.widget.ListView
 import java.io.File
+import java.text.Collator
+import java.util.*
+import kotlin.collections.ArrayList
 
 
 class FileView(context: Context, val file: File) : ListView(context), ScreenView {
 
-    var hasAudio = false
+    private var hasAudio = false
     val list: ArrayList<File> = file.let{
         val arrayList = ArrayList<File>()
         val array = file.listFiles()
@@ -28,7 +29,8 @@ class FileView(context: Context, val file: File) : ListView(context), ScreenView
                 }
             }
         }
-        arrayList.sortBy { com.example.podclassic.util.PinyinUtil.getPinyin(it.name) }
+        val collator = Collator.getInstance(Locale.CHINA)
+        arrayList.sortWith(Comparator { o1, o2 -> collator.compare(o1?.name, o2?.name) })
         arrayList
     }
 

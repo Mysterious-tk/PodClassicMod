@@ -17,19 +17,19 @@
         android:layout_above="@id/slide_controller"
         android:id="@+id/frame_layout">
 
-        <com.example.podclassic.view.TitleBar
+        <com.example.podclassic.widget.TitleBar
             android:layout_width="match_parent"
             android:layout_height="24dp"
             android:id="@+id/title_bar" />
 
-        <com.example.podclassic.view.Screen
+        <com.example.podclassic.widget.Screen
             android:layout_marginTop="24dp"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:id="@+id/screen" />
     </FrameLayout>
 
-    <com.example.podclassic.view.SlideController
+    <com.example.podclassic.widget.SlideController
         android:layout_alignParentBottom="true"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

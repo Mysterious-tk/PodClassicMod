@@ -1,4 +1,4 @@
-package com.example.podclassic.view
+package com.example.podclassic.widget
 
 import android.content.Context
 import android.graphics.drawable.Drawable
@@ -25,14 +25,14 @@ class SeekBar(context: Context) : FrameLayout(context) {
         addView(background)
         addView(bar)
 
-        val layoutParams_left = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT)
+        val layoutParamsLeft = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT)
         leftView.setPadding(0, BAR_HEIGHT / 2,0,0)
-        addView(leftView, layoutParams_left)
+        addView(leftView, layoutParamsLeft)
 
-        val layoutParams_right = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT)
-        rightView.gravity = Gravity.RIGHT
+        val layoutParamsRight = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT)
+        rightView.gravity = Gravity.END
         rightView.setPadding(0, BAR_HEIGHT / 2,0,0)
-        addView(rightView, layoutParams_right)
+        addView(rightView, layoutParamsRight)
     }
 
     private var max = 1
@@ -90,7 +90,9 @@ class SeekBar(context: Context) : FrameLayout(context) {
             leftView.text = toMinute(current)
         }
         if (width != 0) {
-            bar.layout(0, 0, width * current / max, BAR_HEIGHT)
+            bar.layout(0, 0, width * current / max,
+                BAR_HEIGHT
+            )
         }
     }
 
@@ -102,10 +104,16 @@ class SeekBar(context: Context) : FrameLayout(context) {
 
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
         super.onLayout(changed, left, top, right, bottom)
-        background.layout(0, 0,width, BAR_HEIGHT)
-        leftView.layout(0, BAR_HEIGHT, width / 2, height)
-        rightView.layout(width / 2, BAR_HEIGHT, width, height)
-        bar.layout(0, 0, width * current / max, BAR_HEIGHT)
+        background.layout(0, 0,width,
+            BAR_HEIGHT
+        )
+        leftView.layout(0,
+            BAR_HEIGHT, width / 2, height)
+        rightView.layout(width / 2,
+            BAR_HEIGHT, width, height)
+        bar.layout(0, 0, width * current / max,
+            BAR_HEIGHT
+        )
     }
 
     private fun toMinute(ms: Int): String {

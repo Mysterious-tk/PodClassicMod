@@ -3,8 +3,10 @@ package com.example.podclassic.`object`
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
+import android.media.ThumbnailUtils
 import android.net.Uri
 import android.text.TextUtils
+import android.util.Log
 import com.example.podclassic.util.FileUtil
 import com.example.podclassic.util.MediaMetadataUtil
 import com.example.podclassic.util.Values
@@ -93,26 +95,24 @@ class Music {
         if (imageSet.music == this) {
             return imageSet.image
         }
-        try {
-            val mediaMetadataRetriever = MediaMetadataRetriever()
-            mediaMetadataRetriever.setDataSource(path)
 
-            val byteArray = mediaMetadataRetriever.embeddedPicture
-            val image = if (byteArray == null || byteArray.isEmpty()) {
-                null
-            } else {
-                BitmapFactory.decodeByteArray(byteArray, 0, byteArray.size)
-            }
-            val tempImage = imageSet.image
-            if (tempImage != null && !tempImage.isRecycled) {
-                tempImage.recycle()
-            }
-            imageSet.music = this
-            imageSet.image = image
-            return image
-        } catch (ignored : Exception) {
-            return null
+        val mediaMetadataRetriever = MediaMetadataRetriever()
+        mediaMetadataRetriever.setDataSource(path)
+        val byteArray = mediaMetadataRetriever.embeddedPicture
+
+        mediaMetadataRetriever.release()
+        val image = if (byteArray == null || byteArray.isEmpty()) {
+            null
+        } else {
+            ThumbnailUtils.extractThumbnail(BitmapFactory.decodeByteArray(byteArray, 0, byteArray.size), 512, 512)
         }
+        val tempImage = imageSet.image
+        if (tempImage?.isRecycled == false) {
+            tempImage.recycle()
+        }
+        imageSet.music = this
+        imageSet.image = image
+        return image
     }
 
     override fun hashCode(): Int {

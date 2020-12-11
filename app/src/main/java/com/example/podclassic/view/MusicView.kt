@@ -1,12 +1,19 @@
 package com.example.podclassic.view
 
 import android.content.Context
+import com.example.podclassic.R
 import com.example.podclassic.`object`.Core
 import com.example.podclassic.`object`.MediaPlayer
 import com.example.podclassic.`object`.MusicList
+import com.example.podclassic.activity.MainActivity
 import com.example.podclassic.base.ScreenView
+import com.example.podclassic.fragment.SplashFragment
+import com.example.podclassic.storage.SPManager
 import com.example.podclassic.storage.SaveMusicLists
 import com.example.podclassic.util.MediaUtil
+import com.example.podclassic.util.ThreadUtil
+import com.example.podclassic.widget.ListView
+import kotlinx.android.synthetic.main.activity_main.view.*
 
 class MusicView(context: Context) : ListView(context), ScreenView {
     companion object { const val TITLE = "音乐" }
@@ -19,9 +26,19 @@ class MusicView(context: Context) : ListView(context), ScreenView {
 
     override fun slide(slideVal: Int) : Boolean { return onSlide(slideVal) }
 
-    val item = Item("当前播放列表", object : OnItemClickListener {
+    private val currentList = Item("当前播放列表", object : OnItemClickListener {
         override fun onItemClick(index: Int, listView : ListView) : Boolean {
             Core.addView(MusicListView(context, MusicListView.LONG_CLICK_REMOVE_CURRENT))
+            return true
+        }
+    }, true)
+
+    private val coverFlow = Item("CoverFlow", object : OnItemClickListener {
+        override fun onItemClick(index: Int, listView: ListView): Boolean {
+            if (MediaUtil.albums.isEmpty()) {
+                return false
+            }
+            Core.addView(CoverFlowView(context))
             return true
         }
     }, true)
@@ -30,15 +47,14 @@ class MusicView(context: Context) : ListView(context), ScreenView {
         super.onWindowFocusChanged(hasWindowFocus)
         if (hasWindowFocus) {
             if (MediaPlayer.getCurrent() == null) {
-                remove(item)
+                remove(currentList)
             } else {
-                addIfNotExist(item)
+                addIfNotExist(currentList)
             }
         }
     }
 
     init {
-
         itemList = arrayListOf(
             Item("歌曲", object : OnItemClickListener {
                 val musicList = MediaUtil.musics
@@ -123,9 +139,12 @@ class MusicView(context: Context) : ListView(context), ScreenView {
                 }
             }, true)
             )
+        if (SPManager.getBoolean(SPManager.SP_COVER_FLOW)) {
+            addIfNotExist(coverFlow)
+        }
 
         if (MediaPlayer.getCurrent() != null) {
-            addIfNotExist(item)
+            addIfNotExist(currentList)
         }
     }
 

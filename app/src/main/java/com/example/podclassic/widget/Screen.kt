@@ -1,15 +1,15 @@
-package com.example.podclassic.view
+package com.example.podclassic.widget
 
 import android.animation.LayoutTransition
 import android.animation.ObjectAnimator
 import android.annotation.SuppressLint
 import android.content.Context
 import android.util.AttributeSet
-import android.util.Log
 import android.view.View
 import android.widget.FrameLayout
 import com.example.podclassic.base.ScreenView
 import com.example.podclassic.util.Colors
+import com.example.podclassic.view.MainView
 import java.util.*
 
 

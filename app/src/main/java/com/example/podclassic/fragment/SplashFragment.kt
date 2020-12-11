@@ -13,17 +13,18 @@ import androidx.fragment.app.Fragment
 import com.example.podclassic.R
 import com.example.podclassic.`object`.Core
 import com.example.podclassic.`object`.MediaPlayer
+import com.example.podclassic.storage.SPManager
 import com.example.podclassic.storage.SaveMusicLists
 import com.example.podclassic.storage.SaveMusics
 import com.example.podclassic.util.*
 import java.lang.Exception
 
-class SplashFragment : Fragment() {
+class SplashFragment(val runnable: Runnable = Runnable{MediaUtil.prepare()}) : Fragment() {
 
     private val asyncTask = @SuppressLint("StaticFieldLeak")
     object : AsyncTask<Unit, Unit, Unit>() {
         override fun doInBackground(vararg params: Unit?) {
-            MediaUtil.prepare()
+            runnable.run()
         }
 
         override fun onPostExecute(result: Unit?) {

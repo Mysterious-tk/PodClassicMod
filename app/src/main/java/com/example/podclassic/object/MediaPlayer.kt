@@ -6,6 +6,7 @@ import android.content.ContentValues.TAG
 import android.content.Context
 import android.content.Intent
 import android.media.MediaPlayer
+import android.media.audiofx.AudioEffect
 import android.media.audiofx.Equalizer
 import android.media.audiofx.PresetReverb
 import android.net.Uri
@@ -40,6 +41,7 @@ object MediaPlayer : MediaPlayer.OnCompletionListener, MediaPlayer.OnPreparedLis
     private const val PLAY_MODE_SINGLE_STRING = "单曲循环"
     private const val PLAY_MODE_SHUFFLE_STRING = "随机播放"
 
+    private const val BLACK_LIST = "LG"
     /*
     private val NORMAL = shortArrayOf(0,0,0,0,0,0,0,0,0,0)
     private val CLASSICAL = shortArrayOf(0,8,8,4,0,0,0,0,2,2)
@@ -82,11 +84,14 @@ object MediaPlayer : MediaPlayer.OnCompletionListener, MediaPlayer.OnPreparedLis
         onMediaChangeListeners.clear()
         onProgressListeners.clear()
 
-        equalizer.release()
+        if (!Build.BRAND.equals(BLACK_LIST, true) && equalizer.hasControl()) {
+            equalizer.release()
+        }
     }
 
     fun clearPlayList() {
         cancelTimer()
+
         if (mediaPlayer.isPlaying) {
             mediaPlayer.stop()
         }
@@ -120,7 +125,7 @@ object MediaPlayer : MediaPlayer.OnCompletionListener, MediaPlayer.OnPreparedLis
     var isPlaying = false
 
     private val mediaPlayer = MediaPlayer()
-    private val equalizer = Equalizer(1000, mediaPlayer.audioSessionId)
+    private val equalizer by lazy { Equalizer(1000, mediaPlayer.audioSessionId) }
     val equalizerList = ArrayList<String>()
 
     init {
@@ -129,15 +134,19 @@ object MediaPlayer : MediaPlayer.OnCompletionListener, MediaPlayer.OnPreparedLis
         mediaPlayer.setOnErrorListener(this)
         mediaPlayer.setAudioAttributes(audioFocusManager.attribute)
 
-        equalizer.enabled = true
-
-        for (i in 0 until equalizer.numberOfPresets) {
-            equalizerList.add(equalizer.getPresetName(i.toShort()))
+        if (!Build.BRAND.equals(BLACK_LIST, true) && equalizer.hasControl()) {
+            equalizer.enabled = true
+            for (i in 0 until equalizer.numberOfPresets) {
+                equalizerList.add(equalizer.getPresetName(i.toShort()))
+            }
+            setEqualizer(SPManager.getInt(SPManager.SP_EQUALIZER))
         }
-        setEqualizer(SPManager.getInt(SPManager.SP_EQUALIZER))
     }
 
     fun setEqualizer(index: Int): Boolean {
+        if (Build.BRAND.equals(BLACK_LIST, true)) {
+            return false
+        }
         return if (index in 0 until equalizerList.size) {
             SPManager.setInt(SPManager.SP_EQUALIZER, index)
             equalizer.usePreset(index.toShort())
@@ -239,6 +248,13 @@ object MediaPlayer : MediaPlayer.OnCompletionListener, MediaPlayer.OnPreparedLis
         currentPlayMode = PLAY_MODE_SHUFFLE
         SPManager.setInt(SPManager.SP_PLAY_MODE, currentPlayMode)
         setPlayList(list, Random.nextInt(list.size))
+    }
+
+    fun shufflePlay() {
+        val list = if (SPManager.getBoolean(SPManager.SP_PLAY_ALL)) MediaUtil.musics else SaveMusics.loveList.getList()
+        if (list.isNotEmpty()) {
+            shufflePlay(list)
+        }
     }
 
     fun add(music: Music) {

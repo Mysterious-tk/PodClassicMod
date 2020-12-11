@@ -146,6 +146,7 @@ public class SPManager {
     public static final String SP_EQUALIZER = "equalizer";
     public static final String SP_PLAY_MODE = "play_mode";
     public static final String SP_PLAY_ALL = "play_all";
+    public static final String SP_COVER_FLOW = "cover_flow";
 
     private static SharedPreferences getSharedPreferences() {
         return PreferenceManager.getDefaultSharedPreferences(BaseApplication.getContext());
@@ -184,6 +185,7 @@ public class SPManager {
         setBoolean(SP_SHOW_LYRIC, true);
         setBoolean(SP_THEME, true);
         setBoolean(SP_SHOW_INFO, false);
+        setBoolean(SP_COVER_FLOW, false);
         setInt(NightMode.SP_NAME, NightMode.DISABLE_ID);
         setInt(Sound.SP_NAME, Sound.VIBRATE_ID);
         setInt(AutoStop.SP_NAME, AutoStop.DISABLE_ID);

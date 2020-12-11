@@ -8,7 +8,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.*
-import android.util.Log
 import android.view.Gravity
 import android.widget.LinearLayout
 import android.widget.RelativeLayout
@@ -16,10 +15,13 @@ import com.example.podclassic.R
 import com.example.podclassic.`object`.MediaPlayer
 import com.example.podclassic.base.ScreenView
 import com.example.podclassic.storage.SPManager
-import com.example.podclassic.storage.SaveMusics
 import com.example.podclassic.util.*
 import com.example.podclassic.util.Values.DEFAULT_PADDING
+import com.example.podclassic.widget.TextView
+import com.example.podclassic.widget.SeekBar
 import java.util.*
+import kotlin.math.max
+import kotlin.math.min
 
 
 class MusicPlayerView(context: Context) : RelativeLayout(context), ScreenView, MediaPlayer.OnMediaChangeListener, MediaPlayer.OnProgressListener {
@@ -145,8 +147,7 @@ class MusicPlayerView(context: Context) : RelativeLayout(context), ScreenView, M
                 stopTimer?.schedule(object : TimerTask() {
                     override fun run() {
                         if (MediaPlayer.stopTime == 0L && stopTimer != null) {
-                            stopTimer!!.cancel()
-                            stopTimer = null
+                            cancelStopTimer()
                             ThreadUtil.runOnUiThread(Runnable {
                                 stopTime.setLeftIcon(null)
                                 stopTime.text = ""
@@ -301,11 +302,14 @@ class MusicPlayerView(context: Context) : RelativeLayout(context), ScreenView, M
                 singer.gravity = Gravity.LEFT
                 album.gravity = Gravity.LEFT
                 lyric.gravity = Gravity.LEFT
+
                 if (hasHeight) {
                     loadImage(bitmap)
                 } else {
                     post { loadImage(bitmap) }
                 }
+
+                //image.setImageBitmap(bitmap)
             }
             name.text = music.name
             singer.text = music.singer
@@ -324,7 +328,7 @@ class MusicPlayerView(context: Context) : RelativeLayout(context), ScreenView, M
         if (!hasHeight) {
             return
         }
-        val imageHeight = measuredHeight / 2f
+        val imageHeight = min(measuredHeight / 2f, measuredWidth / 2f - DEFAULT_PADDING * 4)
         val scaleWidth : Float = imageHeight / bitmap.width
         val scaleHeight : Float= imageHeight / bitmap.height
         val matrix = Matrix()
@@ -352,6 +356,10 @@ class MusicPlayerView(context: Context) : RelativeLayout(context), ScreenView, M
         hasHeight = hasWindowFocus() && measuredHeight != 0
     }
 
+    override fun getLaunchMode(): Int {
+        return ScreenView.LAUNCH_MODE_SINGLE
+    }
+
     class ImageView(context: Context) : androidx.appcompat.widget.AppCompatImageView(context) {
         private var bitmap : Bitmap? = null
 
@@ -376,11 +384,8 @@ class MusicPlayerView(context: Context) : RelativeLayout(context), ScreenView, M
             }
             bitmap?.recycle()
             bitmap = bm
+
             super.setImageBitmap(bm)
         }
-    }
-
-    override fun getLaunchMode(): Int {
-        return ScreenView.LAUNCH_MODE_SINGLE
     }
 }

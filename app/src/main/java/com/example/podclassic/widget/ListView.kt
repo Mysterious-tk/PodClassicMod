@@ -1,4 +1,4 @@
-package com.example.podclassic.view
+package com.example.podclassic.widget
 
 import android.content.Context
 import android.graphics.Canvas
@@ -11,7 +11,6 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.LinearLayout.VERTICAL
-import com.example.podclassic.storage.SPManager
 import com.example.podclassic.util.Colors
 import com.example.podclassic.util.Icons
 import com.example.podclassic.util.PinyinUtil
@@ -30,12 +29,17 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
         const val QUICK_SLIDE = DEFAULT_MAX_SIZE * 5
     }
 
-    constructor(context: Context) : this(context, DEFAULT_MAX_SIZE)
+    constructor(context: Context) : this(context,
+        DEFAULT_MAX_SIZE
+    )
 
     private val linearLayout = LinearLayout(context)
-    private val itemViewList = ArrayList<ItemView>(DEFAULT_MAX_SIZE)
+    private val itemViewList = ArrayList<ItemView>(
+        DEFAULT_MAX_SIZE
+    )
 
-    private val scrollBar = ScrollBar(context)
+    private val scrollBar =
+        ScrollBar(context)
 
     private val indexView = android.widget.TextView(context)
 
@@ -46,7 +50,8 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
         scrollBarLayoutParams.gravity = Gravity.END
         this.addView(scrollBar, scrollBarLayoutParams)
         for (i in 0 until MAX_SIZE) {
-            val itemView = ItemView(context)
+            val itemView =
+                ItemView(context)
             val layoutParams = LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT,LayoutParams.WRAP_CONTENT)
             layoutParams.weight = 1f
             itemViewList.add(itemView)
@@ -154,7 +159,8 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
             //itemList.height = itemHeight
             //itemView.cancelShake()
             if (scrollBar.visibility == View.VISIBLE) {
-                itemView.setPadding(0,0, ScrollBar.WIDTH, 0)
+                itemView.setPadding(0,0,
+                    ScrollBar.WIDTH, 0)
             }
             itemView.setHighlight(i == index)
             itemView.setRightText(itemList[i].rightText)
@@ -191,6 +197,8 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
     var sorted = false
     private var prevSlideTime = 0L
     private var slideCount = 0
+
+    private var timer : Timer? = null
 
     fun onSlide(direction: Int) : Boolean {
         if (direction == 0 || itemList.isEmpty()) {
@@ -231,11 +239,15 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
                     refreshList()
                     if (sorted) {
                         indexView.visibility = VISIBLE
-                        postDelayed({
-                            if ((System.currentTimeMillis() - prevSlideTime) > DELAY) {
-                                indexView.visibility = INVISIBLE
+                        timer?.cancel()
+                        timer = Timer()
+                        timer!!.schedule(object : TimerTask() {
+                            override fun run() {
+                                if ((System.currentTimeMillis() - prevSlideTime) > DELAY) {
+                                    indexView.visibility = INVISIBLE
+                                }
                             }
-                        }, DELAY * 20L)
+                        }, DELAY * 6L)
                     }
                     prevSlideTime = currentMillis
                     return true
@@ -255,11 +267,17 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
                 }
             }
             if (sorted) {
-                postDelayed({
-                    if ((System.currentTimeMillis() - prevSlideTime) > DELAY) {
-                        indexView.visibility = INVISIBLE
-                    }
-                }, DELAY * 10L)
+                if (indexView.visibility == View.VISIBLE) {
+                    timer?.cancel()
+                    timer = Timer()
+                    timer!!.schedule(object : TimerTask() {
+                        override fun run() {
+                            if ((System.currentTimeMillis() - prevSlideTime) > DELAY) {
+                                indexView.visibility = INVISIBLE
+                            }
+                        }
+                    }, DELAY * 6L)
+                }
             }
             prevSlideTime = currentMillis
         }

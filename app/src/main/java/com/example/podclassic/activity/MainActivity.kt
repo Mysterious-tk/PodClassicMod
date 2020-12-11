@@ -31,8 +31,9 @@ import kotlin.system.exitProcess
 class MainActivity : AppCompatActivity() {
 
     companion object {
-        var statusBarHeight = 0
+        const val TOP_MARGIN = 24
         var screenRatio = 0f
+        var statusBarHeight = 0
     }
 
     override fun onNewIntent(intent: Intent?) {
@@ -50,15 +51,15 @@ class MainActivity : AppCompatActivity() {
             SPManager.setBoolean(SPManager.SP_STARTED, true)
             SPManager.reset()
         }
+
         initView()
 
         Core.init(slide_controller, screen, title_bar, night_mode, this)
 
         checkPermission()
 
-        initMediaPlayer(intent)
-
         startService(Intent(this, MediaPlayerService::class.java))
+        initMediaPlayer(intent)
 
         val autoStop = SPManager.getInt(SPManager.AutoStop.SP_NAME)
         if (autoStop != 0) {
@@ -98,6 +99,7 @@ class MainActivity : AppCompatActivity() {
         if (resourceId > 0) {
             statusBarHeight = resources.getDimensionPixelSize(resourceId)
         }
+
         val point = Point()
         windowManager.defaultDisplay.getSize(point)
 
@@ -117,25 +119,22 @@ class MainActivity : AppCompatActivity() {
                 layoutParams.rightMargin = layoutParams.rightMargin * 7 / 6
                 layoutParams.topMargin /= 2
                 layoutParams.bottomMargin /= 4
-                (frame_layout.layoutParams as RelativeLayout.LayoutParams).topMargin = statusBarHeight
             }
             screenRatio == 16f / 9f -> {
                 layoutParams.topMargin /= 2
                 layoutParams.bottomMargin /= 2
-                (frame_layout.layoutParams as RelativeLayout.LayoutParams).topMargin = statusBarHeight
             }
             screenRatio <= 17f / 9f -> {
                 layoutParams.bottomMargin /= 2
-                (frame_layout.layoutParams as RelativeLayout.LayoutParams).topMargin = statusBarHeight * 3 / 2
             }
             screenRatio >= 21f / 10f -> {
-                layoutParams.topMargin = layoutParams.topMargin * 3 / 2
-                (frame_layout.layoutParams as RelativeLayout.LayoutParams).topMargin = statusBarHeight * 3 / 2
+                layoutParams.topMargin = layoutParams.topMargin * 2
             } else -> {
-                (frame_layout.layoutParams as RelativeLayout.LayoutParams).topMargin = statusBarHeight * 3 / 2
-            }
-
+                layoutParams.topMargin = layoutParams.topMargin * 3 / 2
         }
+        }
+
+        (frame_layout.layoutParams as RelativeLayout.LayoutParams).topMargin = statusBarHeight + TOP_MARGIN
 
         frame_layout.outlineProvider = object : ViewOutlineProvider() {
             override fun getOutline(view: View, outline: Outline) {
@@ -147,8 +146,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkPermission() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE), 1)
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE), 1)
         } else {
             prepare()
         }

@@ -1,18 +1,24 @@
 package com.example.podclassic.util
 
 import android.content.ContentResolver
+import android.content.ContentUris
 import android.database.Cursor
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.net.Uri
 import android.provider.MediaStore
 import android.text.TextUtils
-import android.util.Log
-import android.widget.Toast
 import com.example.podclassic.`object`.Music
 import com.example.podclassic.`object`.MusicList
 import com.example.podclassic.base.BaseApplication
+import com.example.podclassic.storage.SPManager
 import java.io.File
+import java.io.FileNotFoundException
+import java.io.InputStream
+import java.lang.Exception
+import java.text.Collator
 import java.util.*
+import kotlin.Comparator
 import kotlin.collections.ArrayList
 import kotlin.collections.HashSet
 
@@ -26,13 +32,14 @@ object MediaUtil {
     const val NAME = MediaStore.Audio.Media.TITLE
     const val PATH = MediaStore.Audio.Media.DATA
     private val contentResolver = BaseApplication.getContext().contentResolver
+    private val collator = Collator.getInstance(Locale.CHINA)
 
 
     val musics = ArrayList<Music>()
     val singers = ArrayList<MusicList>()
     val albums = ArrayList<MusicList>()
 
-    private fun buildMusicFromCursor(cursor : Cursor) : Music? {
+    private fun buildMusicFromCursor(cursor: Cursor) : Music? {
         val duration = cursor.getLong(cursor.getColumnIndex(MediaStore.Audio.Media.DURATION))
         val size = cursor.getLong(cursor.getColumnIndex(MediaStore.Audio.Media.SIZE))
         val path = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Media.DATA))
@@ -60,31 +67,40 @@ object MediaUtil {
             }
         }
         cursor.close()
-        //musics.sortBy { PinyinUtil.getPinyin(it.name) }
 
         uri = MediaStore.Audio.Albums.EXTERNAL_CONTENT_URI
-        cursor = contentResolver.query(uri, null, null, null, MediaStore.Audio.Albums.ALBUM + " collate localized")
+        cursor = contentResolver.query(uri, null, null, null, null/*MediaStore.Audio.Albums.ALBUM + " collate localized"*/)
         var hashSet = HashSet<MusicList>(cursor!!.count)
+        //var albumIdIndex = cursor.getColumnIndex(MediaStore.Audio.Albums.ALBUM_ID)
+        val albumIdIndex = cursor.getColumnIndex(MediaStore.Audio.Albums._ID)
+        //if (albumIdIndex == -1) {
+        //}
+
+        val artistIndex = cursor.getColumnIndex(MediaStore.Audio.Albums.ARTIST)
+        val nameIndex = cursor.getColumnIndex(MediaStore.Audio.Albums.ALBUM)
+
         while (cursor.moveToNext()) {
-            val name = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Albums.ALBUM))
-            //val id = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Albums.ALBUM_ID))
+            val name = cursor.getString(nameIndex)
             if (TextUtils.isEmpty(name)) {
                 continue
             }
+
+            val artist = cursor.getString(artistIndex)
+            val id = if (albumIdIndex == -1) -1 else cursor.getLong(albumIdIndex)
+
             val album = MusicList()
             album.type = MusicList.TYPE_ALBUM
             album.name = name
-            album.id = -1
+            album.artist = artist
+            album.id = id
             hashSet.add(album)
         }
+        albums.addAll(hashSet)
+        albums.sortWith(Comparator { o1, o2 -> collator.compare(o1?.name, o2?.name) })
         cursor.close()
 
-        albums.addAll(hashSet)
-        //albums.sortBy { PinyinUtil.getPinyin(it.name) }
-
-
         uri = MediaStore.Audio.Artists.EXTERNAL_CONTENT_URI
-        cursor = contentResolver.query(uri, null, null, null, MediaStore.Audio.Artists.ARTIST + " collate localized")
+        cursor = contentResolver.query(uri, null, null, null, /*MediaStore.Audio.Artists.ARTIST + " collate localized"*/null)
         hashSet = HashSet(cursor!!.count)
         while (cursor.moveToNext()) {
             val name = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Artists.ARTIST))
@@ -98,15 +114,15 @@ object MediaUtil {
         }
         cursor.close()
         singers.addAll(hashSet)
-        //singers.sortBy { PinyinUtil.getPinyin(it.name) }
-        prepared = true
+        singers.sortWith(Comparator { o1, o2 -> collator.compare(o1?.name, o2?.name) })
 
         System.gc()
+        prepared = true
     }
 
-    fun searchMusic(selection : String?, selectionArgs : Array<String>) : ArrayList<Music>{
+    fun getAlbumMusic(album: String): ArrayList<Music> {
         val uri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
-        val cursor = contentResolver.query(uri, null, selection, selectionArgs, MediaStore.Audio.Media.TITLE + " collate localized")
+        val cursor = contentResolver.query(uri, null, "$ALBUM=?", arrayOf(album), MediaStore.Audio.Media.TRACK)
         val result = ArrayList<Music>(cursor!!.count)
         while (cursor.moveToNext()) {
             val music = buildMusicFromCursor(cursor)
@@ -114,30 +130,48 @@ object MediaUtil {
                 result.add(music)
             }
         }
-        result.sortBy { PinyinUtil.getPinyin(it.name) }
         cursor.close()
         return result
     }
 
-    fun searchAlbum(by : String?, target: String?): ArrayList<MusicList> {
-        val uri = MediaStore.Audio.Albums.EXTERNAL_CONTENT_URI
-        val cursor = contentResolver.query(uri, null, if (by == null) null else "$by=?", if (target == null) null else arrayOf(target), MediaStore.Audio.Media.TITLE + " collate localized")
-        val list = HashSet<MusicList>(cursor!!.count)
+    fun getArtistMusic(artist: String): ArrayList<Music> {
+        val uri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
+        val cursor = contentResolver.query(uri, null, "$NAME like? or $SINGER=?", arrayOf("%$artist%"), MediaStore.Audio.Media.TITLE + " collate localized")
+        val result = ArrayList<Music>(cursor!!.count)
         while (cursor.moveToNext()) {
-            val name = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Albums.ALBUM))
-            val id = cursor.getInt(cursor.getColumnIndex(MediaStore.Audio.Albums.ALBUM_ID))
+            val music = buildMusicFromCursor(cursor)
+            if (music != null) {
+                result.add(music)
+            }
+        }
+        cursor.close()
+        return result
+    }
+
+
+    fun searchAlbum(by: String, target: String): ArrayList<MusicList> {
+        val uri = MediaStore.Audio.Albums.EXTERNAL_CONTENT_URI
+        val cursor = contentResolver.query(uri, null, "$by=?", arrayOf(target), null/*MediaStore.Audio.Albums.ALBUM + " collate localized"*/)
+        val list = HashSet<MusicList>(cursor!!.count)
+        val nameId = cursor.getColumnIndex(MediaStore.Audio.Albums.ALBUM)
+        val artistId = cursor.getColumnIndex(MediaStore.Audio.Albums.ARTIST)
+        while (cursor.moveToNext()) {
+            val name = cursor.getString(nameId)
+            val artist = cursor.getString(artistId)
+
             if (TextUtils.isEmpty(name)) {
                 continue
             }
             val album = MusicList()
             album.type = MusicList.TYPE_ALBUM
             album.name = name
-            album.id = id
+            album.artist = artist
             list.add(album)
         }
         cursor.close()
         val temp = ArrayList<MusicList>(list)
-        temp.sortBy { PinyinUtil.getPinyin(it.name) }
+        temp.sortWith(Comparator { o1, o2 -> collator.compare(o1?.name, o2?.name) })
+        //temp.sortBy { PinyinUtil.getPinyin(it.name) }
         return temp
     }
 

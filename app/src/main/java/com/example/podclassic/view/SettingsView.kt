@@ -10,6 +10,7 @@ import com.example.podclassic.base.ScreenView
 import com.example.podclassic.storage.SPManager
 import com.example.podclassic.util.MediaUtil
 import com.example.podclassic.util.Values
+import com.example.podclassic.widget.ListView
 
 class SettingsView(context: Context) : ListView(context), ScreenView {
 
@@ -146,7 +147,6 @@ class SettingsView(context: Context) : ListView(context), ScreenView {
                     listView.getCurrentItem().rightText = if (showLyric) "关闭" else "打开"
                     return true
                 }
-
             }, if (SPManager.getBoolean(SPManager.SP_SHOW_LYRIC))  "打开" else "关闭" ),
 
             Item("显示歌手及专辑信息", object : OnItemClickListener {
@@ -177,6 +177,15 @@ class SettingsView(context: Context) : ListView(context), ScreenView {
                     return true
                 }
             }, SPManager.AutoStop.getString(SPManager.getInt(SPManager.AutoStop.SP_NAME))),
+
+            Item("CoverFlow", object : OnItemClickListener {
+                override fun onItemClick(index : Int, listView : ListView) : Boolean {
+                    val coverFlow = SPManager.getBoolean(SPManager.SP_COVER_FLOW)
+                    SPManager.setBoolean(SPManager.SP_COVER_FLOW, !coverFlow)
+                    listView.getCurrentItem().rightText = if (coverFlow) "关闭" else "打开"
+                    return true
+                }
+            }, if (SPManager.getBoolean(SPManager.SP_COVER_FLOW))  "打开" else "关闭" ),
 
             Item("Reset All Settings", object : OnItemClickListener {
                 override fun onItemClick(index : Int, listView: ListView) : Boolean {

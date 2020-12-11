@@ -19,6 +19,4 @@ object ThreadUtil {
     fun newThread(runnable: Runnable) {
         threadPoolExecutor.execute(runnable)
     }
-
-
 }

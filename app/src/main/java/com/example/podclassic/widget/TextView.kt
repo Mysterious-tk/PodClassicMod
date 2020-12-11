@@ -1,4 +1,4 @@
-package com.example.podclassic.view
+package com.example.podclassic.widget
 
 import android.content.Context
 import android.graphics.Typeface
@@ -27,6 +27,16 @@ class TextView(context: Context) : androidx.appcompat.widget.AppCompatTextView(c
         setTextColor(Colors.text)
         setPadding(DEFAULT_PADDING, DEFAULT_PADDING / 4, DEFAULT_PADDING, DEFAULT_PADDING / 4)
         gravity = Gravity.CENTER_VERTICAL
+    }
+
+    private var bufferedText : String? = null
+
+    fun setBufferedText(text : String?) {
+        if (text == bufferedText) {
+            return
+        }
+        super.setText(text)
+        bufferedText = text
     }
 
     fun setLeftIcon(drawable : Drawable?) {

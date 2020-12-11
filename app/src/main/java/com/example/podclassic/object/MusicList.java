@@ -1,9 +1,14 @@
 package com.example.podclassic.object;
 
+import android.content.ContentResolver;
+import android.content.ContentUris;
+import android.content.Context;
 import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.media.ThumbnailUtils;
 import android.net.Uri;
+import android.provider.MediaStore;
 import android.util.Log;
 
 import com.example.podclassic.R;
@@ -13,13 +18,15 @@ import com.example.podclassic.util.MediaUtil;
 
 import org.jetbrains.annotations.NotNull;
 
+import java.io.InputStream;
 import java.util.ArrayList;
 
 
 
 public class MusicList {
     public String name;
-    public int id;
+    public Long id;
+    public String artist;
 
     public int size;
     public int type = 0;
@@ -31,9 +38,9 @@ public class MusicList {
     public ArrayList<Music> getList() {
         if (list == null) {
             if (type == TYPE_SINGER) {
-                list = MediaUtil.INSTANCE.searchMusic(MediaUtil.NAME + " like? or " + MediaUtil.SINGER + "=?", new String[] {"%" + name + "%", name});
+                list = MediaUtil.INSTANCE.getArtistMusic(name);
             } else if (type == TYPE_ALBUM) {
-                list = MediaUtil.INSTANCE.searchMusic(MediaUtil.ALBUM + "=?", new String[] {name});
+                list = MediaUtil.INSTANCE.getAlbumMusic(name);
             }
         }
         return list;
@@ -57,23 +64,24 @@ public class MusicList {
         return size;
     }
 
+
+    private Bitmap bitmap = null;
     public Bitmap getImage() {
-        String uriAlbums = "content://media/external/audio/albums";
-        String[] projection = new String[]{"album_art"};
-        Cursor cursor = BaseApplication.getContext().getContentResolver().query(Uri.parse(uriAlbums + "/" + id), projection, null, null, null);
-        String image = null;
-
-
-        if (cursor.getCount() > 0) {
-            cursor.moveToNext();
-            image = cursor.getString(0);
-            cursor.close();
+        if (bitmap != null && !bitmap.isRecycled()) {
+            return bitmap;
         }
+        ContentResolver contentResolver = BaseApplication.getContext().getContentResolver();
+        Uri artworkUri = Uri.parse("content://media/external/audio/albumart");
 
-        if (image == null) {
+
+        Uri uri = ContentUris.withAppendedId(artworkUri, id);
+
+        try (InputStream inputStream = contentResolver.openInputStream(uri)) {
+            bitmap = ThumbnailUtils.extractThumbnail(BitmapFactory.decodeStream(inputStream), 512, 512, ThumbnailUtils.OPTIONS_RECYCLE_INPUT);
+            return bitmap;
+        } catch (Exception ignored) {
             return null;
         }
-        return BitmapFactory.decodeFile(image);
     }
 
     @NotNull
@@ -100,7 +108,7 @@ public class MusicList {
 
     @Override
     public int hashCode() {
-        return toString().hashCode();
+        return name.hashCode();
     }
 
 }

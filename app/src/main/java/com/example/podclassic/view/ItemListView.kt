@@ -2,6 +2,7 @@ package com.example.podclassic.view
 
 import android.content.Context
 import com.example.podclassic.base.ScreenView
+import com.example.podclassic.widget.ListView
 
 class ItemListView(context: Context, itemList : ArrayList<Item>, private val title : String, defaultListener: OnItemClickListener?, max_size: Int) : ListView(context, max_size), ScreenView {
 

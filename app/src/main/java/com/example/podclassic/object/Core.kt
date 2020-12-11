@@ -9,6 +9,9 @@ import com.example.podclassic.service.MediaPlayerService
 import com.example.podclassic.storage.SPManager
 import com.example.podclassic.util.*
 import com.example.podclassic.view.*
+import com.example.podclassic.widget.Screen
+import com.example.podclassic.widget.SlideController
+import com.example.podclassic.widget.TitleBar
 import java.util.*
 import kotlin.system.exitProcess
 
