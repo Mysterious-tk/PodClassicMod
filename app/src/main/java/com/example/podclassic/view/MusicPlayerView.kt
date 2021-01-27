@@ -12,6 +12,7 @@ import android.view.Gravity
 import android.widget.LinearLayout
 import android.widget.RelativeLayout
 import com.example.podclassic.R
+import com.example.podclassic.`object`.Core
 import com.example.podclassic.`object`.MediaPlayer
 import com.example.podclassic.base.ScreenView
 import com.example.podclassic.storage.SPManager
@@ -20,10 +21,10 @@ import com.example.podclassic.util.Values.DEFAULT_PADDING
 import com.example.podclassic.widget.TextView
 import com.example.podclassic.widget.SeekBar
 import java.util.*
-import kotlin.math.max
 import kotlin.math.min
 
 
+@SuppressLint("RtlHardcoded")
 class MusicPlayerView(context: Context) : RelativeLayout(context), ScreenView, MediaPlayer.OnMediaChangeListener, MediaPlayer.OnProgressListener {
 
     companion object { const val TITLE = "正在播放" }
@@ -45,10 +46,22 @@ class MusicPlayerView(context: Context) : RelativeLayout(context), ScreenView, M
     }
 
     private fun setPlayMode() {
-        when (MediaPlayer.getPlayMode()) {
-            MediaPlayer.PLAY_MODE_SHUFFLE -> index.setRightIcon(Icons.PLAY_MODE_SHUFFLE.drawable)
-            MediaPlayer.PLAY_MODE_SINGLE -> index.setRightIcon(Icons.PLAY_MODE_SINGLE.drawable)
-            else -> index.setRightIcon(null)
+        val playMode = when (MediaPlayer.getPlayMode()) {
+            MediaPlayer.PLAY_MODE_SHUFFLE -> Icons.PLAY_MODE_SHUFFLE.drawable
+            MediaPlayer.PLAY_MODE_SINGLE -> Icons.PLAY_MODE_SINGLE.drawable
+            else -> null
+        }
+        if (SPManager.getBoolean(SPManager.SP_REPEAT)) {
+            if (playMode == null) {
+                icon1.setImageDrawable(Icons.PLAY_MODE_REPEAT.drawable)
+                icon2.setImageDrawable(null)
+            } else {
+                icon1.setImageDrawable(playMode)
+                icon2.setImageDrawable(Icons.PLAY_MODE_REPEAT.drawable)
+            }
+        } else {
+            icon1.setImageDrawable(playMode)
+            icon2.setImageDrawable(null)
         }
     }
 
@@ -61,13 +74,15 @@ class MusicPlayerView(context: Context) : RelativeLayout(context), ScreenView, M
     private val name = TextView(context)
     private val singer = TextView(context)
     private val album = TextView(context)
-    private val lyric = TextView(context)
+    private val lyric = if (SPManager.getBoolean(SPManager.SP_SHOW_LYRIC)) TextView(context) else null
     private val infoSet = LinearLayout(context)
+    private val icon1 = android.widget.ImageView(context)
+    private val icon2 = android.widget.ImageView(context)
 
     @SuppressLint("ObjectAnimatorBinding")
     fun setSeekBar(seekBar : SeekBar) {
         if (seekBar == progressBar) {
-            layoutTransition.setAnimator(LayoutTransition.APPEARING, ObjectAnimator.ofFloat(null, "translationX", -measuredWidth.toFloat(), 0f))
+            //layoutTransition.setAnimator(LayoutTransition.APPEARING, ObjectAnimator.ofFloat(null, "translationX", -measuredWidth.toFloat(), 0f))
             layoutTransition.setAnimator(LayoutTransition.DISAPPEARING, ObjectAnimator.ofFloat(null, "translationX", 0f, measuredWidth.toFloat()))
             removeView(volumeBar)
             addView(progressBar)
@@ -80,62 +95,73 @@ class MusicPlayerView(context: Context) : RelativeLayout(context), ScreenView, M
     }
 
     init {
-        val layoutTransition = LayoutTransition()
-        layoutTransition.setDuration(300L)
-        layoutTransition.setStartDelay(LayoutTransition.APPEARING, 0)
-        layoutTransition.setStartDelay(LayoutTransition.DISAPPEARING, 0)
-        setLayoutTransition(layoutTransition)
+        layoutTransition = LayoutTransition()
+            .apply {
+                setDuration(300L)
+                setStartDelay(LayoutTransition.APPEARING, 0)
+                setStartDelay(LayoutTransition.DISAPPEARING, 0)
+            }
 
         val padding = DEFAULT_PADDING * 2
+
         setPadding(padding, padding, padding, padding)
 
-        val layoutParams = LayoutParams(LayoutParams.MATCH_PARENT,LayoutParams.WRAP_CONTENT)
-        layoutParams.addRule(ALIGN_PARENT_BOTTOM)
-        volumeBar.layoutParams = layoutParams
+        volumeBar.layoutParams = LayoutParams(LayoutParams.MATCH_PARENT,LayoutParams.WRAP_CONTENT).apply { addRule(ALIGN_PARENT_BOTTOM) }
 
-        val progressBarLayoutParams = LayoutParams(LayoutParams.MATCH_PARENT,LayoutParams.WRAP_CONTENT)
-        progressBarLayoutParams.addRule(ALIGN_PARENT_BOTTOM)
-        progressBar.layoutParams = progressBarLayoutParams
-
-        val stopTimeLayoutParams = LayoutParams(LayoutParams.WRAP_CONTENT,LayoutParams.WRAP_CONTENT)
-        stopTimeLayoutParams.addRule(CENTER_HORIZONTAL)
+        progressBar.layoutParams = LayoutParams(LayoutParams.MATCH_PARENT,LayoutParams.WRAP_CONTENT).apply { addRule(ALIGN_PARENT_BOTTOM) }
 
         index.id = R.id.index
         image.id = R.id.image
 
-        index.setPadding(0, 0, 0, DEFAULT_PADDING)
-        stopTime.setPadding(0,0,0, DEFAULT_PADDING)
+        index.setPadding(0, 0, DEFAULT_PADDING * 3 , DEFAULT_PADDING)
 
-        addView(index, LayoutParams(LayoutParams.MATCH_PARENT,LayoutParams.WRAP_CONTENT))
-        addView(stopTime, stopTimeLayoutParams)
+        stopTime.setPadding(0,0,0, DEFAULT_PADDING)
+        stopTime.layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT,LayoutParams.WRAP_CONTENT).apply { addRule(CENTER_HORIZONTAL) }
+        addView(index)//, LayoutParams(LayoutParams.MATCH_PARENT,LayoutParams.WRAP_CONTENT))
+        addView(stopTime)
         addView(progressBar)
 
-        val imageLayoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT)
-        imageLayoutParams.addRule(BELOW, index.id)
-        addView(image, imageLayoutParams)
+        image.layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply { addRule(BELOW, index.id) }
+        addView(image)
 
-        lyric.scrollable = true
-        lyric.typeface = Typeface.defaultFromStyle(Typeface.NORMAL)
-        lyric.textSize = 12f
-        lyric.visibility = if (SPManager.getBoolean(SPManager.SP_SHOW_LYRIC)) VISIBLE else GONE
-        val lyricLayoutParams = LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT)
-        lyricLayoutParams.setMargins(0, DEFAULT_PADDING / 2, 0, 0)
+        infoSet.apply {
+            setPadding(DEFAULT_PADDING, DEFAULT_PADDING, DEFAULT_PADDING , 0)
+            orientation = LinearLayout.VERTICAL
+            addView(name)
+            addView(singer)
+            addView(album)
+        }
 
-        infoSet.setPadding(DEFAULT_PADDING, DEFAULT_PADDING, DEFAULT_PADDING , 0)
-        infoSet.orientation = LinearLayout.VERTICAL
-        infoSet.addView(name)
-        infoSet.addView(singer)
-        infoSet.addView(album)
-        infoSet.addView(lyric, lyricLayoutParams)
+        if (lyric != null) {
+            lyric.apply {
+                scrollable = true
+                typeface = Typeface.defaultFromStyle(Typeface.NORMAL)
+                textSize = 12f
+            }
+            lyric.layoutParams = LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply { setMargins(0, DEFAULT_PADDING / 2, 0, 0) }
+            infoSet.addView(lyric)
+        }
 
-        val infoSetLayoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
-        infoSetLayoutParams.addRule(BELOW, index.id)
-        infoSetLayoutParams.addRule(RIGHT_OF, image.id)
+        infoSet.layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply {
+            addRule(BELOW, index.id)
+            addRule(RIGHT_OF, image.id)
+        }
 
-        addView(infoSet, infoSetLayoutParams)
+        addView(infoSet)
 
+        icon1.id = R.id.icon_1
+
+        icon1.layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply { addRule(ALIGN_PARENT_RIGHT) }
+        icon2.layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply { addRule(LEFT_OF, icon1.id) }
+
+        icon1.setPadding(DEFAULT_PADDING / 2, 5,0, 0)
+        icon2.setPadding(0, 5,0, 0)
+
+        addView(icon1)
+        addView(icon2)
         setVolumeBar()
         setPlayMode()
+
     }
 
     private var stopTimer : Timer? = null
@@ -173,10 +199,12 @@ class MusicPlayerView(context: Context) : RelativeLayout(context), ScreenView, M
     }
 
     private fun setVolumeBar() {
-        volumeBar.setMax(VolumeUtil.maxVolume)
-        volumeBar.setLeftIcon(Icons.VOLUME_DOWN.drawable)
-        volumeBar.setRightIcon(Icons.VOLUME_UP.drawable)
-        volumeBar.textVisibility = GONE
+        volumeBar.apply {
+            setMax(VolumeUtil.maxVolume)
+            setLeftIcon(Icons.VOLUME_DOWN.drawable)
+            setRightIcon(Icons.VOLUME_UP.drawable)
+            textVisibility = GONE
+        }
     }
 
     private val volumeBroadcastReceiver = object : BroadcastReceiver() {
@@ -186,25 +214,29 @@ class MusicPlayerView(context: Context) : RelativeLayout(context), ScreenView, M
     }
 
     private var broadcastReceiverRegistered = false
-
+    private val intentFilter = IntentFilter("android.media.VOLUME_CHANGED_ACTION")
     private fun onStart() {
-        MediaPlayer.addOnMediaChangeListener(this)
-        MediaPlayer.addOnProgressListener(this)
+        MediaPlayer.apply {
+            addOnMediaChangeListener(this@MusicPlayerView)
+            addOnProgressListener(this@MusicPlayerView)
+        }
 
-        val intentFilter = IntentFilter()
-        intentFilter.addAction("android.media.VOLUME_CHANGED_ACTION")
         if (!broadcastReceiverRegistered) {
             context.registerReceiver(volumeBroadcastReceiver, intentFilter)
             broadcastReceiverRegistered = true
         }
+
         setStopTimer()
         onMediaChange()
+        onMediaChangeFinished()
     }
 
 
     private fun onStop() {
-        MediaPlayer.removeOnProgressListener(this)
-        MediaPlayer.removeOnMediaChangeListener(this)
+        MediaPlayer.apply {
+            removeOnProgressListener(this@MusicPlayerView)
+            removeOnMediaChangeListener(this@MusicPlayerView)
+        }
 
         if (broadcastReceiverRegistered) {
             context.unregisterReceiver(volumeBroadcastReceiver)
@@ -268,60 +300,77 @@ class MusicPlayerView(context: Context) : RelativeLayout(context), ScreenView, M
         }
     }
 
-    private var lyricSet : MediaMetadataUtil.LyricSet? = null
+    private var lyricSet : LyricUtil.LyricSet? = null
 
     @SuppressLint("SetTextI18n", "RtlHardcoded")
-    override fun onMediaChange() {
+    override fun onMediaChangeFinished() {
         if (!hasWindowFocus()) {
             return
         }
         val progress = MediaPlayer.getProgress()
-        progressBar.setCurrent(progress)
+
         progressBar.setMax(MediaPlayer.getDuration())
+        progressBar.setCurrent(progress)
 
         val music = MediaPlayer.getCurrent()
         if (music == null) {
-            name.text = Values.NULL
-            singer.text = Values.NULL
-            album.text = Values.NULL
-            image.setImageBitmap(null)
-            name.gravity = Gravity.CENTER
-            singer.gravity = Gravity.CENTER
-            album.gravity = Gravity.CENTER
-            lyric.gravity = Gravity.CENTER
+            Core.removeView()
         } else {
-            val bitmap = music.getImage()
+            val bitmap = MediaPlayer.image
             if (bitmap == null) {
-                image.setImageBitmap(null)
                 name.gravity = Gravity.CENTER
                 singer.gravity = Gravity.CENTER
                 album.gravity = Gravity.CENTER
-                lyric.gravity = Gravity.CENTER
+                lyric?.gravity = Gravity.CENTER
             } else {
                 name.gravity = Gravity.LEFT
                 singer.gravity = Gravity.LEFT
                 album.gravity = Gravity.LEFT
-                lyric.gravity = Gravity.LEFT
+                lyric?.gravity = Gravity.LEFT
 
                 if (hasHeight) {
                     loadImage(bitmap)
                 } else {
                     post { loadImage(bitmap) }
                 }
-
-                //image.setImageBitmap(bitmap)
             }
-            name.text = music.name
-            singer.text = music.singer
-            album.text = music.album
 
-            if (SPManager.getBoolean(SPManager.SP_SHOW_LYRIC)) {
-                lyricSet = music.getLyric()
+            if (lyric != null) {
+                lyricSet = MediaPlayer.lyricSet
                 lyric.text = lyricSet?.getLyric(progress)
             }
         }
+    }
 
-        index.text = (MediaPlayer.getCurrentIndex() + 1).toString() + "/" + MediaPlayer.getPlayListSize().toString()
+    @SuppressLint("SetTextI18n")
+    override fun onMediaChange() {
+        if (!hasWindowFocus()) {
+            return
+        }
+        val music = MediaPlayer.getCurrent()
+
+        if (music == null) {
+            Core.removeView()
+            return
+        }
+
+        name.text = music.name
+        singer.text = music.singer
+        album.text = music.album
+
+        index.text = "${(MediaPlayer.getCurrentIndex() + 1)}/${MediaPlayer.getPlayListSize()}"
+
+
+        progressBar.setMax(0)
+        progressBar.setCurrent(0)
+
+        lyricSet = null
+        lyric?.text = null
+        if (name.gravity == Gravity.CENTER) {
+            image.setImageBitmap(null)
+        } else {
+            loadImage(Icons.EMPTY)
+        }
     }
 
     private fun loadImage(bitmap: Bitmap) {
@@ -329,8 +378,8 @@ class MusicPlayerView(context: Context) : RelativeLayout(context), ScreenView, M
             return
         }
         val imageHeight = min(measuredHeight / 2f, measuredWidth / 2f - DEFAULT_PADDING * 4)
-        val scaleWidth : Float = imageHeight / bitmap.width
-        val scaleHeight : Float= imageHeight / bitmap.height
+        val scaleWidth : Float = imageHeight / bitmap.width.toFloat()
+        val scaleHeight : Float= imageHeight / bitmap.height.toFloat()
         val matrix = Matrix()
         matrix.postScale(scaleWidth, scaleHeight)
         val result = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, false)
@@ -341,7 +390,7 @@ class MusicPlayerView(context: Context) : RelativeLayout(context), ScreenView, M
 
     override fun onProgress(progress: Int) {
         progressBar.setCurrent(progress)
-        if (lyricSet != null) {
+        if (lyric != null && lyricSet != null) {
             val text = lyricSet?.getLyric(progress)
             if (lyric.text.toString() != text) {
                 lyric.text = text
@@ -361,7 +410,6 @@ class MusicPlayerView(context: Context) : RelativeLayout(context), ScreenView, M
     }
 
     class ImageView(context: Context) : androidx.appcompat.widget.AppCompatImageView(context) {
-        private var bitmap : Bitmap? = null
 
         @SuppressLint("DrawAllocation")
         override fun onDraw(canvas: Canvas) {
@@ -376,16 +424,6 @@ class MusicPlayerView(context: Context) : RelativeLayout(context), ScreenView, M
             paint.style = Paint.Style.STROKE
             paint.strokeWidth = 1f
             canvas.drawRect(rect, paint)
-        }
-
-        override fun setImageBitmap(bm: Bitmap?) {
-            if (bm == bitmap) {
-                return
-            }
-            bitmap?.recycle()
-            bitmap = bm
-
-            super.setImageBitmap(bm)
         }
     }
 }

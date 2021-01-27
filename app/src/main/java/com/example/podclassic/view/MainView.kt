@@ -154,9 +154,9 @@ class MainView(context: Context) : ListView(context), ScreenView {
                             ); return true
                         }
 
-                    }, true)// ,
+                    }, true) /*,
 
-                    /*
+
                     Item("所有程序", object : OnItemClickListener {
                         inner class App(val name: String, val intent: Intent)
 
@@ -208,9 +208,9 @@ class MainView(context: Context) : ListView(context), ScreenView {
                             )
                             return true
                         }
-
                     }, true)
-                */
+                    */
+
 
                 )
 
@@ -234,14 +234,11 @@ class MainView(context: Context) : ListView(context), ScreenView {
             }, true),
             Item("随机播放歌曲", object : OnItemClickListener {
                 override fun onItemClick(index: Int, listView: ListView): Boolean {
-                    val list = if (SPManager.getBoolean(SPManager.SP_PLAY_ALL)) MediaUtil.musics else SaveMusics.loveList.getList()
-                    return if (list.isEmpty()) {
-                        false
-                    } else {
-                        MediaPlayer.shufflePlay(list)
+                    if (MediaPlayer.shufflePlay()) {
                         Core.addView(MusicPlayerView(context))
-                        true
+                        return true
                     }
+                    return false
                 }
             }, false)
         )

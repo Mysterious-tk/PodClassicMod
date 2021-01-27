@@ -1,21 +1,17 @@
 package com.example.podclassic.util
 
-import android.content.ContentResolver
 import android.content.ContentUris
 import android.database.Cursor
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.media.ThumbnailUtils
 import android.net.Uri
 import android.provider.MediaStore
 import android.text.TextUtils
 import com.example.podclassic.`object`.Music
 import com.example.podclassic.`object`.MusicList
 import com.example.podclassic.base.BaseApplication
-import com.example.podclassic.storage.SPManager
 import java.io.File
-import java.io.FileNotFoundException
-import java.io.InputStream
-import java.lang.Exception
 import java.text.Collator
 import java.util.*
 import kotlin.Comparator
@@ -31,6 +27,7 @@ object MediaUtil {
     const val ALBUM = MediaStore.Audio.Media.ALBUM
     const val NAME = MediaStore.Audio.Media.TITLE
     const val PATH = MediaStore.Audio.Media.DATA
+
     private val contentResolver = BaseApplication.getContext().contentResolver
     private val collator = Collator.getInstance(Locale.CHINA)
 
@@ -47,6 +44,7 @@ object MediaUtil {
             val album = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Media.ALBUM))
             val singer = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Media.ARTIST))
             val name = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Media.TITLE))
+            val id = cursor.getLong(cursor.getColumnIndex(MediaStore.Audio.Media.ALBUM_ID))
             return Music(name, album, singer, path)
         }
         return null
@@ -57,8 +55,10 @@ object MediaUtil {
         if (prepared) {
             return
         }
+
         var uri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
-        var cursor = contentResolver.query(uri, null, null, null, /*null*/MediaStore.Audio.Media.TITLE + " collate localized")
+        var cursor = contentResolver.query(uri, null, null, null, null)//MediaStore.Audio.Media.TITLE_RESOURCE_URI + " collate localized")
+
         musics.ensureCapacity(cursor!!.count)
         while (cursor.moveToNext()) {
             val music = buildMusicFromCursor(cursor)
@@ -66,10 +66,17 @@ object MediaUtil {
                 musics.add(music)
             }
         }
+        musics.sortWith(Comparator { o1, o2 -> collator.compare(o1?.name, o2?.name) })
         cursor.close()
 
         uri = MediaStore.Audio.Albums.EXTERNAL_CONTENT_URI
-        cursor = contentResolver.query(uri, null, null, null, null/*MediaStore.Audio.Albums.ALBUM + " collate localized"*/)
+        cursor = contentResolver.query(
+            uri,
+            null,
+            null,
+            null,
+            null/*MediaStore.Audio.Albums.ALBUM + " collate localized"*/
+        )
         var hashSet = HashSet<MusicList>(cursor!!.count)
         //var albumIdIndex = cursor.getColumnIndex(MediaStore.Audio.Albums.ALBUM_ID)
         val albumIdIndex = cursor.getColumnIndex(MediaStore.Audio.Albums._ID)
@@ -100,7 +107,13 @@ object MediaUtil {
         cursor.close()
 
         uri = MediaStore.Audio.Artists.EXTERNAL_CONTENT_URI
-        cursor = contentResolver.query(uri, null, null, null, /*MediaStore.Audio.Artists.ARTIST + " collate localized"*/null)
+        cursor = contentResolver.query(
+            uri,
+            null,
+            null,
+            null, /*MediaStore.Audio.Artists.ARTIST + " collate localized"*/
+            null
+        )
         hashSet = HashSet(cursor!!.count)
         while (cursor.moveToNext()) {
             val name = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Artists.ARTIST))
@@ -122,7 +135,13 @@ object MediaUtil {
 
     fun getAlbumMusic(album: String): ArrayList<Music> {
         val uri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
-        val cursor = contentResolver.query(uri, null, "$ALBUM=?", arrayOf(album), MediaStore.Audio.Media.TRACK)
+        val cursor = contentResolver.query(
+            uri,
+            null,
+            "$ALBUM=?",
+            arrayOf(album),
+            MediaStore.Audio.Media.TRACK
+        )
         val result = ArrayList<Music>(cursor!!.count)
         while (cursor.moveToNext()) {
             val music = buildMusicFromCursor(cursor)
@@ -136,7 +155,13 @@ object MediaUtil {
 
     fun getArtistMusic(artist: String): ArrayList<Music> {
         val uri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
-        val cursor = contentResolver.query(uri, null, "$NAME like? or $SINGER=?", arrayOf("%$artist%"), MediaStore.Audio.Media.TITLE + " collate localized")
+        val cursor = contentResolver.query(
+            uri,
+            null,
+            "$SINGER=?",
+            arrayOf(artist),
+            MediaStore.Audio.Media.TITLE + " collate localized"
+        )
         val result = ArrayList<Music>(cursor!!.count)
         while (cursor.moveToNext()) {
             val music = buildMusicFromCursor(cursor)
@@ -151,7 +176,13 @@ object MediaUtil {
 
     fun searchAlbum(by: String, target: String): ArrayList<MusicList> {
         val uri = MediaStore.Audio.Albums.EXTERNAL_CONTENT_URI
-        val cursor = contentResolver.query(uri, null, "$by=?", arrayOf(target), null/*MediaStore.Audio.Albums.ALBUM + " collate localized"*/)
+        val cursor = contentResolver.query(
+            uri,
+            null,
+            "$by=?",
+            arrayOf(target),
+            null/*MediaStore.Audio.Albums.ALBUM + " collate localized"*/
+        )
         val list = HashSet<MusicList>(cursor!!.count)
         val nameId = cursor.getColumnIndex(MediaStore.Audio.Albums.ALBUM)
         val artistId = cursor.getColumnIndex(MediaStore.Audio.Albums.ARTIST)
@@ -205,7 +236,13 @@ object MediaUtil {
         if (photoSize != null) {
             return photoSize!!
         }
-        val cursor = contentResolver.query(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, null, null, null, null)
+        val cursor = contentResolver.query(
+            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+            null,
+            null,
+            null,
+            null
+        )
         val size = cursor?.count
         cursor?.close()
         photoSize = size
@@ -215,10 +252,34 @@ object MediaUtil {
         if (videoSize != null) {
             return videoSize!!
         }
-        val cursor = contentResolver.query(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, null, null, null, null)
+        val cursor = contentResolver.query(
+            MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
+            null,
+            null,
+            null,
+            null
+        )
         val size = cursor?.count
         cursor?.close()
         videoSize = size
         return size!!
+    }
+
+
+    fun getAlbumImage(album: MusicList): Bitmap? {
+        val artworkUri = Uri.parse("content://media/external/audio/albumart")
+        val uri = ContentUris.withAppendedId(artworkUri, album.id)
+        try {
+            contentResolver.openInputStream(uri).use { inputStream ->
+                return ThumbnailUtils.extractThumbnail(
+                    BitmapFactory.decodeStream(inputStream),
+                    Values.IMAGE_WIDTH,
+                    Values.IMAGE_WIDTH,
+                    ThumbnailUtils.OPTIONS_RECYCLE_INPUT
+                )
+            }
+        } catch (ignored: Exception) {
+            return null
+        }
     }
 }

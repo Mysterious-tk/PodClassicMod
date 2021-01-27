@@ -61,6 +61,7 @@ class TitleBar(context: Context, attributeSet: AttributeSet) : FrameLayout(conte
     }
 
     override fun onMediaChange() {}
+    override fun onMediaChangeFinished() {}
 
     override fun onPlayStateChange() {
         if (MediaPlayer.isPlaying) {

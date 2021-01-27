@@ -2,6 +2,7 @@ package com.example.podclassic.view
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.os.Build
 import android.os.Environment
 import android.os.StatFs
 import com.example.podclassic.`object`.Core
@@ -76,7 +77,6 @@ class SettingsView(context: Context) : ListView(context), ScreenView {
                     }))
                     return true
                 }
-
             }, true),
 
             Item("播放顺序", object : OnItemClickListener {
@@ -86,6 +86,15 @@ class SettingsView(context: Context) : ListView(context), ScreenView {
                     return true
                 }
             }, MediaPlayer.getPlayModeString()),
+
+            Item("循环播放", object : OnItemClickListener {
+                override fun onItemClick(index : Int, listView : ListView) : Boolean {
+                    val repeat = SPManager.getBoolean(SPManager.SP_REPEAT)
+                    SPManager.setBoolean(SPManager.SP_REPEAT, !repeat)
+                    listView.getCurrentItem().rightText = if (repeat) "关闭" else "开启"
+                    return true
+                }
+            }, if (SPManager.getBoolean(SPManager.SP_REPEAT))  "开启" else "关闭" ),
 
             Item("随机播放", object : OnItemClickListener {
                 override fun onItemClick(index : Int, listView : ListView) : Boolean {

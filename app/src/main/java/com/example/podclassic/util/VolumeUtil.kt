@@ -21,12 +21,11 @@ object VolumeUtil {
     val maxVolume by lazy { audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC) }
 
     private var streamId = 0
-    private val soundPool by lazy {
-        val pool = SoundPool.Builder()
-            .setMaxStreams(1)
-            .build()
-        streamId = pool.load(BaseApplication.getContext(), R.raw.click, 0)
-        pool
+    private val soundPool = SoundPool.Builder().apply {
+        setMaxStreams(1)
+        build()
+    }.build().apply {
+        streamId = load(BaseApplication.getContext(), R.raw.click, 0)
     }
 
     fun getCurrentVolume(): Int {
@@ -51,7 +50,9 @@ object VolumeUtil {
             soundPool.play(streamId, 1f, 1f, 0, 0, 1f)
         }
         if (sound and SPManager.Sound.VIBRATE_ID != 0) {
-            view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+            ThreadUtil.newThread(Runnable {
+                view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+            })
         }
     }
 

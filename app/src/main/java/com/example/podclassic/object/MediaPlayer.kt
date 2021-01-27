@@ -2,36 +2,34 @@ package com.example.podclassic.`object`
 
 import android.app.AlarmManager
 import android.app.PendingIntent
-import android.content.ContentValues.TAG
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.media.MediaMetadataRetriever
 import android.media.MediaPlayer
-import android.media.audiofx.AudioEffect
+import android.media.ThumbnailUtils
 import android.media.audiofx.Equalizer
-import android.media.audiofx.PresetReverb
-import android.net.Uri
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
-import androidx.core.content.ContextCompat.getSystemService
 import com.example.podclassic.base.BaseApplication
 import com.example.podclassic.service.MediaPlayerService
 import com.example.podclassic.storage.SPManager
 import com.example.podclassic.storage.SaveMusics
-import com.example.podclassic.util.AudioFocusManager
-import com.example.podclassic.util.MediaUtil
-import com.example.podclassic.util.ThreadUtil
-import java.lang.Exception
+import com.example.podclassic.util.*
 import java.util.*
-import kotlin.collections.ArrayDeque
+import java.util.concurrent.*
 import kotlin.collections.ArrayList
 import kotlin.collections.HashSet
 import kotlin.math.max
 import kotlin.math.min
-import kotlin.random.Random
 
 
-object MediaPlayer : MediaPlayer.OnCompletionListener, MediaPlayer.OnPreparedListener,
-    MediaPlayer.OnErrorListener, AudioFocusManager.OnAudioFocusChangeListener {
+object MediaPlayer : MediaPlayer.OnCompletionListener,
+    MediaPlayer.OnErrorListener, AudioFocusManager.OnAudioFocusChangeListener,
+    MediaPlayer.OnPreparedListener {
 
     private const val PLAY_MODE_ORDER = 0
     const val PLAY_MODE_SINGLE = 1
@@ -41,7 +39,6 @@ object MediaPlayer : MediaPlayer.OnCompletionListener, MediaPlayer.OnPreparedLis
     private const val PLAY_MODE_SINGLE_STRING = "单曲循环"
     private const val PLAY_MODE_SHUFFLE_STRING = "随机播放"
 
-    private const val BLACK_LIST = "LG"
     /*
     private val NORMAL = shortArrayOf(0,0,0,0,0,0,0,0,0,0)
     private val CLASSICAL = shortArrayOf(0,8,8,4,0,0,0,0,2,2)
@@ -75,28 +72,27 @@ object MediaPlayer : MediaPlayer.OnCompletionListener, MediaPlayer.OnPreparedLis
     private val audioFocusManager = AudioFocusManager(this)
 
     fun release() {
-        cancelTimer()
-        if (mediaPlayer.isPlaying) {
-            mediaPlayer.stop()
-        }
-        audioFocusManager.abandonAudioFocus()
+        stop()
         mediaPlayer.release()
         onMediaChangeListeners.clear()
         onProgressListeners.clear()
 
-        if (!Build.BRAND.equals(BLACK_LIST, true) && equalizer.hasControl()) {
-            equalizer.release()
-        }
+        equalizer.release()
     }
 
-    fun clearPlayList() {
+    fun stop() {
         cancelTimer()
-
         if (mediaPlayer.isPlaying) {
-            mediaPlayer.stop()
+            mediaPlayer.pause()
+            mediaPlayer.reset()
         }
         audioFocusManager.abandonAudioFocus()
         playList.clear()
+        isPlaying = false
+        isPrepared = false
+        currentIndex = -1
+        onPlayStateChange()
+        onMediaChange()
     }
 
     fun setPlayMode() {
@@ -104,7 +100,12 @@ object MediaPlayer : MediaPlayer.OnCompletionListener, MediaPlayer.OnPreparedLis
         currentPlayMode %= 3
         SPManager.setInt(SPManager.SP_PLAY_MODE, currentPlayMode)
         if (currentPlayMode == PLAY_MODE_SHUFFLE) {
-            RandomPlayer.reset()
+            shufflePlayList()
+        } else if (currentPlayMode == PLAY_MODE_ORDER) {
+            val current = getCurrent()
+            playList = orderedPlayList.clone() as ArrayList<Music>
+            currentIndex = playList.indexOf(current)
+            onMediaChange()
         }
     }
 
@@ -124,29 +125,31 @@ object MediaPlayer : MediaPlayer.OnCompletionListener, MediaPlayer.OnPreparedLis
     var isPrepared = false
     var isPlaying = false
 
-    private val mediaPlayer = MediaPlayer()
-    private val equalizer by lazy { Equalizer(1000, mediaPlayer.audioSessionId) }
-    val equalizerList = ArrayList<String>()
+    val equalizerList = ArrayList<String>(10)
+
+
+    private val mediaPlayer = MediaPlayer().apply {
+        setOnCompletionListener(this@MediaPlayer)
+        setOnErrorListener(this@MediaPlayer)
+        setOnPreparedListener(this@MediaPlayer)
+        setAudioAttributes(audioFocusManager.attribute)
+    }
+    private val equalizer = Equalizer(0, mediaPlayer.audioSessionId)
 
     init {
-        mediaPlayer.setOnCompletionListener(this)
-        mediaPlayer.setOnPreparedListener(this)
-        mediaPlayer.setOnErrorListener(this)
-        mediaPlayer.setAudioAttributes(audioFocusManager.attribute)
-
-        if (!Build.BRAND.equals(BLACK_LIST, true) && equalizer.hasControl()) {
-            equalizer.enabled = true
-            for (i in 0 until equalizer.numberOfPresets) {
-                equalizerList.add(equalizer.getPresetName(i.toShort()))
+        equalizer.apply {
+            if (hasControl()) {
+                enabled = true
+                for (i in 0 until numberOfPresets) {
+                    equalizerList.add(getPresetName(i.toShort()))
+                }
+                setEqualizer(SPManager.getInt(SPManager.SP_EQUALIZER))
             }
-            setEqualizer(SPManager.getInt(SPManager.SP_EQUALIZER))
         }
     }
 
+
     fun setEqualizer(index: Int): Boolean {
-        if (Build.BRAND.equals(BLACK_LIST, true)) {
-            return false
-        }
         return if (index in 0 until equalizerList.size) {
             SPManager.setInt(SPManager.SP_EQUALIZER, index)
             equalizer.usePreset(index.toShort())
@@ -157,18 +160,21 @@ object MediaPlayer : MediaPlayer.OnCompletionListener, MediaPlayer.OnPreparedLis
     }
 
     interface OnMediaChangeListener {
+        //确定下一首歌的music对象
         fun onMediaChange()
+        //图片和歌词加载完成, 开始播放
+        fun onMediaChangeFinished()
         fun onPlayStateChange()
     }
 
     private val onMediaChangeListeners = HashSet<OnMediaChangeListener>()
 
-    fun addOnMediaChangeListener(onMediaChangeListener: OnMediaChangeListener): Boolean {
-        return onMediaChangeListeners.add(onMediaChangeListener)
+    fun addOnMediaChangeListener(onMediaChangeListener: OnMediaChangeListener) {
+        onMediaChangeListeners.add(onMediaChangeListener)
     }
 
-    fun removeOnMediaChangeListener(onMediaChangeListener: OnMediaChangeListener): Boolean {
-        return onMediaChangeListeners.remove(onMediaChangeListener)
+    fun removeOnMediaChangeListener(onMediaChangeListener: OnMediaChangeListener) {
+        onMediaChangeListeners.remove(onMediaChangeListener)
     }
 
     interface OnProgressListener {
@@ -177,36 +183,33 @@ object MediaPlayer : MediaPlayer.OnCompletionListener, MediaPlayer.OnPreparedLis
 
     private val onProgressListeners = HashSet<OnProgressListener>()
 
-    fun addOnProgressListener(onProgressListener: OnProgressListener): Boolean {
-        val result = onProgressListeners.add(onProgressListener)
-        if (result && isPlaying && timer == null) {
+    fun addOnProgressListener(onProgressListener: OnProgressListener) {
+        onProgressListeners.add(onProgressListener)
+        if (onProgressListeners.isNotEmpty() && isPlaying && timer == null) {
             setTimer()
         }
-        return result
     }
 
-    fun removeOnProgressListener(onProgressListener: OnProgressListener): Boolean {
-        val result = onProgressListeners.remove(onProgressListener)
-        if (result && onProgressListeners.isEmpty() && timer != null) {
+    fun removeOnProgressListener(onProgressListener: OnProgressListener) {
+        onProgressListeners.remove(onProgressListener)
+        if (onProgressListeners.isEmpty() && timer != null) {
             cancelTimer()
         }
-        return result
     }
 
     private var timer: Timer? = null
 
     private fun setTimer() {
-        timer?.cancel()
-        timer = null
         if (onProgressListeners.isEmpty()) {
-            return
+            cancelTimer()
+        } else if (timer == null) {
+            timer = Timer()
+            timer!!.schedule(object : TimerTask() {
+                override fun run() {
+                    onProgress()
+                }
+            }, 500, 1000)
         }
-        timer = Timer()
-        timer!!.schedule(object : TimerTask() {
-            override fun run() {
-                onProgress()
-            }
-        }, 500, 1000)
     }
 
     private fun cancelTimer() {
@@ -215,26 +218,39 @@ object MediaPlayer : MediaPlayer.OnCompletionListener, MediaPlayer.OnPreparedLis
     }
 
     private var playList = ArrayList<Music>()
-        private set(value) {
-            field = value.clone() as ArrayList<Music>
-        }
+
+    private var orderedPlayList = ArrayList<Music>()
 
     private var currentIndex = -1
     fun setPlayList(list: ArrayList<Music>, index: Int) {
         if (list.isEmpty() || index !in 0 until list.size) {
             return
         }
-        if (list == playList) {
-            setCurrent(index)
+        if (list == orderedPlayList) {
+            setCurrent(list[index])
             return
         }
-        playList = list
+        playList = list.clone() as ArrayList<Music>
+        orderedPlayList = list.clone() as ArrayList<Music>
+
         if (currentPlayMode == PLAY_MODE_SHUFFLE) {
-            RandomPlayer.reset()
+            shufflePlayList(index)
+        } else {
+            currentIndex = index
         }
-        currentIndex = index
         startMediaPlayer()
     }
+
+    private fun shufflePlayList(index: Int = currentIndex) {
+        if (index !in 0 until playList.size) {
+            return
+        }
+        val current = playList[index]
+        playList.shuffle()
+        currentIndex = playList.indexOf(current)
+        onMediaChange()
+    }
+
 
     fun getPlayListSize(): Int {
         return playList.size
@@ -247,23 +263,28 @@ object MediaPlayer : MediaPlayer.OnCompletionListener, MediaPlayer.OnPreparedLis
     fun shufflePlay(list: ArrayList<Music>) {
         currentPlayMode = PLAY_MODE_SHUFFLE
         SPManager.setInt(SPManager.SP_PLAY_MODE, currentPlayMode)
-        setPlayList(list, Random.nextInt(list.size))
+        playList = list.clone() as ArrayList<Music>
+        orderedPlayList = list.clone() as ArrayList<Music>
+        playList.shuffle()
+        currentIndex = 0
+        startMediaPlayer()
     }
 
-    fun shufflePlay() {
+    fun shufflePlay() : Boolean {
         val list = if (SPManager.getBoolean(SPManager.SP_PLAY_ALL)) MediaUtil.musics else SaveMusics.loveList.getList()
-        if (list.isNotEmpty()) {
+        return if (list.isNotEmpty()) {
             shufflePlay(list)
+            true
+        } else {
+            false
         }
     }
 
     fun add(music: Music) {
         val index = playList.indexOf(music)
         if (index == -1) {
-            if (currentPlayMode == PLAY_MODE_SHUFFLE) {
-                RandomPlayer.add(music)
-            }
             playList.add(currentIndex + 1, music)
+            orderedPlayList.add(currentIndex + 1, music)
             setCurrent(currentIndex + 1)
         } else {
             setCurrent(index)
@@ -275,9 +296,8 @@ object MediaPlayer : MediaPlayer.OnCompletionListener, MediaPlayer.OnPreparedLis
             return
         }
         val music = playList.removeAt(index)
-        if (currentPlayMode == PLAY_MODE_SHUFFLE) {
-            RandomPlayer.remove(music)
-        }
+        orderedPlayList.remove(music)
+
         if (index == currentIndex) {
             if (currentIndex >= playList.size) {
                 currentIndex--
@@ -292,8 +312,13 @@ object MediaPlayer : MediaPlayer.OnCompletionListener, MediaPlayer.OnPreparedLis
         return currentIndex
     }
 
+    fun setCurrent(music: Music) {
+        val index = playList.indexOf(music)
+        setCurrent(index)
+    }
+
     fun setCurrent(index: Int) {
-        if (index !in 0 until playList.size) {
+        if ((index !in 0 until playList.size) || (index == currentIndex && isPlaying)) {
             return
         }
         if (index == currentIndex && isPrepared && !isPlaying) {
@@ -328,49 +353,134 @@ object MediaPlayer : MediaPlayer.OnCompletionListener, MediaPlayer.OnPreparedLis
             pendingIntent = PendingIntent.getService(context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT)
             stopTime = System.currentTimeMillis() + min * 60 * 1000
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, stopTime, pendingIntent)
+                alarmManager.setExactAndAllowWhileIdle(
+                    AlarmManager.RTC_WAKEUP,
+                    stopTime,
+                    pendingIntent
+                )
             } else {
                 alarmManager.setExact(AlarmManager.RTC_WAKEUP, stopTime, pendingIntent)
             }
         }
     }
 
-    private fun startMediaPlayer() {
-        if (playList.isEmpty() || currentIndex !in 0 until playList.size) {
-            if (isPlaying) {
-                mediaPlayer.stop()
-                isPlaying = false
-                isPrepared = false
-                onPlayStateChange()
-                onMediaChange()
+    private object ThreadManager {
+        private val handler = Handler(Looper.getMainLooper())
+
+        private val threadPoolExecutor = ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, LinkedBlockingQueue())
+        //ThreadPoolExecutor(0, Integer.MAX_VALUE, 60L, TimeUnit.SECONDS, SynchronousQueue<Runnable>())
+
+        private var next : Music? = null
+
+        private var running = false
+
+        fun addTask(music : Music) {
+            next = music
+            execTask()
+        }
+
+        private fun execTask() {
+            if (next == null) {
+                running = false
+                return
             }
+            if (running) {
+                return
+            }
+
+            val music = next!!
+            next = null
+            doInBackground(Runnable {
+                running = true
+                loadImage(music)
+                if (next != null) {
+                    running = false
+                    return@Runnable
+                }
+                lyricSet = LyricUtil.getLyric(music)
+                running = false
+            }, Runnable {
+                if (next == null) {
+                    onMediaChangeFinished()
+                } else {
+                    execTask()
+                }
+            })
             return
         }
+
+        private fun doInBackground(doInBackground: Runnable, onFinish: Runnable) {
+            threadPoolExecutor.execute {
+                doInBackground.run()
+                handler.post(onFinish)
+            }
+        }
+    }
+
+    private fun startMediaPlayer() {
+        if (playList.isEmpty() || currentIndex !in 0 until playList.size) {
+            stop()
+            return
+        }
+
+        onMediaChange()
+
         isPrepared = false
+        mediaPlayer.reset()
         isPlaying = false
 
         val music = playList[currentIndex]
 
+        ThreadManager.addTask(music)
+
         try {
-            mediaPlayer.reset()
             mediaPlayer.setDataSource(music.path)
             mediaPlayer.prepareAsync()
-            RandomPlayer.setPlayed(music)
-        } catch (e: Exception) {
+        } catch (ignored: Exception) {
             onCompletion(mediaPlayer)
         }
+
     }
+
+    override fun onPrepared(mp: MediaPlayer?) {
+        isPrepared = true
+        audioFocusManager.requestAudioFocus()
+        mediaPlayer.start()
+        isPlaying = true
+        onPlayStateChange()
+        setTimer()
+    }
+
+    var image : Bitmap? = null
+    var lyricSet : LyricUtil.LyricSet? = null
+
+    private fun loadImage(music: Music) {
+        synchronized(this) {
+            if (this.image?.isRecycled == false) {
+                this.image?.recycle()
+            }
+            this.image = null
+        }
+
+        val mediaMetadataRetriever = MediaMetadataRetriever()
+        mediaMetadataRetriever.setDataSource(music.path)
+        val byteArray = mediaMetadataRetriever.embeddedPicture
+        mediaMetadataRetriever.release()
+        val image = if (byteArray == null || byteArray.isEmpty()) {
+            null
+        } else {
+            ThumbnailUtils.extractThumbnail(BitmapFactory.decodeByteArray(byteArray, 0, byteArray.size), Values.IMAGE_WIDTH, Values.IMAGE_WIDTH)
+        }
+        this.image = image
+    }
+
 
     fun next() {
         if (playList.isEmpty()) {
             return
         }
-        if (currentPlayMode == PLAY_MODE_SHUFFLE) {
-            currentIndex = RandomPlayer.next()
-        } else {
-            currentIndex++
-            currentIndex %= playList.size
-        }
+        currentIndex++
+        currentIndex %= playList.size
         startMediaPlayer()
     }
 
@@ -379,13 +489,9 @@ object MediaPlayer : MediaPlayer.OnCompletionListener, MediaPlayer.OnPreparedLis
         if (playList.isEmpty()) {
             return
         }
-        if (currentPlayMode == PLAY_MODE_SHUFFLE) {
-            currentIndex = RandomPlayer.prev()
-        } else {
-            currentIndex--
-            if (currentIndex < 0) {
-              currentIndex += playList.size
-            }
+        currentIndex--
+        if (currentIndex < 0) {
+            currentIndex += playList.size
         }
         startMediaPlayer()
     }
@@ -439,21 +545,17 @@ object MediaPlayer : MediaPlayer.OnCompletionListener, MediaPlayer.OnPreparedLis
     }
 
     override fun onCompletion(p0: MediaPlayer?) {
-        if (currentPlayMode != PLAY_MODE_SINGLE) {
-            next()
+        currentIndex ++
+        if (currentIndex == playList.size) {
+            if (SPManager.getBoolean(SPManager.SP_REPEAT)) {
+                currentIndex = 0
+                startMediaPlayer()
+            } else {
+                stop()
+            }
         } else {
             startMediaPlayer()
         }
-    }
-
-    override fun onPrepared(p0: MediaPlayer?) {
-        audioFocusManager.requestAudioFocus()
-        isPrepared = true
-        mediaPlayer.start()
-        isPlaying = true
-        onMediaChange()
-        onPlayStateChange()
-        setTimer()
     }
 
     override fun onError(p0: MediaPlayer?, what: Int, extra: Int): Boolean {
@@ -461,6 +563,12 @@ object MediaPlayer : MediaPlayer.OnCompletionListener, MediaPlayer.OnPreparedLis
             next()
         }
         return true
+    }
+
+    private fun onMediaChangeFinished() {
+        for (item in onMediaChangeListeners) {
+            item.onMediaChangeFinished()
+        }
     }
 
     private fun onMediaChange() {
@@ -487,75 +595,14 @@ object MediaPlayer : MediaPlayer.OnCompletionListener, MediaPlayer.OnPreparedLis
         if (wasPlaying && !isPlaying) {
             pause()
         }
-        wasPlaying = false
     }
 
     override fun onAudioFocusLoss() {
         if (isPlaying) {
             wasPlaying = true
             pause()
-        }
-    }
-
-    private object RandomPlayer {
-        private class Pair(var music : Music, var played: Boolean)
-
-        private var played = Stack<Music>()
-        private var shuffled = ArrayList<Pair>()
-        private var index = 0
-
-        fun reset() {
-            played.clear()
-            shuffled.clear()
-            for (music in playList) {
-                shuffled.add(Pair(music, false))
-            }
-            shuffled.shuffle()
-            index = 0
-        }
-
-        fun next() : Int {
-            while (shuffled[index].played) {
-                index++
-                if (index >= playList.size) {
-                    reset()
-                    break
-                }
-            }
-            return playList.indexOf(shuffled[index].music)
-        }
-
-        fun prev() : Int {
-            played.pop()
-            return if (!played.isEmpty()) {
-                playList.indexOf(played.pop())
-            } else {
-                next()
-            }
-        }
-
-        fun add(music : Music) {
-            shuffled.add(0, Pair(music, false))
-        }
-
-        fun remove(music : Music) {
-            played.remove(music)
-            for (i in shuffled.indices) {
-                if (shuffled[i].music == music) {
-                    shuffled.removeAt(i)
-                    break
-                }
-            }
-        }
-
-        fun setPlayed(music: Music) {
-            played.add(music)
-            for (i in shuffled.indices) {
-                if (shuffled[i].music == music) {
-                    shuffled[i].played = true
-                    return
-                }
-            }
+        } else {
+            wasPlaying = false
         }
     }
 

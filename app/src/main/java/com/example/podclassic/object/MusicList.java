@@ -64,26 +64,6 @@ public class MusicList {
         return size;
     }
 
-
-    private Bitmap bitmap = null;
-    public Bitmap getImage() {
-        if (bitmap != null && !bitmap.isRecycled()) {
-            return bitmap;
-        }
-        ContentResolver contentResolver = BaseApplication.getContext().getContentResolver();
-        Uri artworkUri = Uri.parse("content://media/external/audio/albumart");
-
-
-        Uri uri = ContentUris.withAppendedId(artworkUri, id);
-
-        try (InputStream inputStream = contentResolver.openInputStream(uri)) {
-            bitmap = ThumbnailUtils.extractThumbnail(BitmapFactory.decodeStream(inputStream), 512, 512, ThumbnailUtils.OPTIONS_RECYCLE_INPUT);
-            return bitmap;
-        } catch (Exception ignored) {
-            return null;
-        }
-    }
-
     @NotNull
     @Override
     public String toString() {

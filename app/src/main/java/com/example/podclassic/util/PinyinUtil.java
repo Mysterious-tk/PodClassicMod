@@ -537,7 +537,6 @@ public class PinyinUtil {
                 charMap.put(c, result);
                 temp = result.charAt(0);
             }
-
         }
         if ((temp >= 'A' && temp <= 'Z') || (temp >= '0' && temp <= '9')) {
             return temp;

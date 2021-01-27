@@ -12,39 +12,44 @@ import android.graphics.drawable.Icon
 import android.media.AudioManager
 import android.media.MediaMetadata
 import android.media.RemoteControlClient
+import android.media.browse.MediaBrowser
 import android.media.session.MediaSession
 import android.media.session.PlaybackState
 import android.os.Build
+import android.os.Bundle
 import android.os.IBinder
+import android.service.media.MediaBrowserService
+import androidx.core.app.NotificationCompat
 import com.example.podclassic.R
 import com.example.podclassic.`object`.Core
 import com.example.podclassic.`object`.MediaPlayer
+import com.example.podclassic.`object`.Music
 import com.example.podclassic.activity.MainActivity
 import com.example.podclassic.storage.SaveMusics
 import com.example.podclassic.util.AudioFocusManager
 import com.example.podclassic.util.Colors
 
 
-class MediaPlayerService : Service(), MediaPlayer.OnMediaChangeListener, AudioFocusManager.OnAudioFocusChangeListener {
+class MediaPlayerService : Service(), MediaPlayer.OnMediaChangeListener,
+    AudioFocusManager.OnAudioFocusChangeListener {
 
-    private val mediaPlayer = MediaPlayer
-    private val audioFocusManager by lazy { AudioFocusManager(this) }
-
-    init {
-        mediaPlayer.addOnMediaChangeListener(this)
+    private val mediaPlayer = MediaPlayer.apply {
+        addOnMediaChangeListener(this@MediaPlayerService)
     }
+    private val audioFocusManager = AudioFocusManager(this)
 
     override fun onBind(intent: Intent?): IBinder? { return null }
 
-    private val mediaSession by lazy { MediaSession(this, packageName) }
-    private val playbackStateActions = PlaybackState.ACTION_FAST_FORWARD or PlaybackState.ACTION_REWIND or PlaybackState.ACTION_PLAY_PAUSE or PlaybackState.ACTION_SKIP_TO_NEXT or PlaybackState.ACTION_SKIP_TO_PREVIOUS or PlaybackState.ACTION_STOP
+    private lateinit var mediaSession: MediaSession
+
+    private val playbackStateActions =
+        PlaybackState.ACTION_FAST_FORWARD or PlaybackState.ACTION_REWIND or PlaybackState.ACTION_PLAY_PAUSE or PlaybackState.ACTION_SKIP_TO_NEXT or PlaybackState.ACTION_SKIP_TO_PREVIOUS or PlaybackState.ACTION_STOP
 
     private val mediaSessionCallBack = object : MediaSession.Callback() {
         override fun onMediaButtonEvent(mediaButtonIntent: Intent): Boolean {
             mediaBroadcastReceiver.onReceive(this@MediaPlayerService, mediaButtonIntent)
             return true
         }
-
         override fun onRewind() { MediaPlayer.backward() }
         override fun onFastForward() { MediaPlayer.forward() }
         override fun onSkipToPrevious() { MediaPlayer.prev() }
@@ -61,62 +66,44 @@ class MediaPlayerService : Service(), MediaPlayer.OnMediaChangeListener, AudioFo
         audioFocusManager.onAudioFocusChangeListener = null
         stopForeground(true)
 
-        mediaSession.setCallback(null)
-        mediaSession.isActive = false
-        mediaSession.release()
-        unregisterBroadcastReceiver()
-    }
-
-    private val pendingIntentShuffle by lazy {
-        val intent = Intent(this, MediaPlayerService::class.java)
-        intent.action = ACTION_SHUFFLE
-        val pendingIntent: PendingIntent?
-        pendingIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            PendingIntent.getForegroundService(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT)
-        } else {
-            PendingIntent.getService(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT)
+        mediaSession.apply {
+            setCallback(null)
+            isActive = false
+            release()
         }
-        pendingIntent
+        unregisterBroadcastReceiver()
     }
 
     override fun onCreate() {
         super.onCreate()
         registerBroadcastReceiver()
-        mediaSession.isActive = true
-        mediaSession.setCallback(mediaSessionCallBack)
-        mediaSession.setFlags(MediaSession.FLAG_HANDLES_TRANSPORT_CONTROLS or MediaSession.FLAG_HANDLES_MEDIA_BUTTONS)
-        mediaSession.setMediaButtonReceiver(pendingIntentShuffle)
-        mediaSession.setSessionActivity(pendingIntentActivity)
 
         val componentName = ComponentName(this, MediaBroadcastReceiver::class.java)
-        packageManager.setComponentEnabledSetting(
-            componentName,
-            PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
-            PackageManager.DONT_KILL_APP
-        )
+        packageManager.setComponentEnabledSetting(componentName, PackageManager.COMPONENT_ENABLED_STATE_ENABLED, PackageManager.DONT_KILL_APP)
         val mediaButtonIntent = Intent(Intent.ACTION_MEDIA_BUTTON)
         mediaButtonIntent.component = componentName
-        val pendingIntent = PendingIntent.getBroadcast(
-            this,
-            0,
-            mediaButtonIntent,
-            PendingIntent.FLAG_CANCEL_CURRENT
-        )
-        mediaSession.setMediaButtonReceiver(pendingIntent)
+        val pendingIntent = PendingIntent.getBroadcast(this, 0, mediaButtonIntent, PendingIntent.FLAG_CANCEL_CURRENT)
+
+        mediaSession = MediaSession(applicationContext, packageName).apply {
+            isActive = true
+            setCallback(mediaSessionCallBack)
+            setFlags(MediaSession.FLAG_HANDLES_TRANSPORT_CONTROLS or MediaSession.FLAG_HANDLES_MEDIA_BUTTONS)
+            setMediaButtonReceiver(pendingIntentShuffle)
+            setSessionActivity(pendingIntentActivity)
+            setMediaButtonReceiver(pendingIntent)
+        }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            val channel = NotificationChannel(
-                packageName,
-                "播放控制",
-                NotificationManager.IMPORTANCE_LOW
-            )
+            val channel = NotificationChannel(packageName, "播放控制", NotificationManager.IMPORTANCE_LOW)
             channel.setSound(null, null)
             notificationManager.createNotificationChannel(channel)
         }
     }
 
-    override fun onMediaChange() {
+    override fun onMediaChange() {}
+
+    override fun onMediaChangeFinished() {
         sendNotification()
     }
 
@@ -134,142 +121,46 @@ class MediaPlayerService : Service(), MediaPlayer.OnMediaChangeListener, AudioFo
         const val ACTION_FAVORITE = "action_favorite"
     }
 
+    private val contentIntent by lazy {
+        PendingIntent.getActivity(this, 10, Intent(this, MainActivity::class.java).apply { action = ACTION_MAIN }, PendingIntent.FLAG_UPDATE_CURRENT)
+    }
+
+    private val pendingIntentShuffle by lazy {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) PendingIntent.getForegroundService(this, 100, Intent(this, MediaPlayerService::class.java).apply { action = ACTION_SHUFFLE }, PendingIntent.FLAG_UPDATE_CURRENT)
+        else PendingIntent.getService(this, 100, Intent(this, MediaPlayerService::class.java).apply { action = ACTION_SHUFFLE }, PendingIntent.FLAG_UPDATE_CURRENT)
+    }
+
     private val pendingIntentPause by lazy {
-        val intent = Intent(this, MediaPlayerService::class.java)
-        intent.action = ACTION_PAUSE
-        val pendingIntent: PendingIntent?
-        pendingIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            PendingIntent.getForegroundService(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT)
-        } else {
-            PendingIntent.getService(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT)
-        }
-        pendingIntent
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) PendingIntent.getForegroundService(this, 2, Intent(this, MediaPlayerService::class.java).apply { action = ACTION_PAUSE }, PendingIntent.FLAG_UPDATE_CURRENT)
+        else PendingIntent.getService(this, 2, Intent(this, MediaPlayerService::class.java).apply { action = ACTION_PAUSE }, PendingIntent.FLAG_UPDATE_CURRENT)
     }
 
     private val pendingIntentActivity by lazy {
-        val intent = Intent(this, MainActivity::class.java)
-        intent.action = ACTION_MAIN
-        val pendingIntent: PendingIntent?
-        pendingIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            PendingIntent.getForegroundService(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT)
-        } else {
-            PendingIntent.getService(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT)
-        }
-        pendingIntent
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) PendingIntent.getForegroundService(this, 6, Intent(this, MainActivity::class.java).apply {  action = ACTION_MAIN }, PendingIntent.FLAG_UPDATE_CURRENT)
+        else PendingIntent.getService(this, 6, Intent(this, MainActivity::class.java).apply {  action = ACTION_MAIN }, PendingIntent.FLAG_UPDATE_CURRENT)
     }
 
     private val pendingIntentFavorite by lazy {
-        val intent = Intent(this, MediaPlayerService::class.java)
-        intent.action = ACTION_FAVORITE
-        val pendingIntent: PendingIntent?
-        pendingIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            PendingIntent.getForegroundService(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT)
-        } else {
-            PendingIntent.getService(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT)
-        }
-        pendingIntent
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) PendingIntent.getForegroundService(this, 4, Intent(this, MediaPlayerService::class.java).apply { action = ACTION_FAVORITE }, PendingIntent.FLAG_UPDATE_CURRENT)
+        else PendingIntent.getService(this, 4, Intent(this, MediaPlayerService::class.java).apply { action = ACTION_FAVORITE }, PendingIntent.FLAG_UPDATE_CURRENT)
     }
 
     private val actionPrev by lazy {
-        val intent = Intent(this, MediaPlayerService::class.java)
-        intent.action = ACTION_PREV
-        val pendingIntent: PendingIntent?
-        val action: Notification.Action?
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            pendingIntent = PendingIntent.getForegroundService(
-                this,
-                0,
-                intent,
-                PendingIntent.FLAG_UPDATE_CURRENT
-            )
-            action = Notification.Action.Builder(
-                Icon.createWithResource(
-                    this,
-                    R.drawable.ic_skip_previous_grey_800_36dp
-                ), "prev", pendingIntent
-            ).build()
-        } else {
-            pendingIntent = PendingIntent.getService(
-                this,
-                0,
-                intent,
-                PendingIntent.FLAG_UPDATE_CURRENT
-            )
-            action = Notification.Action.Builder(
-                R.drawable.ic_skip_previous_grey_800_36dp,
-                "prev",
-                pendingIntent
-            ).build()
-        }
-        action
+        val intent = Intent(this, MediaPlayerService::class.java).apply { action = ACTION_PREV }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) Notification.Action.Builder(Icon.createWithResource(this, R.drawable.ic_skip_previous_grey_800_36dp), "prev", PendingIntent.getForegroundService(this, 1, intent, PendingIntent.FLAG_UPDATE_CURRENT)).build()
+        else Notification.Action.Builder(R.drawable.ic_skip_previous_grey_800_36dp, "prev", PendingIntent.getService(this, 1, intent, PendingIntent.FLAG_UPDATE_CURRENT)).build()
     }
 
     private val actionNext by lazy {
-        val intent = Intent(this, MediaPlayerService::class.java)
-        intent.action = ACTION_NEXT
-        val pendingIntent: PendingIntent?
-        val action: Notification.Action?
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            pendingIntent = PendingIntent.getForegroundService(
-                this,
-                0,
-                intent,
-                PendingIntent.FLAG_UPDATE_CURRENT
-            )
-            action = Notification.Action.Builder(
-                Icon.createWithResource(
-                    this,
-                    R.drawable.ic_skip_next_grey_800_36dp
-                ), "next", pendingIntent
-            ).build()
-        } else {
-            pendingIntent = PendingIntent.getService(
-                this,
-                0,
-                intent,
-                PendingIntent.FLAG_UPDATE_CURRENT
-            )
-            action = Notification.Action.Builder(
-                R.drawable.ic_skip_next_grey_800_36dp,
-                "next",
-                pendingIntent
-            ).build()
-        }
-        action
+        val intent = Intent(this, MediaPlayerService::class.java).apply { action = ACTION_NEXT }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) Notification.Action.Builder(Icon.createWithResource(this, R.drawable.ic_skip_next_grey_800_36dp), "next", PendingIntent.getForegroundService(this, 3, intent, PendingIntent.FLAG_UPDATE_CURRENT)).build()
+        else Notification.Action.Builder(R.drawable.ic_skip_next_grey_800_36dp, "next", PendingIntent.getService(this, 3, intent, PendingIntent.FLAG_UPDATE_CURRENT)).build()
     }
 
     private val actionStop by lazy {
-        val intent = Intent(this, MediaPlayerService::class.java)
-        intent.action = ACTION_STOP
-        val pendingIntent: PendingIntent?
-        val action: Notification.Action?
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            pendingIntent = PendingIntent.getForegroundService(
-                this,
-                0,
-                intent,
-                PendingIntent.FLAG_UPDATE_CURRENT
-            )
-            action = Notification.Action.Builder(
-                Icon.createWithResource(
-                    this,
-                    R.drawable.ic_close_grey_800_24dp
-                ), "stop", pendingIntent
-            ).build()
-        } else {
-            pendingIntent = PendingIntent.getService(
-                this,
-                0,
-                intent,
-                PendingIntent.FLAG_UPDATE_CURRENT
-            )
-            action = Notification.Action.Builder(
-                R.drawable.ic_close_grey_800_24dp,
-                "stop",
-                pendingIntent
-            ).build()
-        }
-        action
+        val intent = Intent(this, MediaPlayerService::class.java).apply { action = ACTION_STOP }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) Notification.Action.Builder(Icon.createWithResource(this, R.drawable.ic_close_grey_800_24dp), "stop", PendingIntent.getForegroundService(this, 5, intent, PendingIntent.FLAG_UPDATE_CURRENT)).build()
+        else Notification.Action.Builder(R.drawable.ic_close_grey_800_24dp, "stop", PendingIntent.getService(this, 5, intent, PendingIntent.FLAG_UPDATE_CURRENT)).build()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -296,98 +187,68 @@ class MediaPlayerService : Service(), MediaPlayer.OnMediaChangeListener, AudioFo
     }
 
     private val mediaStyle by lazy {
-        val style = MediaStyle()
-        style.setMediaSession(mediaSession.sessionToken)
-        style
+        MediaStyle().apply {
+            setMediaSession(mediaSession.sessionToken)
+            setShowActionsInCompactView(1,2,3)
+        }
     }
 
     @Suppress("DEPRECATION")
     private fun sendNotification() {
-        val music = mediaPlayer.getCurrent()
+        val music = MediaPlayer.getCurrent()
         if (music == null) {
             stopForeground(true)
             return
         }
-        val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) Notification.Builder(
-            this,
-            packageName
-        ) else Notification.Builder(this)
+        val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) Notification.Builder(this, packageName) else Notification.Builder(this)
 
-        val image = music.getImage()
-        builder.style = mediaStyle
-        builder.setSmallIcon(R.drawable.ic_play_arrow_grey_800_36dp)
-        builder.setShowWhen(false)
-        builder.setOnlyAlertOnce(true)
-        builder.setLargeIcon(image)
-        val contentIntent = Intent(this, MainActivity::class.java)
-        contentIntent.action = ACTION_MAIN
-        builder.setContentIntent(
-            PendingIntent.getActivity(
-                this,
-                3,
-                contentIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT
-            )
-        )
 
-        val actionPause = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            Notification.Action.Builder(
-                Icon.createWithResource(
-                    this,
-                    if (mediaPlayer.isPlaying) R.drawable.ic_pause_grey_800_36dp else R.drawable.ic_play_arrow_grey_800_36dp
-                ), "pause", pendingIntentPause
-            ).build()
-        } else {
-            Notification.Action.Builder(
-                if (mediaPlayer.isPlaying) R.drawable.ic_pause_grey_800_36dp else R.drawable.ic_play_arrow_grey_800_36dp,
-                "pause",
-                pendingIntentPause
-            ).build()
+        val actionPause = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) Notification.Action.Builder(Icon.createWithResource(this, if (mediaPlayer.isPlaying) R.drawable.ic_pause_grey_800_36dp else R.drawable.ic_play_arrow_grey_800_36dp), "pause", pendingIntentPause).build()
+        else Notification.Action.Builder(if (mediaPlayer.isPlaying) R.drawable.ic_pause_grey_800_36dp else R.drawable.ic_play_arrow_grey_800_36dp, "pause", pendingIntentPause).build()
+
+        val actionFavorite = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) Notification.Action.Builder(Icon.createWithResource(this, if (SaveMusics.loveList.contains(music)) R.drawable.ic_favorite_grey_800_24dp else R.drawable.ic_favorite_border_grey_800_24dp), "favorite", pendingIntentFavorite).build()
+        else Notification.Action.Builder(if (SaveMusics.loveList.contains(music)) R.drawable.ic_favorite_grey_800_24dp else R.drawable.ic_favorite_border_grey_800_24dp, "favorite", pendingIntentFavorite).build()
+
+        builder.apply {
+            setVisibility(Notification.VISIBILITY_PUBLIC)
+            setPriority(Notification.PRIORITY_MAX)
+            setSmallIcon(R.drawable.ic_play_arrow_grey_800_36dp)
+            setShowWhen(false)
+            setOnlyAlertOnce(true)
+            setDeleteIntent(actionStop.actionIntent)
+            setContentIntent(contentIntent)
+            setLargeIcon(MediaPlayer.image)
+            setOngoing(mediaPlayer.isPlaying)
+            addAction(actionPrev)
+            addAction(actionPause)
+            addAction(actionNext)
+            addAction(actionFavorite)
+            addAction(actionStop)
+            setContentTitle(music.name)
+            setContentText(music.singer)
+            setColor(Colors.color_primary)
+            style = mediaStyle
         }
-
-        val actionFavorite = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            Notification.Action.Builder(
-                Icon.createWithResource(
-                    this, if (SaveMusics.loveList.contains(
-                            music
-                        )
-                    ) R.drawable.ic_favorite_grey_800_24dp else R.drawable.ic_favorite_border_grey_800_24dp
-                ), "favorite", pendingIntentFavorite
-            ).build()
-        } else {
-            Notification.Action.Builder(
-                if (SaveMusics.loveList.contains(music)) R.drawable.ic_favorite_grey_800_24dp else R.drawable.ic_favorite_border_grey_800_24dp,
-                "favorite",
-                pendingIntentFavorite
-            ).build()
-        }
-
-        builder.addAction(actionPrev)
-        builder.addAction(actionPause)
-        builder.addAction(actionNext)
-        builder.addAction(actionFavorite)
-        builder.addAction(actionStop)
-
-        builder.setContentTitle(music.name)
-        builder.setContentText(music.singer)
-
-        builder.setColor(Colors.color_primary)
-
-        builder.setVisibility(Notification.VISIBILITY_PUBLIC)
 
         val notification = builder.build()
         notification.flags = Notification.FLAG_ONGOING_EVENT
         startForeground(1, notification)
 
-        val state = if (mediaPlayer.isPlaying)  PlaybackState.STATE_PLAYING else PlaybackState.STATE_PAUSED
+        val state = if (mediaPlayer.isPlaying) PlaybackState.STATE_PLAYING else PlaybackState.STATE_PAUSED
+        mediaSession.setPlaybackState(
+            PlaybackState.Builder().apply {
+                setActions(playbackStateActions)
+                setState(state, mediaPlayer.getProgress().toLong(), 1f)
+            }.build()
+        )
+
         val mediaMetadata = MediaMetadata.Builder()
             .putString(MediaMetadata.METADATA_KEY_TITLE, music.name)
             .putString(MediaMetadata.METADATA_KEY_ALBUM, music.album)
             .putString(MediaMetadata.METADATA_KEY_ARTIST, music.singer)
-            .putBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON, image)
+            .putBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON, mediaPlayer.image)
             .build()
         mediaSession.setMetadata(mediaMetadata)
-        mediaSession.setPlaybackState(PlaybackState.Builder().setActions(playbackStateActions).setState(state, mediaPlayer.getProgress().toLong(), 1f).build())
     }
 
     private val mediaBroadcastReceiver = MediaBroadcastReceiver()

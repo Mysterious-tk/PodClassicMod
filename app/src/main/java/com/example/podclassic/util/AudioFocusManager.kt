@@ -16,6 +16,7 @@ class AudioFocusManager(var onAudioFocusChangeListener : OnAudioFocusChangeListe
         .setUsage(AudioAttributes.USAGE_MEDIA)
         .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
         .build()!!
+
     private val audioFocusRequest : AudioFocusRequest? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
         AudioFocusRequest
             .Builder(AudioManager.AUDIOFOCUS_GAIN)
@@ -25,7 +26,7 @@ class AudioFocusManager(var onAudioFocusChangeListener : OnAudioFocusChangeListe
 
     @Suppress("DEPRECATION")
     fun requestAudioFocus() {
-        if (!SPManager.getBoolean(SPManager.SP_AUDIO_FOCUS)) { return }
+        if (!SPManager.getBoolean(SPManager.SP_AUDIO_FOCUS)) return
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             audioManager.requestAudioFocus(audioFocusRequest!!)

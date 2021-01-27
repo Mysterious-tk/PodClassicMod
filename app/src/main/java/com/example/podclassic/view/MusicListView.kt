@@ -35,7 +35,6 @@ class MusicListView : ListView, ScreenView, MediaPlayer.OnMediaChangeListener {
         sorted = musicList.type != MusicList.TYPE_ALBUM
     }
     constructor(context: Context, onLongClick : Int) : super(context) {
-        Log.d("haotian_wang", "onLongClick = $onLongClick")
         val musicList = when (onLongClick) {
             LONG_CLICK_REMOVE_LOVE -> SaveMusics.loveList.getMusicList()
             LONG_CLICK_REMOVE_CURRENT -> MusicList("正在播放", MediaPlayer.getPlayList())
@@ -138,6 +137,8 @@ class MusicListView : ListView, ScreenView, MediaPlayer.OnMediaChangeListener {
     override fun onMediaChange() {
         refreshList()
     }
+
+    override fun onMediaChangeFinished() {}
 
     override fun onPlayStateChange() {}
 

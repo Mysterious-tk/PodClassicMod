@@ -12,6 +12,8 @@ object Values {
     const val RESOLUTION_HIGH = 1440
     const val RESOLUTION_LOW = 720
 
+    const val IMAGE_WIDTH = 512
+
     val DEFAULT_PADDING by lazy {
         when {
             resolution >= RESOLUTION_HIGH -> 36

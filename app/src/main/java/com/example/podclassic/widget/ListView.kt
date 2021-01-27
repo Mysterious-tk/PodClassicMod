@@ -29,17 +29,12 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
         const val QUICK_SLIDE = DEFAULT_MAX_SIZE * 5
     }
 
-    constructor(context: Context) : this(context,
-        DEFAULT_MAX_SIZE
-    )
+    constructor(context: Context) : this(context, DEFAULT_MAX_SIZE)
 
     private val linearLayout = LinearLayout(context)
-    private val itemViewList = ArrayList<ItemView>(
-        DEFAULT_MAX_SIZE
-    )
+    private val itemViewList = ArrayList<ItemView>(DEFAULT_MAX_SIZE)
 
-    private val scrollBar =
-        ScrollBar(context)
+    private val scrollBar = ScrollBar(context)
 
     private val indexView = android.widget.TextView(context)
 
@@ -50,8 +45,7 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
         scrollBarLayoutParams.gravity = Gravity.END
         this.addView(scrollBar, scrollBarLayoutParams)
         for (i in 0 until MAX_SIZE) {
-            val itemView =
-                ItemView(context)
+            val itemView = ItemView(context)
             val layoutParams = LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT,LayoutParams.WRAP_CONTENT)
             layoutParams.weight = 1f
             itemViewList.add(itemView)
@@ -59,8 +53,10 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
         }
 
         indexView.visibility = INVISIBLE
-        indexView.layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT,LayoutParams.WRAP_CONTENT)
-        (indexView.layoutParams as LayoutParams).gravity = Gravity.CENTER
+        val layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT,LayoutParams.WRAP_CONTENT)
+        layoutParams.gravity = Gravity.CENTER
+        indexView.layoutParams = layoutParams
+
         indexView.setTextColor(Colors.text_light)
         indexView.setBackgroundColor(Colors.color_primary)
 
@@ -70,10 +66,10 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
         gradientDrawable.setColor(Colors.color_primary)
         gradientDrawable.cornerRadius = 4f
         gradientDrawable.setStroke(DEFAULT_PADDING * 4, Colors.color_primary)
+
         indexView.background = gradientDrawable
         indexView.textSize = 20f
         indexView.gravity = Gravity.CENTER
-
 
         indexView.width = DEFAULT_PADDING * 10
         indexView.maxWidth = DEFAULT_PADDING * 10
@@ -106,10 +102,9 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
     }
 
     fun remove(item : Item) {
-        val result = itemList.remove(item)
-        if (result) {
+        if (itemList.remove(item)) {
             if (index == itemList.size) {
-                index--
+                index --
             }
             if (index < 0) {
                 index = 0
@@ -149,6 +144,7 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
         if (itemList.size > MAX_SIZE && scrollBar.visibility == GONE) {
             scrollBar.visibility = View.VISIBLE
         }
+        scrollBar.setScrollBar(position, MAX_SIZE, itemList.size)
         for (i in position until MAX_SIZE + position) {
             if (i >= itemList.size) {
                 clearAt(i - position)
@@ -159,25 +155,24 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
             //itemList.height = itemHeight
             //itemView.cancelShake()
             if (scrollBar.visibility == View.VISIBLE) {
-                itemView.setPadding(0,0,
-                    ScrollBar.WIDTH, 0)
+                itemView.setPadding(0,0, DEFAULT_PADDING, 0)
             }
             itemView.setHighlight(i == index)
             itemView.setRightText(itemList[i].rightText)
             itemView.setEnable(itemList[i].enable)
             onItemCreated(i, itemView)
         }
-        scrollBar.setScrollBar(position, MAX_SIZE, itemList.size)
     }
 
     open fun refreshItem() {
         val itemView = itemViewList[index - position]
-        if (itemList.size == 0) {
+        if (itemList.isEmpty()) {
             itemView.clear()
         } else {
-            itemView.setText(itemList[index].name)
-            itemView.setRightText(itemList[index].rightText)
-            itemView.setEnable(itemList[index].enable)
+            val item = itemList[index]
+            itemView.setText(item.name)
+            itemView.setRightText(item.rightText)
+            itemView.setEnable(item.enable)
             onItemCreated(index, itemView)
         }
     }
@@ -239,15 +234,19 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
                     refreshList()
                     if (sorted) {
                         indexView.visibility = VISIBLE
-                        timer?.cancel()
-                        timer = Timer()
-                        timer!!.schedule(object : TimerTask() {
-                            override fun run() {
-                                if ((System.currentTimeMillis() - prevSlideTime) > DELAY) {
-                                    indexView.visibility = INVISIBLE
+                        if (timer == null) {
+                            timer = Timer()
+                            timer!!.schedule(object : TimerTask() {
+                                override fun run() {
+                                    if (indexView.visibility == View.INVISIBLE) {
+                                        cancelTimer()
+                                    } else if ((System.currentTimeMillis() - prevSlideTime) > DELAY) {
+                                        cancelTimer()
+                                        ThreadUtil.runOnUiThread(Runnable { indexView.visibility = INVISIBLE })
+                                    }
                                 }
-                            }
-                        }, DELAY * 6L)
+                            }, DELAY * 6L, DELAY * 12L)
+                        }
                     }
                     prevSlideTime = currentMillis
                     return true
@@ -255,28 +254,17 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
                 else -> {
                     if (direction > 0) {
                         if (slideCount < 0) {
-                            slideCount = 0
+                            slideCount = 1
+                        } else {
+                            slideCount++
                         }
-                        slideCount++
                     } else {
                         if (slideCount > 0) {
-                            slideCount = 0
+                            slideCount = -1
+                        } else {
+                            slideCount--
                         }
-                        slideCount--
                     }
-                }
-            }
-            if (sorted) {
-                if (indexView.visibility == View.VISIBLE) {
-                    timer?.cancel()
-                    timer = Timer()
-                    timer!!.schedule(object : TimerTask() {
-                        override fun run() {
-                            if ((System.currentTimeMillis() - prevSlideTime) > DELAY) {
-                                indexView.visibility = INVISIBLE
-                            }
-                        }
-                    }, DELAY * 6L)
                 }
             }
             prevSlideTime = currentMillis
@@ -289,6 +277,7 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
                 index--
             }
         } else {
+            //direction > 0
             if (index < itemList.size - 1) {
                 if (itemList.size > MAX_SIZE && index == position + MAX_SIZE - 1) {
                     position++
@@ -329,6 +318,11 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
         return itemList.size
     }
 
+    private fun cancelTimer() {
+        timer?.cancel()
+        timer = null
+    }
+
     var defaultOnItemClickListener: OnItemClickListener? = null
 
     interface OnItemClickListener {
@@ -361,7 +355,6 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
         var size = 0
 
         companion object {
-            const val WIDTH = 24
             const val LINE_WIDTH = 1
         }
 
@@ -376,13 +369,13 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
 
         override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
             if (size > maxSize) {
-                visibility = VISIBLE
                 var barHeight = measuredHeight * maxSize / size
                 if (barHeight == 0) {
                     barHeight = 1
                 }
                 val barTop = measuredHeight * position / size
                 bar.layout(LINE_WIDTH, barTop, measuredWidth, barTop + barHeight)
+                visibility = VISIBLE
             } else {
                 visibility = GONE
             }
@@ -390,7 +383,7 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
 
         override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
             super.onMeasure(widthMeasureSpec, heightMeasureSpec)
-            setMeasuredDimension(WIDTH, MeasureSpec.getSize(heightMeasureSpec))
+            setMeasuredDimension(DEFAULT_PADDING, MeasureSpec.getSize(heightMeasureSpec))
         }
 
         override fun onDraw(canvas: Canvas?) {
@@ -422,7 +415,6 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
         private val leftText = TextView(context)
 
         init {
-            clear()
 
             val layoutParams1 = LayoutParams(LayoutParams.MATCH_PARENT,LayoutParams.MATCH_PARENT)
             val layoutParams2 = LayoutParams(LayoutParams.WRAP_CONTENT,LayoutParams.MATCH_PARENT)

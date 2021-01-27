@@ -3,6 +3,6 @@
     <item name="index" type="id"/>
     <item name="image" type="id"/>
     <item name="timer_view" type="id"/>
-
+    <item name="icon_1" type="id"/>
 
 </resources>
