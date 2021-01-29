@@ -304,7 +304,7 @@ public class PinyinUtil {
 
         private static final Collator COLLATOR = Collator.getInstance(Locale.CHINA);
 
-        private static HanziToPinyin sInstance = new HanziToPinyin();
+        private static final HanziToPinyin sInstance = new HanziToPinyin();
 
         public static class Token {
 
@@ -394,7 +394,7 @@ public class PinyinUtil {
     }
 
     private static class Cn2Spell {
-        private static int[] pyvalue = new int[]{-20319, -20317, -20304, -20295, -20292, -20283, -20265, -20257, -20242, -20230, -20051, -20036, -20032,
+        private static final int[] pyvalue = new int[]{-20319, -20317, -20304, -20295, -20292, -20283, -20265, -20257, -20242, -20230, -20051, -20036, -20032,
                 -20026, -20002, -19990, -19986, -19982, -19976, -19805, -19784, -19775, -19774, -19763, -19756, -19751, -19746, -19741, -19739, -19728,
                 -19725, -19715, -19540, -19531, -19525, -19515, -19500, -19484, -19479, -19467, -19289, -19288, -19281, -19275, -19270, -19263, -19261,
                 -19249, -19243, -19242, -19238, -19235, -19227, -19224, -19218, -19212, -19038, -19023, -19018, -19006, -19003, -18996, -18977, -18961,
@@ -418,7 +418,7 @@ public class PinyinUtil {
                 -11340, -11339, -11324, -11303, -11097, -11077, -11067, -11055, -11052, -11045, -11041, -11038, -11024, -11020, -11019, -11018, -11014,
                 -10838, -10832, -10815, -10800, -10790, -10780, -10764, -10587, -10544, -10533, -10519, -10331, -10329, -10328, -10322, -10315, -10309,
                 -10307, -10296, -10281, -10274, -10270, -10262, -10260, -10256, -10254};
-        private static String[] pystr = new String[] {"A","AI","AN","ANG","AO","BA","BAI","BAN","BANG","BAO","BEI","BEN","BENG","BI","BIAN","BIAO","BIE","BIN",
+        private static final String[] pystr = new String[] {"A","AI","AN","ANG","AO","BA","BAI","BAN","BANG","BAO","BEI","BEN","BENG","BI","BIAN","BIAO","BIE","BIN",
                 "BING","BO","BU","CA","CAI","CAN","CANG","CAO","CE","CENG","CHA","CHAI","CHAN","CHANG","CHAO","CHE","CHEN","CHENG","CHI","CHONG","CHOU","CHU",
                 "CHUAI","CHUAN","CHUANG","CHUI","CHUN","CHUO","CI","CONG","COU","CU","CUAN","CUI","CUN","CUO","DA","DAI","DAN","DANG","DAO","DE","DENG","DI",
                 "DIAN","DIAO","DIE","DING","DIU","DONG","DOU","DU","DUAN","DUI","DUN","DUO","E","EN","ER","FA","FAN","FANG","FEI","FEN","FENG","FO","FOU","FU",
@@ -437,7 +437,7 @@ public class PinyinUtil {
                 "YUE","YUN","ZA","ZAI","ZAN","ZANG","ZAO","ZE","ZEI","ZEN","ZENG","ZHA","ZHAI","ZHAN","ZHANG","ZHAO","ZHE","ZHEN","ZHENG","ZHI","ZHONG","ZHOU",
                 "ZHU","ZHUA","ZHUAI","ZHUAN","ZHUANG","ZHUI","ZHUN","ZHUO","ZI","ZONG","ZOU","ZU","ZUAN","ZUI","ZUN","ZUO",
         };
-        private static Cn2Spell cn2Spell = new Cn2Spell();
+        private static final Cn2Spell cn2Spell = new Cn2Spell();
 
         public static Cn2Spell getInstance() {
             return cn2Spell;
@@ -484,10 +484,10 @@ public class PinyinUtil {
         }
     }
 
-    private static HanziToPinyin hanziToPinyin = HanziToPinyin.getInstance();
-    private static Cn2Spell cn2Spell = Cn2Spell.getInstance();
+    private static final HanziToPinyin hanziToPinyin = HanziToPinyin.getInstance();
+    private static final Cn2Spell cn2Spell = Cn2Spell.getInstance();
 
-    private static HashMap<Character, String> charMap = new HashMap<>();
+    private static final HashMap<Character, String> charMap = new HashMap<>();
 
     public static String getPinyin(String src) {
         StringBuilder stringBuilder = new StringBuilder();

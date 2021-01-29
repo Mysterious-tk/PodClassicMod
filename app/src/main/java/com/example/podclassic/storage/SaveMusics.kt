@@ -14,6 +14,7 @@ import com.example.podclassic.`object`.MusicList
 import com.example.podclassic.base.BaseApplication
 import com.example.podclassic.service.MediaPlayerService
 import java.io.File
+import java.net.IDN
 
 class SaveMusics(private val databaseName: String, val name : String) {
 
@@ -97,7 +98,7 @@ class SaveMusics(private val databaseName: String, val name : String) {
 
     fun search(selection: String?, selectionArgs: Array<String>?) : ArrayList<Music> {
         val db = getDatabase()
-        val cursor = db.query(databaseName, arrayOf(NAME, PATH, SINGER, ALBUM), selection, selectionArgs, null, null, null)
+        val cursor = db.query(databaseName, arrayOf(NAME, PATH, SINGER, ALBUM, ID), selection, selectionArgs, null, null, null)
         val list = ArrayList<Music>()
         val deleteList = ArrayList<Music>()
 
@@ -132,7 +133,7 @@ class SaveMusics(private val databaseName: String, val name : String) {
     companion object {
         private class DatabaseOpenHelper(context: Context?, private val name: String, factory: CursorFactory?, version: Int) : SQLiteOpenHelper(context, name, factory, version) {
             override fun onCreate(db: SQLiteDatabase) {
-                val sql = "create table if not exists $name (number integer primary key autoincrement, $NAME varchar, $PATH varchar, $SINGER varchar, $ALBUM varchar)"
+                val sql = "create table if not exists $name (number integer primary key autoincrement, $NAME varchar, $PATH varchar, $SINGER varchar, $ALBUM varchar, $ID varchar)"
                 db.execSQL(sql)
             }
             override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {}
@@ -143,6 +144,7 @@ class SaveMusics(private val databaseName: String, val name : String) {
         const val PATH = "path"
         const val SINGER = "singer_name"
         const val ALBUM = "album_name"
+        const val ID = "album_id"
 
         private const val LOVE_LIST = "love_list"
 
@@ -155,7 +157,8 @@ class SaveMusics(private val databaseName: String, val name : String) {
             val album = cursor.getString(cursor.getColumnIndex(ALBUM))
             val singer = cursor.getString(cursor.getColumnIndex(SINGER))
             val path = cursor.getString(cursor.getColumnIndex(PATH))
-            return Music(name, album, singer, path)
+            val id = cursor.getLong(cursor.getColumnIndex(ID))
+            return Music(name, album, singer, path, id)
         }
 
         fun putMusic(values: ContentValues, music: Music): ContentValues? {
@@ -163,6 +166,7 @@ class SaveMusics(private val databaseName: String, val name : String) {
             values.put(SINGER, music.singer)
             values.put(ALBUM, music.album)
             values.put(PATH, music.path)
+            values.put(ID, music.id)
             return values
         }
     }

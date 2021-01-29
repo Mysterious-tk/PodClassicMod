@@ -4,6 +4,7 @@ import android.content.ContentUris
 import android.database.Cursor
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.media.MediaMetadataRetriever
 import android.media.ThumbnailUtils
 import android.net.Uri
 import android.provider.MediaStore
@@ -45,7 +46,7 @@ object MediaUtil {
             val singer = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Media.ARTIST))
             val name = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Media.TITLE))
             val id = cursor.getLong(cursor.getColumnIndex(MediaStore.Audio.Media.ALBUM_ID))
-            return Music(name, album, singer, path)
+            return Music(name, album, singer, path, id)
         }
         return null
     }
@@ -266,9 +267,9 @@ object MediaUtil {
     }
 
 
-    fun getAlbumImage(album: MusicList): Bitmap? {
+    fun getAlbumImage(id : Long) : Bitmap? {
         val artworkUri = Uri.parse("content://media/external/audio/albumart")
-        val uri = ContentUris.withAppendedId(artworkUri, album.id)
+        val uri = ContentUris.withAppendedId(artworkUri, id)
         try {
             contentResolver.openInputStream(uri).use { inputStream ->
                 return ThumbnailUtils.extractThumbnail(
@@ -280,6 +281,18 @@ object MediaUtil {
             }
         } catch (ignored: Exception) {
             return null
+        }
+    }
+
+    fun getMusicImage(path : String) : Bitmap? {
+        val mediaMetadataRetriever = MediaMetadataRetriever()
+        mediaMetadataRetriever.setDataSource(path)
+        val byteArray = mediaMetadataRetriever.embeddedPicture
+        mediaMetadataRetriever.release()
+        return if (byteArray == null || byteArray.isEmpty()) {
+            null
+        } else {
+            ThumbnailUtils.extractThumbnail(BitmapFactory.decodeByteArray(byteArray, 0, byteArray.size), Values.IMAGE_WIDTH, Values.IMAGE_WIDTH)
         }
     }
 }

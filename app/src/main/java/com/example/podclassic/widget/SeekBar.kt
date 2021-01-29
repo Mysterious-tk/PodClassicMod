@@ -66,18 +66,23 @@ class SeekBar(context: Context) : FrameLayout(context) {
     }
 
     fun setMax(duration : Int) {
-        this.max = duration
-        if (duration <= 0 || duration > 1000 * 60 * 60 * 24) {
+        if (duration in 1..1000 * 60 * 720) {
+            this.max = duration
+        } else {
             this.max = 1
         }
         if (textVisibility == View.VISIBLE) {
-            rightView.text = toMinute(this.max)
+            rightView.setBufferedText(toMinute(this.max))
         }
         onCurrentPositionChange()
     }
 
     fun setCurrent(cur : Int) {
-        this.current = cur
+        if (cur in 0..1000 * 60 * 720) {
+            this.current = cur
+        } else {
+            this.current = 0
+        }
         onCurrentPositionChange()
     }
 
@@ -90,9 +95,7 @@ class SeekBar(context: Context) : FrameLayout(context) {
             leftView.text = toMinute(current)
         }
         if (width != 0) {
-            bar.layout(0, 0, width * current / max,
-                BAR_HEIGHT
-            )
+            bar.layout(0, 0, width * current / max, BAR_HEIGHT)
         }
     }
 
@@ -104,16 +107,10 @@ class SeekBar(context: Context) : FrameLayout(context) {
 
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
         super.onLayout(changed, left, top, right, bottom)
-        background.layout(0, 0,width,
-            BAR_HEIGHT
-        )
-        leftView.layout(0,
-            BAR_HEIGHT, width / 2, height)
-        rightView.layout(width / 2,
-            BAR_HEIGHT, width, height)
-        bar.layout(0, 0, width * current / max,
-            BAR_HEIGHT
-        )
+        background.layout(0, 0, width, BAR_HEIGHT)
+        leftView.layout(0, BAR_HEIGHT, width / 2, height)
+        rightView.layout(width / 2, BAR_HEIGHT, width, height)
+        bar.layout(0, 0, width * current / max, BAR_HEIGHT)
     }
 
     private fun toMinute(ms: Int): String {

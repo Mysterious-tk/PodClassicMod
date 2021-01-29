@@ -5,10 +5,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.media.MediaMetadataRetriever
 import android.media.MediaPlayer
-import android.media.ThumbnailUtils
 import android.media.audiofx.Equalizer
 import android.os.Build
 import android.os.Handler
@@ -27,9 +24,7 @@ import kotlin.math.max
 import kotlin.math.min
 
 
-object MediaPlayer : MediaPlayer.OnCompletionListener,
-    MediaPlayer.OnErrorListener, AudioFocusManager.OnAudioFocusChangeListener,
-    MediaPlayer.OnPreparedListener {
+object MediaPlayer : MediaPlayer.OnCompletionListener, MediaPlayer.OnErrorListener, AudioFocusManager.OnAudioFocusChangeListener, MediaPlayer.OnPreparedListener {
 
     private const val PLAY_MODE_ORDER = 0
     const val PLAY_MODE_SINGLE = 1
@@ -38,34 +33,6 @@ object MediaPlayer : MediaPlayer.OnCompletionListener,
     private const val PLAY_MODE_ORDER_STRING = "顺序播放"
     private const val PLAY_MODE_SINGLE_STRING = "单曲循环"
     private const val PLAY_MODE_SHUFFLE_STRING = "随机播放"
-
-    /*
-    private val NORMAL = shortArrayOf(0,0,0,0,0,0,0,0,0,0)
-    private val CLASSICAL = shortArrayOf(0,8,8,4,0,0,0,0,2,2)
-    private val DANCE = shortArrayOf(-1.5, 3, 4,1,-1.5,-1.5,0,0,4,4)
-    private val FLAT = shortArrayOf(0,0,0,0,0,0,0,-1,-2,0)
-    private val FOLK = shortArrayOf(0, 2, 0, 0, 1, 4, 5, 3, 0, 1)
-    private val METAL = shortArrayOf(-5.5,0,0,0,0,0,2,0,2,0)
-    private val HIP_HOP = shortArrayOf(5,5,4,0,-1,1,3,0,3,4)
-    private val JAZZ = shortArrayOf(0,0,0,4,4,4,0,2,3,4)
-    private val POP = shortArrayOf(3,1,0,-1.5,-3.5,-3.5,-1.5,0,1,2)
-    private val ROCK = shortArrayOf(-1.5, 0,2,4,-1.5,-1.5, 0,0,4,4)
-     */
-    /*
-
-    private val NORMAL = shortArrayOf(0, 0, 0, 0, 0)
-    private val CLASSICAL = shortArrayOf(533, 400, 0, 66, 200)
-    private val DANCE = shortArrayOf(183, 116, -100, 133, 400)
-    private val FLAT = shortArrayOf(0, 0, 0, -100, -100)
-    private val FOLK = shortArrayOf(66, 33, 333, 266, 50)
-    private val METAL = shortArrayOf(-183, 0, 66, 133, 100)
-    private val HIP_HOP = shortArrayOf(466, 100, 100, 200, 350)
-    private val JAZZ = shortArrayOf(0, 266, 266, 166, 350)
-    private val POP = shortArrayOf(144, -166, -283, -16, 150)
-    private val ROCK = shortArrayOf(16, 150, -100, 133, 400)
-    private val EQ = arrayOf(NORMAL, CLASSICAL, DANCE, FLAT, FOLK, METAL, HIP_HOP, JAZZ, POP, ROCK)
-
-     */
 
     private var currentPlayMode = SPManager.getInt(SPManager.SP_PLAY_MODE)
 
@@ -80,7 +47,7 @@ object MediaPlayer : MediaPlayer.OnCompletionListener,
         equalizer.release()
     }
 
-    fun stop() {
+    private fun stop() {
         cancelTimer()
         if (mediaPlayer.isPlaying) {
             mediaPlayer.pause()
@@ -105,7 +72,7 @@ object MediaPlayer : MediaPlayer.OnCompletionListener,
             val current = getCurrent()
             playList = orderedPlayList.clone() as ArrayList<Music>
             currentIndex = playList.indexOf(current)
-            onMediaChange()
+            onPlayStateChange()
         }
     }
 
@@ -162,19 +129,25 @@ object MediaPlayer : MediaPlayer.OnCompletionListener,
     interface OnMediaChangeListener {
         //确定下一首歌的music对象
         fun onMediaChange()
-        //图片和歌词加载完成, 开始播放
+        //图片和歌词加载完成
         fun onMediaChangeFinished()
+        //开始播放
         fun onPlayStateChange()
     }
 
     private val onMediaChangeListeners = HashSet<OnMediaChangeListener>()
+    private var onMediaChangeListenersIterator : MutableIterator<OnMediaChangeListener>? = null
 
     fun addOnMediaChangeListener(onMediaChangeListener: OnMediaChangeListener) {
         onMediaChangeListeners.add(onMediaChangeListener)
     }
 
-    fun removeOnMediaChangeListener(onMediaChangeListener: OnMediaChangeListener) {
-        onMediaChangeListeners.remove(onMediaChangeListener)
+    @Synchronized fun removeOnMediaChangeListener(onMediaChangeListener: OnMediaChangeListener) {
+        if (onMediaChangeListenersIterator == null) {
+            onMediaChangeListeners.remove(onMediaChangeListener)
+        } else {
+            onMediaChangeListenersIterator?.remove()
+        }
     }
 
     interface OnProgressListener {
@@ -198,17 +171,22 @@ object MediaPlayer : MediaPlayer.OnCompletionListener,
     }
 
     private var timer: Timer? = null
-
+    private var timerCount : Int = 0
+    private var duration : Int = 1
     private fun setTimer() {
         if (onProgressListeners.isEmpty()) {
             cancelTimer()
         } else if (timer == null) {
             timer = Timer()
+            if (isPrepared) {
+                timerCount = mediaPlayer.currentPosition
+            }
             timer!!.schedule(object : TimerTask() {
                 override fun run() {
-                    onProgress()
+                    timerCount += 500
+                    onProgress(timerCount)
                 }
-            }, 500, 1000)
+            }, 500, 500)
         }
     }
 
@@ -263,8 +241,12 @@ object MediaPlayer : MediaPlayer.OnCompletionListener,
     fun shufflePlay(list: ArrayList<Music>) {
         currentPlayMode = PLAY_MODE_SHUFFLE
         SPManager.setInt(SPManager.SP_PLAY_MODE, currentPlayMode)
-        playList = list.clone() as ArrayList<Music>
-        orderedPlayList = list.clone() as ArrayList<Music>
+
+        if (list != orderedPlayList) {
+            playList = list.clone() as ArrayList<Music>
+            orderedPlayList = list.clone() as ArrayList<Music>
+        }
+
         playList.shuffle()
         currentIndex = 0
         startMediaPlayer()
@@ -367,54 +349,46 @@ object MediaPlayer : MediaPlayer.OnCompletionListener,
     private object ThreadManager {
         private val handler = Handler(Looper.getMainLooper())
 
-        private val threadPoolExecutor = ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, LinkedBlockingQueue())
+        private val threadPoolExecutor = ThreadPoolExecutor(1, 1, 10000L, TimeUnit.MILLISECONDS, LinkedBlockingQueue())
         //ThreadPoolExecutor(0, Integer.MAX_VALUE, 60L, TimeUnit.SECONDS, SynchronousQueue<Runnable>())
 
         private var next : Music? = null
-
         private var running = false
 
         fun addTask(music : Music) {
             next = music
-            execTask()
+            if (!running) {
+                execTask()
+            }
         }
 
         private fun execTask() {
-            if (next == null) {
-                running = false
-                return
-            }
-            if (running) {
-                return
-            }
-
             val music = next!!
             next = null
-            doInBackground(Runnable {
-                running = true
+
+            running = true
+            threadPoolExecutor.execute {
                 loadImage(music)
                 if (next != null) {
                     running = false
-                    return@Runnable
+                    handler.post {
+                        execTask()
+                    }
+                    return@execute
                 }
                 lyricSet = LyricUtil.getLyric(music)
-                running = false
-            }, Runnable {
-                if (next == null) {
-                    onMediaChangeFinished()
-                } else {
-                    execTask()
-                }
-            })
-            return
-        }
 
-        private fun doInBackground(doInBackground: Runnable, onFinish: Runnable) {
-            threadPoolExecutor.execute {
-                doInBackground.run()
-                handler.post(onFinish)
+                running = false
+                handler.post {
+                    if (next == null) {
+                        onMediaChangeFinished()
+                    } else {
+                        execTask()
+                    }
+                }
             }
         }
+
     }
 
     private fun startMediaPlayer() {
@@ -425,6 +399,8 @@ object MediaPlayer : MediaPlayer.OnCompletionListener,
 
         onMediaChange()
 
+        timerCount = 0
+
         isPrepared = false
         mediaPlayer.reset()
         isPlaying = false
@@ -433,22 +409,8 @@ object MediaPlayer : MediaPlayer.OnCompletionListener,
 
         ThreadManager.addTask(music)
 
-        try {
-            mediaPlayer.setDataSource(music.path)
-            mediaPlayer.prepareAsync()
-        } catch (ignored: Exception) {
-            onCompletion(mediaPlayer)
-        }
-
-    }
-
-    override fun onPrepared(mp: MediaPlayer?) {
-        isPrepared = true
-        audioFocusManager.requestAudioFocus()
-        mediaPlayer.start()
-        isPlaying = true
-        onPlayStateChange()
-        setTimer()
+        mediaPlayer.setDataSource(music.path)
+        mediaPlayer.prepareAsync()
     }
 
     var image : Bitmap? = null
@@ -456,22 +418,16 @@ object MediaPlayer : MediaPlayer.OnCompletionListener,
 
     private fun loadImage(music: Music) {
         synchronized(this) {
-            if (this.image?.isRecycled == false) {
-                this.image?.recycle()
+            if (image?.isRecycled == false) {
+                image?.recycle()
             }
-            this.image = null
+            image = null
         }
-
-        val mediaMetadataRetriever = MediaMetadataRetriever()
-        mediaMetadataRetriever.setDataSource(music.path)
-        val byteArray = mediaMetadataRetriever.embeddedPicture
-        mediaMetadataRetriever.release()
-        val image = if (byteArray == null || byteArray.isEmpty()) {
-            null
+        image = if (music.id == 0L) {
+            MediaUtil.getMusicImage(music.path)
         } else {
-            ThumbnailUtils.extractThumbnail(BitmapFactory.decodeByteArray(byteArray, 0, byteArray.size), Values.IMAGE_WIDTH, Values.IMAGE_WIDTH)
+            MediaUtil.getAlbumImage(music.id)
         }
-        this.image = image
     }
 
 
@@ -524,24 +480,26 @@ object MediaPlayer : MediaPlayer.OnCompletionListener,
         if (!isPrepared) {
             return
         }
-        mediaPlayer.seekTo(min(getDuration(), getProgress() + 12000))
-        onProgress()
+        mediaPlayer.seekTo(min(getDuration(), timerCount + 12000))
+        timerCount = mediaPlayer.currentPosition
+        onProgress(timerCount)
     }
 
     fun backward() {
         if (!isPrepared) {
             return
         }
-        mediaPlayer.seekTo(max(0, getProgress() - 12000))
-        onProgress()
+        mediaPlayer.seekTo(max(0, timerCount - 12000))
+        timerCount = mediaPlayer.currentPosition
+        onProgress(timerCount)
     }
 
-    fun getDuration(): Int {
-        return mediaPlayer.duration
+    fun getDuration() : Int {
+        return duration
     }
 
     fun getProgress(): Int {
-        return mediaPlayer.currentPosition
+        return timerCount
     }
 
     override fun onCompletion(p0: MediaPlayer?) {
@@ -558,6 +516,16 @@ object MediaPlayer : MediaPlayer.OnCompletionListener,
         }
     }
 
+    override fun onPrepared(mp: MediaPlayer?) {
+        isPrepared = true
+        audioFocusManager.requestAudioFocus()
+        mediaPlayer.start()
+        isPlaying = true
+        duration = mediaPlayer.duration
+        onPlayStateChange()
+        setTimer()
+    }
+
     override fun onError(p0: MediaPlayer?, what: Int, extra: Int): Boolean {
         if (what == 1 && extra == -2147483648) {
             next()
@@ -566,26 +534,32 @@ object MediaPlayer : MediaPlayer.OnCompletionListener,
     }
 
     private fun onMediaChangeFinished() {
-        for (item in onMediaChangeListeners) {
-            item.onMediaChangeFinished()
+        onMediaChangeListenersIterator = onMediaChangeListeners.iterator()
+        while (onMediaChangeListenersIterator!!.hasNext()) {
+            onMediaChangeListenersIterator!!.next().onMediaChangeFinished()
         }
+        onMediaChangeListenersIterator = null
     }
 
     private fun onMediaChange() {
-        for (item in onMediaChangeListeners) {
-            item.onMediaChange()
+        onMediaChangeListenersIterator = onMediaChangeListeners.iterator()
+        while (onMediaChangeListenersIterator!!.hasNext()) {
+            onMediaChangeListenersIterator!!.next().onMediaChange()
         }
+        onMediaChangeListenersIterator = null
     }
 
     private fun onPlayStateChange() {
-        for (item in onMediaChangeListeners) {
-            item.onPlayStateChange()
+        onMediaChangeListenersIterator = onMediaChangeListeners.iterator()
+        while (onMediaChangeListenersIterator!!.hasNext()) {
+            onMediaChangeListenersIterator!!.next().onPlayStateChange()
         }
+        onMediaChangeListenersIterator = null
     }
 
-    private fun onProgress() {
+    private fun onProgress(progress: Int) {
         for (item in onProgressListeners) {
-            ThreadUtil.runOnUiThread(Runnable { item.onProgress(mediaPlayer.currentPosition) })
+            ThreadUtil.runOnUiThread(Runnable { item.onProgress(progress) })
         }
     }
 
@@ -605,6 +579,5 @@ object MediaPlayer : MediaPlayer.OnCompletionListener,
             wasPlaying = false
         }
     }
-
 }
 

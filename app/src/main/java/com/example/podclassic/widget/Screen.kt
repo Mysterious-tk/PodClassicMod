@@ -18,8 +18,8 @@ class Screen(context: Context, attributeSet: AttributeSet?) : FrameLayout(contex
 
     private val viewStack = Stack<ScreenView>()
 
-    private var addAnimator : ObjectAnimator? = null
-    private var removeAnimator : ObjectAnimator? = null
+    private lateinit var addAnimator : ObjectAnimator
+    private lateinit var removeAnimator : ObjectAnimator
 
     private var mainView : ScreenView = MainView(context)
     var currentView : ScreenView = mainView
@@ -44,8 +44,6 @@ class Screen(context: Context, attributeSet: AttributeSet?) : FrameLayout(contex
                 viewStack.push(prevView)
             }
             currentView = view
-            layoutTransition.setAnimator(LayoutTransition.DISAPPEARING, null)
-            //layoutTransition.setAnimator(LayoutTransition.DISAPPEARING, ObjectAnimator.ofFloat(null, "translationX", 0f, -measuredWidth.toFloat()))
             removeViewAt(0)
         }
         layoutTransition.setAnimator(LayoutTransition.APPEARING, addAnimator)
@@ -64,7 +62,6 @@ class Screen(context: Context, attributeSet: AttributeSet?) : FrameLayout(contex
             return null
         }
         if (childCount != 0) {
-            //layoutTransition.setAnimator(LayoutTransition.DISAPPEARING, ObjectAnimator.ofFloat(null, "translationX", 0f, measuredWidth.toFloat()))
             removeViewAt(0)
             currentView = if (viewStack.isEmpty()) {
                 mainView

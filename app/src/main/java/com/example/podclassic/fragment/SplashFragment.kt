@@ -19,7 +19,7 @@ import com.example.podclassic.storage.SaveMusics
 import com.example.podclassic.util.*
 import java.lang.Exception
 
-class SplashFragment(val runnable: Runnable = Runnable{MediaUtil.prepare()}) : Fragment() {
+class SplashFragment(val runnable : Runnable) : Fragment() {
 
     private val asyncTask = @SuppressLint("StaticFieldLeak")
     object : AsyncTask<Unit, Unit, Unit>() {

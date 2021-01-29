@@ -11,6 +11,7 @@ import android.util.Log
 import android.view.View
 import android.view.ViewOutlineProvider
 import android.widget.RelativeLayout
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -21,6 +22,7 @@ import com.example.podclassic.`object`.Music
 import com.example.podclassic.fragment.SplashFragment
 import com.example.podclassic.service.MediaPlayerService
 import com.example.podclassic.storage.SPManager
+import com.example.podclassic.util.MediaUtil
 import com.example.podclassic.util.Values
 import com.example.podclassic.util.VolumeUtil
 import com.example.podclassic.view.MusicPlayerView
@@ -35,6 +37,7 @@ class MainActivity : AppCompatActivity() {
         var screenRatio = 0f
         var statusBarHeight = 0
     }
+
 
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
@@ -58,8 +61,9 @@ class MainActivity : AppCompatActivity() {
 
         checkPermission()
 
-        startService(Intent(this, MediaPlayerService::class.java))
         initMediaPlayer(intent)
+
+        startService(Intent(this, MediaPlayerService::class.java))
 
         val autoStop = SPManager.getInt(SPManager.AutoStop.SP_NAME)
         if (autoStop != 0) {
@@ -71,7 +75,12 @@ class MainActivity : AppCompatActivity() {
         Core.lock(true)
         supportFragmentManager
             .beginTransaction()
-            .replace(R.id.frame_layout, SplashFragment())
+            .replace(R.id.frame_layout, SplashFragment(Runnable {
+                MediaUtil.prepare()
+                if (SPManager.getBoolean(SPManager.SP_AUTO_START)) {
+                    MediaPlayer.shufflePlay()
+                }
+            }))
             .commit()
     }
 
@@ -81,6 +90,13 @@ class MainActivity : AppCompatActivity() {
         }
         if (!Core.removeView()) {
             Core.exit()
+        }
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) {
+            Core.setNightMode(SPManager.NightMode.nightMode(SPManager.getInt(SPManager.NightMode.SP_NAME)))
         }
     }
 
@@ -131,7 +147,7 @@ class MainActivity : AppCompatActivity() {
                 layoutParams.topMargin = layoutParams.topMargin * 2
             } else -> {
                 layoutParams.topMargin = layoutParams.topMargin * 3 / 2
-        }
+            }
         }
 
         (frame_layout.layoutParams as RelativeLayout.LayoutParams).topMargin = statusBarHeight + TOP_MARGIN

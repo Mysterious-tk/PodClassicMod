@@ -19,6 +19,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
 import android.service.media.MediaBrowserService
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.example.podclassic.R
 import com.example.podclassic.`object`.Core
@@ -200,6 +201,7 @@ class MediaPlayerService : Service(), MediaPlayer.OnMediaChangeListener,
             stopForeground(true)
             return
         }
+
         val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) Notification.Builder(this, packageName) else Notification.Builder(this)
 
 

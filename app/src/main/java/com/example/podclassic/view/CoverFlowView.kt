@@ -23,8 +23,8 @@ import kotlin.math.*
 
 class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
     companion object {
-        private const val MAX_SIZE = 9
-        private const val CENTER_OFFSET = 5
+        private const val MAX_SIZE = 11
+        private const val CENTER_OFFSET = 6
         private const val DEFAULT_DURATION = 300L
         private const val MIN_DURATION = 30L
 
@@ -46,11 +46,12 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
     private var imageCenter = 0
     private var imagePadding = 0
     private var textHeight = 0
+    private var centerY = 0
 
     private var index = -CENTER_OFFSET
 
     init {
-        for (i in 0..MAX_SIZE) {
+        for (i in 0 until MAX_SIZE) {
             val imageView = ImageView(context)
             imageViews.add(imageView)
             addView(imageView)
@@ -66,18 +67,16 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
             return
         }
         for (i in imageViews.indices) {
-            val index = i - CENTER_OFFSET
+            val index = i + this.index
             val imageView = imageViews[i]
-            if (index >= 0 && index < albums.size) {
+            if (index in 0 until albums.size) {
                 imageView.bindItem(albums[index])
             }
-            imageView.layout(imageCenter + index * imagePadding - imageWidth / 2, imageBottom - imageWidth, imageCenter + index * imagePadding + imageWidth / 2, imageBottom)
+            scaleImageView(imageCenter + index * imagePadding, imageView)
             setRotationY(imageView)
-            if (imageView.rotationY == 0f) {
-                setTexts(index)
-            }
-            //if (i != 4) imageView.visibility = INVISIBLE
+
         }
+        setTexts(index + CENTER_OFFSET)
         artist.layout(0, bottom - textHeight, width, bottom)
         album.layout(0, artist.top - textHeight, width, artist.top)
     }
@@ -86,32 +85,38 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
         super.onDetachedFromWindow()
         threadPoolExecutor.queue.clear()
     }
+
     private fun setTexts(index : Int) {
         album.setBufferedText(albums[index].name)
         artist.setBufferedText(albums[index].artist)
     }
 
     private fun setRotationY(imageView: ImageView) {
-        val temp = (imageCenter - (imageView.left + imageView.right) / 2).toFloat()
+        val temp = (imageCenter - imageView.centerX()).toFloat()
         if (temp == 0f) {
             imageView.rotationY = 0f
         } else {
-            val x = temp / width.toDouble()
-            imageView.rotationY = sgn(x) * (1 / (1 + Math.E.pow( - 16 * abs(x)).toFloat()) - 0.5f) * 81f
+            val x = temp / width.toFloat()
+            imageView.rotationY = sgn(x) * (1f / (1f + 3f.pow( - 18f * abs(x))) - 0.5f) * 81f
         }
         imageView.z = -abs(temp)
     }
 
-    private fun sgn(x : Double) : Int {
+    private fun scaleImageView(centerX : Int, imageView: ImageView) {
+        val scale = - abs(imageCenter - centerX) / 4
+        imageView.layout(centerX - halfImageWidth - scale, centerY - halfImageWidth - scale, centerX + halfImageWidth + scale, centerY + halfImageWidth + scale)
+    }
+
+    private fun sgn(x : Float) : Float {
         return when {
-            x < 0 -> -1
-            x > 0 -> 1
-            else -> 0
+            x < 0f -> -1f
+            x > 0f -> 1f
+            else -> 0f
         }
     }
 
-    private fun s(x: Double) : Double {
-        return (sqrt(x) / sqrt(x + 1))
+    private fun s(x: Float) : Float {
+        return sqrt(x) / sqrt(x + 1)
     }
 
 
@@ -120,9 +125,10 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
 
         imageWidth = measuredHeight / 4 * 3
         halfImageWidth = imageWidth / 2
-        imageBottom = measuredHeight / 2 + imageWidth / 2
+        imageBottom = measuredHeight / 2 + halfImageWidth
         imagePadding = (measuredWidth - imageWidth) / 4
         imageCenter = measuredWidth / 2
+        centerY = imageBottom - halfImageWidth
         textHeight = measuredHeight / 10
     }
 
@@ -144,7 +150,7 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
     @SuppressLint("ObjectAnimatorBinding")
     override fun slide(slideVal: Int): Boolean {
         if (animator?.isRunning == true) {
-            duration = (duration * (0.9 + 0.1 * (1 - s(duration.toDouble())))).toLong()
+            duration = (duration * (0.9f + 0.1f * (1f - s(duration.toFloat())))).toLong()
             duration = max(duration, MIN_DURATION)
             animator?.duration = duration
 
@@ -171,16 +177,23 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
             val sgn = if (slides > 0) 1 else -1
             slides -= sgn
 
-            duration = (duration * (1 + 0.1 * (s(slides.toDouble())))).toLong()
-            duration = min(duration, DEFAULT_DURATION)
+            if (slides <= 18) {
+                duration = (duration * (1f + 0.1f * (s(abs(slides).toFloat())))).toLong()
+                duration = min(duration, DEFAULT_DURATION)
+            } else {
+                duration = (duration * (0.9f + 0.1f * (1f - s(duration.toFloat())))).toLong()
+                duration = max(duration, MIN_DURATION)
+            }
             loadAnimation(sgn)
 
         }
 
         override fun onAnimationCancel(animation: Animator?) {}
-
         override fun onAnimationRepeat(animation: Animator?) {}
     }
+
+    private val interpolator = LinearInterpolator()
+    private val startValues = Array(MAX_SIZE) {0}
 
     private fun loadAnimation(slideVal: Int) {
         if ((index == -CENTER_OFFSET && slideVal < 0) || (index + CENTER_OFFSET == albums.size - 1 && slideVal > 0)) {
@@ -193,12 +206,11 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
 
         animator = ValueAnimator.ofInt(0, - slideVal * imagePadding).apply {
             addListener(animatorListener)
-            interpolator = LinearInterpolator()
+            interpolator = this@CoverFlowView.interpolator
             duration = this@CoverFlowView.duration
         }
-        val startValues = ArrayList<Int>(MAX_SIZE)
-        for (imageView in imageViews) {
-            startValues.add(imageView.left)
+        for (i in imageViews.indices) {
+            startValues[i] = imageViews[i].centerX()
         }
         animator?.addUpdateListener { animation ->
             val currentValue = animation.animatedValue as Int
@@ -207,25 +219,23 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
             for (i in imageViews.indices) {
                 val imageView = imageViews[i]
 
-                val left = startValues[i] + currentValue
-                val right = left + imageWidth
-
-                imageView.layout(left, imageView.top, right, imageView.bottom)
-
+                scaleImageView(startValues[i] + currentValue, imageView)
+                //imageView.layout(left, imageView.top, right, imageView.bottom)
+                setRotationY(imageView)
 
                 if (slideVal > 0) {
-                    if (tempImageView == null || tempImageView.left > imageView.left) {
+                    if (tempImageView == null || tempImageView.centerX() > imageView.centerX()) {
                         tempImageView = imageView
                     }
                 } else {
-                    if (tempImageView == null || tempImageView.left < imageView.left) {
+                    if (tempImageView == null || tempImageView.centerX() < imageView.centerX()) {
                         tempImageView = imageView
                     }
                 }
-                setRotationY(imageView)
+
             }
             if (slideVal > 0) {
-                tempImageView!!.layout(imageCenter + (CENTER_OFFSET - 1) * imagePadding - halfImageWidth, tempImageView.top, imageCenter + (CENTER_OFFSET - 1) * imagePadding + halfImageWidth, imageBottom)
+                scaleImageView(imageCenter + (CENTER_OFFSET - 1) * imagePadding, tempImageView!!)
                 val tempIndex = index + MAX_SIZE
 
                 if (tempIndex in 0 until albums.size) {
@@ -236,7 +246,8 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
             } else {
                 val tempIndex = index + 1
 
-                tempImageView!!.layout(imageCenter - (CENTER_OFFSET - 1) * imagePadding - halfImageWidth, tempImageView.top, imageCenter + - (CENTER_OFFSET - 1) * imagePadding + halfImageWidth, imageBottom)
+                scaleImageView(imageCenter - (CENTER_OFFSET - 1) * imagePadding, tempImageView!!)
+
                 if (tempIndex in 0 until albums.size) {
                     tempImageView.bindItem(albums[tempIndex])
                 } else {
@@ -265,6 +276,11 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
         private val defaultBitmap by lazy { getReflectBitmap(Icons.DEFAULT.bitmap) }
         private var runnable : Runnable? = null
 
+        fun centerX() : Int {
+            return (left + right) / 2
+        }
+
+
         fun bindItem(album: MusicList?) {
             if (album != null && album == this.album) {
                 return
@@ -281,7 +297,7 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
                 threadPoolExecutor.remove(runnable)
             }
             runnable = Runnable {
-                val bitmap = MediaUtil.getAlbumImage(album)
+                val bitmap = MediaUtil.getAlbumImage(album.id)
                 if (Thread.currentThread().isInterrupted) {
                     return@Runnable
                 }

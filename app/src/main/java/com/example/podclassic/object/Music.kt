@@ -32,12 +32,14 @@ class Music {
             }
         }
     var path : String = ""
+    var id : Long = 0L
 
-    constructor(name : String, album : String, singer : String, path : String) {
+    constructor(name : String, album : String, singer : String, path : String, id : Long) {
         this.name = name
         this.album = album
         this.singer = singer
         this.path = path
+        this.id = id
     }
 
     constructor(file : File) {

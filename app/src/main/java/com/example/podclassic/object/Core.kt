@@ -31,7 +31,6 @@ object Core {
         this.context = context
         this.nightMode = darkMode
         setTitle(screen.currentView)
-        setNightMode(SPManager.NightMode.nightMode(SPManager.getInt(SPManager.NightMode.SP_NAME)))
         controller.onTouchListener = object : SlideController.OnTouchListener {
             override fun onEnterClick(): Boolean { return Core.screen!!.getView().enter() }
             override fun onEnterLongClick(): Boolean { return Core.screen!!.getView().enterLongClick() }
@@ -51,7 +50,7 @@ object Core {
         screen!!.addView(view)
     }
 
-    fun getView() : ScreenView? {
+    fun getView() : ScreenView {
         return screen!!.getView()
     }
 

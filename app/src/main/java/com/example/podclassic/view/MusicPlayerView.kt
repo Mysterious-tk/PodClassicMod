@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.*
+import android.util.Log
 import android.view.Gravity
 import android.widget.LinearLayout
 import android.widget.RelativeLayout
@@ -20,6 +21,7 @@ import com.example.podclassic.util.*
 import com.example.podclassic.util.Values.DEFAULT_PADDING
 import com.example.podclassic.widget.TextView
 import com.example.podclassic.widget.SeekBar
+import java.lang.Exception
 import java.util.*
 import kotlin.math.min
 
@@ -69,7 +71,7 @@ class MusicPlayerView(context: Context) : RelativeLayout(context), ScreenView, M
 
     private val volumeBar = SeekBar(context)
     private val index = TextView(context)
-    private val stopTime = TextView(context)
+    private val stopTime = if (MediaPlayer.stopTime == 0L) null else TextView(context)
     private val image = ImageView(context)
     private val name = TextView(context)
     private val singer = TextView(context)
@@ -94,6 +96,8 @@ class MusicPlayerView(context: Context) : RelativeLayout(context), ScreenView, M
         }
     }
 
+    private var stopTimer : Timer? = null
+
     init {
         layoutTransition = LayoutTransition()
             .apply {
@@ -115,10 +119,8 @@ class MusicPlayerView(context: Context) : RelativeLayout(context), ScreenView, M
 
         index.setPadding(0, 0, DEFAULT_PADDING * 3 , DEFAULT_PADDING)
 
-        stopTime.setPadding(0,0,0, DEFAULT_PADDING)
-        stopTime.layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT,LayoutParams.WRAP_CONTENT).apply { addRule(CENTER_HORIZONTAL) }
+
         addView(index)//, LayoutParams(LayoutParams.MATCH_PARENT,LayoutParams.WRAP_CONTENT))
-        addView(stopTime)
         addView(progressBar)
 
         image.layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply { addRule(BELOW, index.id) }
@@ -140,6 +142,14 @@ class MusicPlayerView(context: Context) : RelativeLayout(context), ScreenView, M
             }
             lyric.layoutParams = LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply { setMargins(0, DEFAULT_PADDING / 2, 0, 0) }
             infoSet.addView(lyric)
+        }
+
+        if (stopTime != null) {
+            stopTime.setPadding(0,0,0, DEFAULT_PADDING)
+            stopTime.layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT,LayoutParams.WRAP_CONTENT).apply { addRule(CENTER_HORIZONTAL) }
+            addView(stopTime)
+
+            stopTime.setLeftIcon(Icons.STOP_TIME.drawable)
         }
 
         infoSet.layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply {
@@ -164,34 +174,17 @@ class MusicPlayerView(context: Context) : RelativeLayout(context), ScreenView, M
 
     }
 
-    private var stopTimer : Timer? = null
-
     private fun setStopTimer() {
-        if (MediaPlayer.stopTime != 0L) {
-            if (stopTimer == null) {
-                stopTimer = Timer()
-                stopTimer?.schedule(object : TimerTask() {
-                    override fun run() {
-                        if (MediaPlayer.stopTime == 0L && stopTimer != null) {
-                            cancelStopTimer()
-                            ThreadUtil.runOnUiThread(Runnable {
-                                stopTime.setLeftIcon(null)
-                                stopTime.text = ""
-                            })
-                        } else {
-                            val time = ((MediaPlayer.stopTime - System.currentTimeMillis()) / 1000 / 60 + 1).toString()
-                            ThreadUtil.runOnUiThread(Runnable {
-                                if (stopTime.text != time) {
-                                    stopTime.setLeftIcon(Icons.STOP_TIME.drawable)
-                                    stopTime.text = time
-                                }
-                            })
-                        }
-                    }
-                }, 100, 1000 * 60)
-            }
+        if (stopTime != null && stopTimer == null) {
+            stopTimer = Timer()
+            stopTimer!!.schedule(object : TimerTask() {
+                override fun run() {
+                    stopTime.setBufferedText(((MediaPlayer.stopTime - System.currentTimeMillis()) / 1000 / 60 + 1).toString())
+                }
+            }, 100, 1000 * 60)
         }
     }
+
 
     private fun cancelStopTimer() {
         stopTimer?.cancel()
@@ -307,35 +300,40 @@ class MusicPlayerView(context: Context) : RelativeLayout(context), ScreenView, M
         if (!hasWindowFocus()) {
             return
         }
+
+        val music = MediaPlayer.getCurrent()
+        if (music == null) {
+            Core.removeView()
+            return
+        }
+
         val progress = MediaPlayer.getProgress()
 
         progressBar.setMax(MediaPlayer.getDuration())
         progressBar.setCurrent(progress)
 
-        val music = MediaPlayer.getCurrent()
-        if (music == null) {
-            Core.removeView()
+
+        val bitmap = MediaPlayer.image
+        if (bitmap == null) {
+            name.gravity = Gravity.CENTER
+            singer.gravity = Gravity.CENTER
+            album.gravity = Gravity.CENTER
+            lyric?.gravity = Gravity.CENTER
+            image.setImageBitmap(null)
         } else {
-            val bitmap = MediaPlayer.image
-            if (bitmap == null) {
-                name.gravity = Gravity.CENTER
-                singer.gravity = Gravity.CENTER
-                album.gravity = Gravity.CENTER
-                lyric?.gravity = Gravity.CENTER
+            name.gravity = Gravity.LEFT
+            singer.gravity = Gravity.LEFT
+            album.gravity = Gravity.LEFT
+            lyric?.gravity = Gravity.LEFT
+
+            if (hasHeight) {
+                loadImage(bitmap)
             } else {
-                name.gravity = Gravity.LEFT
-                singer.gravity = Gravity.LEFT
-                album.gravity = Gravity.LEFT
-                lyric?.gravity = Gravity.LEFT
-
-                if (hasHeight) {
-                    loadImage(bitmap)
-                } else {
-                    post { loadImage(bitmap) }
-                }
+                post { loadImage(bitmap) }
             }
-
-            if (lyric != null) {
+        }
+        if (lyric != null) {
+            if (MediaPlayer.lyricSet != null) {
                 lyricSet = MediaPlayer.lyricSet
                 lyric.text = lyricSet?.getLyric(progress)
             }
@@ -354,15 +352,14 @@ class MusicPlayerView(context: Context) : RelativeLayout(context), ScreenView, M
             return
         }
 
+        progressBar.setMax(MediaPlayer.getDuration())
+        progressBar.setCurrent(MediaPlayer.getProgress())
+
         name.text = music.name
         singer.text = music.singer
         album.text = music.album
 
         index.text = "${(MediaPlayer.getCurrentIndex() + 1)}/${MediaPlayer.getPlayListSize()}"
-
-
-        progressBar.setMax(0)
-        progressBar.setCurrent(0)
 
         lyricSet = null
         lyric?.text = null
@@ -386,15 +383,14 @@ class MusicPlayerView(context: Context) : RelativeLayout(context), ScreenView, M
         image.setImageBitmap(result)
     }
 
-    override fun onPlayStateChange() {}
+    override fun onPlayStateChange() {
+        progressBar.setMax(MediaPlayer.getDuration())
+    }
 
     override fun onProgress(progress: Int) {
         progressBar.setCurrent(progress)
         if (lyric != null && lyricSet != null) {
-            val text = lyricSet?.getLyric(progress)
-            if (lyric.text.toString() != text) {
-                lyric.text = text
-            }
+            lyric.setBufferedText(lyricSet?.getLyric(progress))
         }
     }
 

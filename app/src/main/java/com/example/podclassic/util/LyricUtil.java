@@ -14,10 +14,13 @@ import com.example.podclassic.object.Music;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileDescriptor;
 import java.io.FileInputStream;
 import java.io.FileReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.RandomAccessFile;
+import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 
@@ -38,7 +41,8 @@ public class LyricUtil {
                 return decodeLyric(stringBuilder.toString(), music);
             } catch (Exception ignored) { }
         } else {
-            try (RandomAccessFile randomAccessFile = new RandomAccessFile(path, "r")) {
+            try  {
+                RandomAccessFile randomAccessFile = new RandomAccessFile(path, "r");
                 byte[] temp = new byte[4];
 
                 randomAccessFile.read(temp);
@@ -107,7 +111,9 @@ public class LyricUtil {
                         }
                     }
                 }
-            } catch (Exception ignored) { }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
         return null;
     }

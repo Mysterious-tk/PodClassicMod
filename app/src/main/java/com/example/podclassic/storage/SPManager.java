@@ -148,6 +148,7 @@ public class SPManager {
     public static final String SP_PLAY_ALL = "play_all";
     public static final String SP_COVER_FLOW = "cover_flow";
     public static final String SP_REPEAT = "repeat";
+    public static final String SP_AUTO_START = "auto_start";
 
     private static SharedPreferences getSharedPreferences() {
         return PreferenceManager.getDefaultSharedPreferences(BaseApplication.getContext());
