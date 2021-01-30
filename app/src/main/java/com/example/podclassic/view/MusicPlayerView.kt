@@ -8,7 +8,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.*
-import android.util.Log
 import android.view.Gravity
 import android.widget.LinearLayout
 import android.widget.RelativeLayout
@@ -19,9 +18,8 @@ import com.example.podclassic.base.ScreenView
 import com.example.podclassic.storage.SPManager
 import com.example.podclassic.util.*
 import com.example.podclassic.util.Values.DEFAULT_PADDING
-import com.example.podclassic.widget.TextView
 import com.example.podclassic.widget.SeekBar
-import java.lang.Exception
+import com.example.podclassic.widget.TextView
 import java.util.*
 import kotlin.math.min
 

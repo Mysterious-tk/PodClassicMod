@@ -4,11 +4,8 @@ import android.content.SharedPreferences;
 import android.preference.PreferenceManager;
 
 import com.example.podclassic.base.BaseApplication;
-import com.example.podclassic.object.Core;
 
-import java.text.SimpleDateFormat;
 import java.util.Calendar;
-import java.util.Date;
 
 public class SPManager {
 

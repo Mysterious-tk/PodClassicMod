@@ -6,7 +6,6 @@ import android.content.Intent
 import android.view.KeyEvent
 import com.example.podclassic.`object`.Core
 import com.example.podclassic.`object`.MediaPlayer
-import com.example.podclassic.util.MediaUtil
 
 class MediaBroadcastReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context?, intent: Intent?) {

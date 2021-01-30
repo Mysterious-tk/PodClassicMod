@@ -14,7 +14,6 @@ import com.example.podclassic.util.ThreadUtil
 import com.example.podclassic.util.Values.DEFAULT_PADDING
 import com.example.podclassic.widget.ListView
 import com.example.podclassic.widget.SeekBar
-import java.lang.Exception
 import java.util.*
 import kotlin.collections.ArrayList
 import kotlin.math.min

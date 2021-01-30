@@ -1,8 +1,6 @@
 package com.example.podclassic.util
 
-import com.example.podclassic.activity.MainActivity
 import com.example.podclassic.base.BaseApplication
-import com.example.podclassic.storage.SPManager
 
 
 object Values {

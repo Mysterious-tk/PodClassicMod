@@ -3,7 +3,6 @@ package com.example.podclassic.view
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.util.Log
 import com.example.podclassic.`object`.Core
 import com.example.podclassic.`object`.MediaPlayer
 import com.example.podclassic.`object`.Music
@@ -12,7 +11,6 @@ import com.example.podclassic.base.ScreenView
 import com.example.podclassic.storage.SPManager
 import com.example.podclassic.storage.SaveMusics
 import com.example.podclassic.widget.ListView
-import java.lang.RuntimeException
 
 @SuppressLint("ViewConstructor")
 class MusicListView : ListView, ScreenView, MediaPlayer.OnMediaChangeListener {

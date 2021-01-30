@@ -5,7 +5,6 @@ import android.animation.ValueAnimator
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.*
-import android.util.Log
 import android.view.Gravity
 import android.view.animation.LinearInterpolator
 import android.widget.FrameLayout

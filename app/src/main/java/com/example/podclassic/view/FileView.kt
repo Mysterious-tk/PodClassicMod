@@ -1,14 +1,8 @@
 package com.example.podclassic.view
 
 import android.content.Context
-import android.content.Intent
-import android.net.Uri
-import android.util.Log
-import android.webkit.MimeTypeMap
-import android.widget.Toast
 import com.example.podclassic.`object`.Core
 import com.example.podclassic.`object`.MediaPlayer
-import com.example.podclassic.`object`.Music
 import com.example.podclassic.base.ScreenView
 import com.example.podclassic.storage.SaveMusicLists
 import com.example.podclassic.storage.SaveMusics

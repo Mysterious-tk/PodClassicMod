@@ -7,8 +7,10 @@ import com.example.podclassic.base.BaseApplication
 import com.example.podclassic.base.ScreenView
 import com.example.podclassic.service.MediaPlayerService
 import com.example.podclassic.storage.SPManager
-import com.example.podclassic.util.*
-import com.example.podclassic.view.*
+import com.example.podclassic.util.ThreadUtil
+import com.example.podclassic.util.VolumeUtil
+import com.example.podclassic.view.MainView
+import com.example.podclassic.view.MusicPlayerView
 import com.example.podclassic.widget.Screen
 import com.example.podclassic.widget.SlideController
 import com.example.podclassic.widget.TitleBar

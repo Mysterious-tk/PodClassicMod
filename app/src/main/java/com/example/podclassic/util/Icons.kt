@@ -1,9 +1,11 @@
 package com.example.podclassic.util
 
 import android.annotation.SuppressLint
-import android.graphics.*
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.PixelFormat
 import android.graphics.drawable.Drawable
-import android.media.ThumbnailUtils
 import com.example.podclassic.R
 import com.example.podclassic.base.BaseApplication
 

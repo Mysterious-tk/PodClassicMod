@@ -3,21 +3,13 @@ package com.example.podclassic.fragment
 import android.annotation.SuppressLint
 import android.os.AsyncTask
 import android.os.Bundle
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.ImageView
-import androidx.appcompat.widget.AppCompatImageView
 import androidx.fragment.app.Fragment
 import com.example.podclassic.R
 import com.example.podclassic.`object`.Core
-import com.example.podclassic.`object`.MediaPlayer
-import com.example.podclassic.storage.SPManager
-import com.example.podclassic.storage.SaveMusicLists
-import com.example.podclassic.storage.SaveMusics
 import com.example.podclassic.util.*
-import java.lang.Exception
 
 class SplashFragment(val runnable : Runnable) : Fragment() {
 

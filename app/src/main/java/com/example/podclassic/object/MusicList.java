@@ -1,24 +1,9 @@
 package com.example.podclassic.object;
 
-import android.content.ContentResolver;
-import android.content.ContentUris;
-import android.content.Context;
-import android.database.Cursor;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.media.ThumbnailUtils;
-import android.net.Uri;
-import android.provider.MediaStore;
-import android.util.Log;
-
-import com.example.podclassic.R;
-import com.example.podclassic.base.BaseApplication;
-import com.example.podclassic.storage.SaveMusics;
 import com.example.podclassic.util.MediaUtil;
 
 import org.jetbrains.annotations.NotNull;
 
-import java.io.InputStream;
 import java.util.ArrayList;
 
 

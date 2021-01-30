@@ -10,7 +10,6 @@ import android.media.audiofx.Equalizer
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
 import com.example.podclassic.base.BaseApplication
 import com.example.podclassic.service.MediaPlayerService
 import com.example.podclassic.storage.SPManager

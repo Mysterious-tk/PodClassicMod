@@ -1,19 +1,14 @@
 package com.example.podclassic.view
 
 import android.content.Context
-import com.example.podclassic.R
 import com.example.podclassic.`object`.Core
 import com.example.podclassic.`object`.MediaPlayer
 import com.example.podclassic.`object`.MusicList
-import com.example.podclassic.activity.MainActivity
 import com.example.podclassic.base.ScreenView
-import com.example.podclassic.fragment.SplashFragment
 import com.example.podclassic.storage.SPManager
 import com.example.podclassic.storage.SaveMusicLists
 import com.example.podclassic.util.MediaUtil
-import com.example.podclassic.util.ThreadUtil
 import com.example.podclassic.widget.ListView
-import kotlinx.android.synthetic.main.activity_main.view.*
 
 class MusicView(context: Context) : ListView(context), ScreenView {
     companion object { const val TITLE = "音乐" }

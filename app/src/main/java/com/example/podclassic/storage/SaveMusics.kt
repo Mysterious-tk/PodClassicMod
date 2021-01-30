@@ -7,14 +7,12 @@ import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteDatabase.CursorFactory
 import android.database.sqlite.SQLiteOpenHelper
-import android.util.Log
 import com.example.podclassic.`object`.MediaPlayer
 import com.example.podclassic.`object`.Music
 import com.example.podclassic.`object`.MusicList
 import com.example.podclassic.base.BaseApplication
 import com.example.podclassic.service.MediaPlayerService
 import java.io.File
-import java.net.IDN
 
 class SaveMusics(private val databaseName: String, val name : String) {
 

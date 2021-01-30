@@ -1,28 +1,18 @@
 package com.example.podclassic.util;
 
-import android.annotation.SuppressLint;
 import android.content.Context;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
 import android.os.storage.StorageManager;
-import android.os.storage.StorageVolume;
 import android.provider.DocumentsContract;
-import android.util.Log;
 
 import com.example.podclassic.base.BaseApplication;
-import com.example.podclassic.object.Music;
-import com.example.podclassic.storage.SaveMusics;
 
 import java.io.File;
 import java.lang.reflect.Array;
-import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Objects;
 
 public class FileUtil {
     private FileUtil() {}

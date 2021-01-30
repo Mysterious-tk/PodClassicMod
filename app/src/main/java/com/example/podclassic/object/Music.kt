@@ -1,16 +1,7 @@
 package com.example.podclassic.`object`
 
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.media.MediaMetadataRetriever
-import android.media.ThumbnailUtils
-import android.net.Uri
-import android.provider.MediaStore
 import android.text.TextUtils
-import com.example.podclassic.util.FileUtil
-import com.example.podclassic.util.LyricUtil
 import com.example.podclassic.util.Values
-import java.io.File
 
 
 class Music {

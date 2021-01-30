@@ -1,26 +1,12 @@
 package com.example.podclassic.util;
 
-import android.content.ContentResolver;
-import android.content.Context;
-import android.media.MediaMetadataRetriever;
-import android.net.Uri;
-import android.text.TextUtils;
-import android.util.Log;
-
-import androidx.core.content.FileProvider;
-
-import com.example.podclassic.base.BaseApplication;
 import com.example.podclassic.object.Music;
 
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileDescriptor;
-import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.io.RandomAccessFile;
-import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 
