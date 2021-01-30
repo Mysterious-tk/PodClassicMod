@@ -116,11 +116,12 @@ object Core {
                 if (!MediaPlayer.isPlaying) {
                     return
                 }
-                ThreadUtil.runOnUiThread(Runnable {
-                    if (screen!!.currentView !is MusicPlayerView) {
+                if (screen!!.currentView !is MusicPlayerView) {
+                    ThreadUtil.runOnUiThread(Runnable {
                         addView(MusicPlayerView(context!!))
-                    }
-                })
+                    })
+                }
+
             }
         }, DELAY)
     }
