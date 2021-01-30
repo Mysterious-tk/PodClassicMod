@@ -72,7 +72,7 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
             if (index in 0 until albums.size) {
                 imageView.bindItem(albums[index])
             }
-            scaleImageView(imageCenter + index * imagePadding, imageView)
+            scaleImageView(imageCenter + (i - CENTER_OFFSET) * imagePadding, imageView)
             setRotationY(imageView)
 
         }

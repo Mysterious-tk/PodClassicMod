@@ -2,11 +2,14 @@ package com.example.podclassic.util
 
 import android.app.Service
 import android.content.Context
+import android.media.AudioAttributes
 import android.media.AudioManager
 import android.media.SoundPool
+import android.os.Binder
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
+import android.util.Log
 import android.view.HapticFeedbackConstants
 import android.view.View
 import com.example.podclassic.R

@@ -5,6 +5,7 @@ import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
 import android.media.ThumbnailUtils
 import android.net.Uri
+import android.provider.MediaStore
 import android.text.TextUtils
 import com.example.podclassic.util.FileUtil
 import com.example.podclassic.util.LyricUtil
@@ -40,26 +41,6 @@ class Music {
         this.singer = singer
         this.path = path
         this.id = id
-    }
-
-    constructor(file : File) {
-        path = file.path
-
-        getMusicInfo()
-    }
-
-    constructor(uri : Uri) {
-        path = FileUtil.uriToPath(uri)
-        getMusicInfo()
-    }
-
-    private fun getMusicInfo() {
-        val mediaMetadataRetriever = MediaMetadataRetriever()
-        mediaMetadataRetriever.setDataSource(path)
-        name = mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)
-        singer = mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)
-        album = mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM)
-        mediaMetadataRetriever.release()
     }
 
     override fun hashCode(): Int {

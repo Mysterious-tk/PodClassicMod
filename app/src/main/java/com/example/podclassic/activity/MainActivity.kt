@@ -22,9 +22,7 @@ import com.example.podclassic.`object`.Music
 import com.example.podclassic.fragment.SplashFragment
 import com.example.podclassic.service.MediaPlayerService
 import com.example.podclassic.storage.SPManager
-import com.example.podclassic.util.MediaUtil
-import com.example.podclassic.util.Values
-import com.example.podclassic.util.VolumeUtil
+import com.example.podclassic.util.*
 import com.example.podclassic.view.MusicPlayerView
 import kotlinx.android.synthetic.main.activity_main.*
 import kotlin.system.exitProcess
@@ -79,6 +77,11 @@ class MainActivity : AppCompatActivity() {
                 MediaUtil.prepare()
                 if (SPManager.getBoolean(SPManager.SP_AUTO_START)) {
                     MediaPlayer.shufflePlay()
+                    if (Core.getView() !is MusicPlayerView) {
+                        ThreadUtil.runOnUiThread(Runnable {
+                            Core.addView(MusicPlayerView(this))
+                        })
+                    }
                 }
             }))
             .commit()
@@ -103,7 +106,7 @@ class MainActivity : AppCompatActivity() {
     private fun initMediaPlayer(intent: Intent?) {
         val uri = intent?.data
         if (uri != null) {
-            MediaPlayer.add(Music(uri))
+            MediaPlayer.add(MediaUtil.getMusic(FileUtil.uriToPath(uri)))
         }
         if ((uri != null || intent?.action == MediaPlayerService.ACTION_MAIN) && Core.getView() !is MusicPlayerView) {
             Core.addView(MusicPlayerView(this))

@@ -18,6 +18,7 @@ import java.util.*
 import kotlin.Comparator
 import kotlin.collections.ArrayList
 import kotlin.collections.HashSet
+import kotlin.math.sin
 
 
 object MediaUtil {
@@ -28,6 +29,7 @@ object MediaUtil {
     const val ALBUM = MediaStore.Audio.Media.ALBUM
     const val NAME = MediaStore.Audio.Media.TITLE
     const val PATH = MediaStore.Audio.Media.DATA
+
 
     private val contentResolver = BaseApplication.getContext().contentResolver
     private val collator = Collator.getInstance(Locale.CHINA)
@@ -156,13 +158,7 @@ object MediaUtil {
 
     fun getArtistMusic(artist: String): ArrayList<Music> {
         val uri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
-        val cursor = contentResolver.query(
-            uri,
-            null,
-            "$SINGER=?",
-            arrayOf(artist),
-            MediaStore.Audio.Media.TITLE + " collate localized"
-        )
+        val cursor = contentResolver.query(uri, null, "$SINGER=?", arrayOf(artist), MediaStore.Audio.Media.TITLE + " collate localized")
         val result = ArrayList<Music>(cursor!!.count)
         while (cursor.moveToNext()) {
             val music = buildMusicFromCursor(cursor)
@@ -174,6 +170,36 @@ object MediaUtil {
         return result
     }
 
+    fun searchMusic(by : String, target: String) : ArrayList<Music> {
+        val uri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
+        val cursor = contentResolver.query(uri, null, by, arrayOf(target), null/*MediaStore.Audio.Albums.ALBUM + " collate localized"*/)
+        val list = ArrayList<Music>(cursor!!.count)
+
+        while (cursor.moveToNext()) {
+            val music = buildMusicFromCursor(cursor)
+            if (music != null) {
+                list.add(music)
+            }
+        }
+        cursor.close()
+
+        list.sortWith(Comparator { o1, o2 -> collator.compare(o1?.name, o2?.name) })
+        return list
+    }
+
+    fun getMusic(path: String) : Music {
+        val list = searchMusic("${PATH}=?", path)
+        if (list.isEmpty()) {
+            val mediaMetadataRetriever = MediaMetadataRetriever()
+            mediaMetadataRetriever.setDataSource(path)
+            val name = mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)
+            val singer = mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)
+            val album = mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM)
+            mediaMetadataRetriever.release()
+            return Music(name, singer, album, path, 0L)
+        }
+        return list[0]
+    }
 
     fun searchAlbum(by: String, target: String): ArrayList<MusicList> {
         val uri = MediaStore.Audio.Albums.EXTERNAL_CONTENT_URI

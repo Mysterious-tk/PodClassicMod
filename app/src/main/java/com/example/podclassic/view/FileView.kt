@@ -3,6 +3,7 @@ package com.example.podclassic.view
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.util.Log
 import android.webkit.MimeTypeMap
 import android.widget.Toast
 import com.example.podclassic.`object`.Core
@@ -12,6 +13,7 @@ import com.example.podclassic.base.ScreenView
 import com.example.podclassic.storage.SaveMusicLists
 import com.example.podclassic.storage.SaveMusics
 import com.example.podclassic.util.FileUtil
+import com.example.podclassic.util.MediaUtil
 import com.example.podclassic.widget.ListView
 import java.io.File
 import java.text.Collator
@@ -44,10 +46,7 @@ class FileView(context: Context, val file: File) : ListView(context), ScreenView
             itemList.add(Item("无内容", null, false))
         } else {
             for (file in list) {
-                if (FileUtil.isAudio(file)) {
-                    hasAudio = true
-                    musicList.add(file)
-                }
+                hasAudio = hasAudio || FileUtil.isAudio(file)
                 itemList.add(Item(file.name, null, file.isDirectory))
             }
 
@@ -63,9 +62,15 @@ class FileView(context: Context, val file: File) : ListView(context), ScreenView
             return false
         }
         if (hasAudio && index == 0) {
-            val musics = ArrayList<Music>()
-            for (file in musicList) {
-                musics.add(Music(file))
+            val musics = MediaUtil.searchMusic("${MediaUtil.PATH} like ?", "${file.path}%")
+            val lastIndex = file.path.length
+            val iterator = musics.iterator()
+            while (iterator.hasNext()) {
+                val music = iterator.next()
+                if (music.path.lastIndexOf('/') != lastIndex) {
+                    iterator.remove()
+                }
+
             }
             MediaPlayer.shufflePlay(musics)
             Core.addView(MusicPlayerView(context))
@@ -82,7 +87,7 @@ class FileView(context: Context, val file: File) : ListView(context), ScreenView
                 FileUtil.TYPE_VIDEO -> Core.addView(VideoView(context, file))
                 FileUtil.TYPE_IMAGE -> Core.addView(ImageView(context, arrayListOf(file), 0))
                 FileUtil.TYPE_AUDIO -> {
-                    MediaPlayer.add(Music(file))
+                    MediaPlayer.add(MediaUtil.getMusic(file.path))
                     Core.addView(MusicPlayerView(context))
                 }
             }
@@ -106,16 +111,11 @@ class FileView(context: Context, val file: File) : ListView(context), ScreenView
             }
             if (hasAudio) {
                 shake()
-                val path = list[id].path
-                if (SaveMusicLists.saveFolders.contains(path)) {
-                    SaveMusicLists.saveFolders.remove(path)
-                } else {
-                    SaveMusicLists.saveFolders.add(path)
-                }
+                SaveMusicLists.saveFolders.add(list[id].path)
                 return true
             }
         } else if (FileUtil.isAudio(list[id])) {
-            SaveMusics.loveList.add(Music(list[id]))
+            SaveMusics.loveList.add(MediaUtil.getMusic(list[id].path))
             shake()
             return true
         }

@@ -179,7 +179,10 @@ class MusicPlayerView(context: Context) : RelativeLayout(context), ScreenView, M
             stopTimer = Timer()
             stopTimer!!.schedule(object : TimerTask() {
                 override fun run() {
-                    stopTime.setBufferedText(((MediaPlayer.stopTime - System.currentTimeMillis()) / 1000 / 60 + 1).toString())
+                    ThreadUtil.runOnUiThread(Runnable {
+                        stopTime.setBufferedText(((MediaPlayer.stopTime - System.currentTimeMillis()) / 1000 / 60 + 1).toString())
+
+                    })
                 }
             }, 100, 1000 * 60)
         }
