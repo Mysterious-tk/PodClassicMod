@@ -47,7 +47,7 @@ object VolumeUtil {
         }
         if (sound and SPManager.Sound.VIBRATE_ID != 0) {
             ThreadUtil.newThread(Runnable {
-                view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
             })
         }
     }

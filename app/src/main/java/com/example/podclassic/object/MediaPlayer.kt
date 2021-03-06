@@ -14,9 +14,14 @@ import com.example.podclassic.base.BaseApplication
 import com.example.podclassic.service.MediaPlayerService
 import com.example.podclassic.storage.SPManager
 import com.example.podclassic.storage.SaveMusics
-import com.example.podclassic.util.*
+import com.example.podclassic.util.AudioFocusManager
+import com.example.podclassic.util.LyricUtil
+import com.example.podclassic.util.MediaUtil
+import com.example.podclassic.util.ThreadUtil
 import java.util.*
-import java.util.concurrent.*
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
 import kotlin.collections.ArrayList
 import kotlin.collections.HashSet
 import kotlin.math.max
@@ -46,12 +51,13 @@ object MediaPlayer : MediaPlayer.OnCompletionListener, MediaPlayer.OnErrorListen
         equalizer.release()
     }
 
-    private fun stop() {
+    fun stop() {
         cancelTimer()
         if (mediaPlayer.isPlaying) {
             mediaPlayer.pause()
-            mediaPlayer.reset()
         }
+        scheduleToStop(0)
+        mediaPlayer.reset()
         audioFocusManager.abandonAudioFocus()
         playList.clear()
         isPlaying = false
@@ -224,8 +230,14 @@ object MediaPlayer : MediaPlayer.OnCompletionListener, MediaPlayer.OnErrorListen
         }
         val current = playList[index]
         playList.shuffle()
+        val temp = currentIndex
         currentIndex = playList.indexOf(current)
-        onMediaChange()
+        if (index != temp) {
+            onMediaChange()
+        }
+        onPlayStateChange()
+
+
     }
 
 
@@ -422,11 +434,7 @@ object MediaPlayer : MediaPlayer.OnCompletionListener, MediaPlayer.OnErrorListen
             }
             image = null
         }
-        image = if (music.id == 0L) {
-            MediaUtil.getMusicImage(music.path)
-        } else {
-            MediaUtil.getAlbumImage(music.id)
-        }
+        image = MediaUtil.getMusicImage(music)
     }
 
 

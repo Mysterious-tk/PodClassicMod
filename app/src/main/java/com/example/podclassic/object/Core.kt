@@ -1,30 +1,27 @@
 package com.example.podclassic.`object`
 
-import android.content.Intent
 import android.view.View
 import com.example.podclassic.activity.MainActivity
-import com.example.podclassic.base.BaseApplication
 import com.example.podclassic.base.ScreenView
-import com.example.podclassic.service.MediaPlayerService
 import com.example.podclassic.storage.SPManager
 import com.example.podclassic.util.ThreadUtil
-import com.example.podclassic.util.VolumeUtil
 import com.example.podclassic.view.MainView
 import com.example.podclassic.view.MusicPlayerView
 import com.example.podclassic.widget.Screen
 import com.example.podclassic.widget.SlideController
 import com.example.podclassic.widget.TitleBar
 import java.util.*
-import kotlin.system.exitProcess
 
 
 object Core {
 
-    private var controller : SlideController? = null
-    private var titleBar : TitleBar? = null
-    private var screen : Screen? = null
-    private var nightMode : View? = null
-    private var context : MainActivity? = null
+    private lateinit var controller : SlideController
+    private lateinit var titleBar : TitleBar
+    private lateinit var screen : Screen
+    private lateinit var nightMode : View
+    private lateinit var context : MainActivity
+
+    var active = false
 
     fun init(controller: SlideController, screen: Screen, titleBar: TitleBar, darkMode: View, context: MainActivity) {
         this.controller = controller
@@ -34,30 +31,32 @@ object Core {
         this.nightMode = darkMode
         setTitle(screen.currentView)
         controller.onTouchListener = object : SlideController.OnTouchListener {
-            override fun onEnterClick(): Boolean { return Core.screen!!.getView().enter() }
-            override fun onEnterLongClick(): Boolean { return Core.screen!!.getView().enterLongClick() }
-            override fun onSlide(slideVal: Int): Boolean { return Core.screen!!.getView().slide(slideVal) }
+            override fun onEnterClick(): Boolean { return Core.screen.getView().enter() }
+            override fun onEnterLongClick(): Boolean { return Core.screen.getView().enterLongClick() }
+            override fun onSlide(slideVal: Int): Boolean { return Core.screen.getView().slide(slideVal) }
         }
         wake()
+
+        active = true
     }
 
     var lock = false
     fun lock(lock : Boolean) {
         this.lock = lock
-        controller?.lock(lock)
+        controller.lock(lock)
     }
 
     fun addView(view: ScreenView) {
         setTitle(view)
-        screen!!.addView(view)
+        screen.addView(view)
     }
 
     fun getView() : ScreenView {
-        return screen!!.getView()
+        return screen.getView()
     }
 
     fun removeView() : Boolean {
-        val view = screen!!.removeView()
+        val view = screen.removeView()
         if (view != null) {
             setTitle(view)
             return true
@@ -67,31 +66,38 @@ object Core {
 
     private fun setTitle(view: ScreenView) {
         if (SPManager.getBoolean(SPManager.SP_SHOW_TIME) && (view is MainView)) {
-            titleBar!!.showTime()
+            titleBar.showTime()
         } else {
-            titleBar!!.showTitle(view.getTitle())
+            titleBar.showTitle(view.getTitle())
         }
     }
 
     fun home() {
-        screen!!.clearViews()
-        setTitle(screen!!.currentView)
+        screen.clearViews()
+        setTitle(screen.currentView)
     }
 
     fun refresh() {
-        controller?.invalidate()
+        controller.invalidate()
     }
 
     fun exit() {
+        MediaPlayer.stop()
+
+        /*
         MediaPlayer.release()
-        val context = BaseApplication.getContext()
         context.stopService(Intent(context, MediaPlayerService::class.java))
         VolumeUtil.releaseSoundPool()
+        context.finish()
         exitProcess(0)
+
+         */
+
+        active = false
     }
 
     fun setNightMode(darkMode: Boolean) {
-        this.nightMode?.visibility = if (darkMode) View.VISIBLE else View.GONE
+        this.nightMode.visibility = if (darkMode) View.VISIBLE else View.GONE
     }
 
     private var timer : Timer? = null
@@ -116,14 +122,13 @@ object Core {
                 if (!MediaPlayer.isPlaying) {
                     return
                 }
-                if (screen!!.currentView !is MusicPlayerView) {
+                if (screen.currentView !is MusicPlayerView) {
                     ThreadUtil.runOnUiThread(Runnable {
-                        addView(MusicPlayerView(context!!))
+                        addView(MusicPlayerView(context))
                     })
                 }
 
             }
         }, DELAY)
     }
-
 }

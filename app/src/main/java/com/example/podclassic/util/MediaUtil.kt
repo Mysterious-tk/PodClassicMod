@@ -309,7 +309,7 @@ object MediaUtil {
         }
     }
 
-    fun getMusicImage(path : String) : Bitmap? {
+    private fun getMusicImage(path : String) : Bitmap? {
         val mediaMetadataRetriever = MediaMetadataRetriever()
         mediaMetadataRetriever.setDataSource(path)
         val byteArray = mediaMetadataRetriever.embeddedPicture
@@ -318,6 +318,14 @@ object MediaUtil {
             null
         } else {
             ThumbnailUtils.extractThumbnail(BitmapFactory.decodeByteArray(byteArray, 0, byteArray.size), Values.IMAGE_WIDTH, Values.IMAGE_WIDTH)
+        }
+    }
+
+    fun getMusicImage(music : Music) : Bitmap? {
+        return if (music.id != 0L) {
+            getAlbumImage(music.id)
+        } else {
+            getMusicImage(music.path)
         }
     }
 }

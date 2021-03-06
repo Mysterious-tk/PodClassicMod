@@ -22,6 +22,7 @@ import com.example.podclassic.util.FileUtil
 import com.example.podclassic.util.MediaUtil
 import com.example.podclassic.util.ThreadUtil
 import com.example.podclassic.util.Values
+import com.example.podclassic.view.MainView
 import com.example.podclassic.view.MusicPlayerView
 import kotlinx.android.synthetic.main.activity_main.*
 import kotlin.system.exitProcess
@@ -47,33 +48,32 @@ class MainActivity : AppCompatActivity() {
 
         setContentView(R.layout.activity_main)
 
+        initView()
+
         if (!SPManager.getBoolean(SPManager.SP_STARTED)) {
             SPManager.setBoolean(SPManager.SP_STARTED, true)
             SPManager.reset()
         }
 
-        initView()
+        checkPermission()
+    }
 
+    private fun prepare() {
         Core.init(slide_controller, screen, title_bar, night_mode, this)
 
-        checkPermission()
-
         initMediaPlayer(intent)
-
         startService(Intent(this, MediaPlayerService::class.java))
-
         val autoStop = SPManager.getInt(SPManager.AutoStop.SP_NAME)
         if (autoStop != 0) {
             MediaPlayer.scheduleToStop(SPManager.AutoStop.getMinute(autoStop))
         }
-    }
 
-    private fun prepare() {
         Core.lock(true)
         supportFragmentManager
             .beginTransaction()
             .replace(R.id.frame_layout, SplashFragment(Runnable {
                 MediaUtil.prepare()
+                MainView.loadAppList()
                 if (SPManager.getBoolean(SPManager.SP_AUTO_START)) {
                     MediaPlayer.shufflePlay()
                     if (Core.getView() !is MusicPlayerView) {
@@ -86,13 +86,18 @@ class MainActivity : AppCompatActivity() {
             .commit()
     }
 
+
     override fun onBackPressed() {
+        return
+    /*
         if (Core.lock) {
             return
         }
         if (!Core.removeView()) {
             Core.exit()
         }
+
+         */
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {

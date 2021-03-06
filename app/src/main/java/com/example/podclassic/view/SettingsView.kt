@@ -90,11 +90,11 @@ class SettingsView(context: Context) : ListView(context), ScreenView {
                 override fun onItemClick(index : Int, listView : ListView) : Boolean {
                     SPManager.getBoolean(SPManager.SP_REPEAT).let {
                         SPManager.setBoolean(SPManager.SP_REPEAT, !it)
-                        listView.getCurrentItem().rightText = if (it) "关闭" else "开启"
+                        listView.getCurrentItem().rightText = if (it) "关闭" else "打开"
                     }
                     return true
                 }
-            }, if (SPManager.getBoolean(SPManager.SP_REPEAT))  "开启" else "关闭" ),
+            }, if (SPManager.getBoolean(SPManager.SP_REPEAT))  "打开" else "关闭" ),
 
             Item("随机播放", object : OnItemClickListener {
                 override fun onItemClick(index : Int, listView : ListView) : Boolean {

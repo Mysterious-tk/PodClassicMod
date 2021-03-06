@@ -29,6 +29,15 @@
             </intent-filter>
         </receiver>
 
+        <receiver android:name="com.example.podclassic.widget.AppWidget">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/app_widget_info" />
+        </receiver>
+
         <activity
             android:name="com.example.podclassic.activity.MainActivity"
             android:icon="@mipmap/ic_launcher"
@@ -36,12 +45,16 @@
             android:launchMode="singleTask"
             android:screenOrientation="portrait"
             android:resizeableActivity="false"
+            android:excludeFromRecents="true"
             tools:targetApi="n">
         <!--android:excludeFromRecents="true" -->
 
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+                <category android:name="android.intent.category.HOME" />
+                <category android:name="android.intent.category.DEFAULT" />
+
                 <!--   <category android:name="android.intent.category.HOME" /> -->
                 <!--   <category android:name="android.intent.category.DEFAULT" /> -->
             </intent-filter>
@@ -59,6 +72,10 @@
                 <data android:scheme="file" />
                 <data android:mimeType="audio/*" />
             </intent-filter>
+
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
 
         </activity>
 

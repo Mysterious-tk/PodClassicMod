@@ -1,9 +1,16 @@
 package com.example.podclassic.view
 
+import android.annotation.SuppressLint
+import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageInfo
+import android.content.pm.PackageManager
+import android.content.pm.ResolveInfo
 import android.os.Environment
 import com.example.podclassic.`object`.Core
 import com.example.podclassic.`object`.MediaPlayer
+import com.example.podclassic.base.BaseApplication
 import com.example.podclassic.base.ScreenView
 import com.example.podclassic.game.Brick
 import com.example.podclassic.util.FileUtil
@@ -14,7 +21,51 @@ import java.io.File
 
 
 class MainView(context: Context) : ListView(context), ScreenView {
-    companion object { const val TITLE = Values.POD }
+
+
+    companion object {
+        const val TITLE = Values.POD
+
+
+        class App(val name: String, val intent: Intent)
+
+        lateinit var appList : ArrayList<App>
+
+        fun loadAppList() {
+            val context = BaseApplication.getContext()
+            val packageManager = context.packageManager
+            val packages: List<PackageInfo> = packageManager.getInstalledPackages(0)
+            appList = ArrayList(packages.size)
+            for (packageInfo in packages) {
+                if (packageInfo.packageName == context.packageName) {
+                    continue
+                }
+
+                val appName = packageInfo.applicationInfo.loadLabel(packageManager).toString()
+                val packageName = packageInfo.packageName
+
+                val intent = Intent(Intent.ACTION_MAIN)
+                intent.addCategory(Intent.CATEGORY_LAUNCHER)
+                intent.flags = Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED or Intent.FLAG_ACTIVITY_NEW_TASK
+
+                var mainActivity : String? = null
+                @SuppressLint("WrongConstant") val list: List<ResolveInfo> =
+                    packageManager.queryIntentActivities(intent, PackageManager.GET_ACTIVITIES)
+                for (info in list) {
+                    if (info.activityInfo.packageName == packageName) {
+                        mainActivity = info.activityInfo.name
+                        break
+                    }
+                }
+                if (mainActivity!= null && mainActivity.isNotEmpty()) {
+                    intent.component = ComponentName(packageName, mainActivity)
+                    appList.add(App(appName, intent))
+                }
+            }
+        }
+
+
+    }
 
     override fun getTitle(): String { return TITLE }
 
@@ -146,44 +197,10 @@ class MainView(context: Context) : ListView(context), ScreenView {
                             ); return true
                         }
 
-                    }, true) /*,
+                    }, true) ,
 
 
                     Item("所有程序", object : OnItemClickListener {
-                        inner class App(val name: String, val intent: Intent)
-
-                        val appList = let {
-                            val appList = ArrayList<App>()
-                            val packageManager = context.packageManager
-                            val packages: List<PackageInfo> = packageManager.getInstalledPackages(0)
-                            for (packageInfo in packages) {
-                                if (packageInfo.packageName == context.packageName) {
-                                    continue
-                                }
-                                
-                                val appName = packageInfo.applicationInfo.loadLabel(packageManager).toString()
-                                val packageName = packageInfo.packageName
-
-                                val intent = Intent(Intent.ACTION_MAIN)
-                                intent.addCategory(Intent.CATEGORY_LAUNCHER)
-                                intent.flags = Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED or Intent.FLAG_ACTIVITY_NEW_TASK
-
-                                var mainActivity : String? = null
-                                @SuppressLint("WrongConstant") val list: List<ResolveInfo> =
-                                    packageManager.queryIntentActivities(intent, PackageManager.GET_ACTIVITIES)
-                                for (info in list) {
-                                    if (info.activityInfo.packageName == packageName) {
-                                        mainActivity = info.activityInfo.name
-                                        break
-                                    }
-                                }
-                                if (mainActivity!= null && mainActivity.isNotEmpty()) {
-                                    intent.component = ComponentName(packageName, mainActivity)
-                                    appList.add(App(appName, intent))
-                                }
-                            }
-                            appList
-                        }
 
                         override fun onItemClick(index: Int, listView: ListView): Boolean {
                             val itemList = ArrayList<Item>()
@@ -201,7 +218,6 @@ class MainView(context: Context) : ListView(context), ScreenView {
                             return true
                         }
                     }, true)
-                    */
 
 
                 )
@@ -212,7 +228,6 @@ class MainView(context: Context) : ListView(context), ScreenView {
                 }
 
             }, true),
-
 
             Item("设置", object : OnItemClickListener {
                 override fun onItemClick(index: Int, listView: ListView): Boolean {

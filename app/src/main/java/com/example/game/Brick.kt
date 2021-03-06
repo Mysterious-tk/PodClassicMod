@@ -3,14 +3,12 @@ package com.example.podclassic.game
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
-import android.util.Log
 import android.view.View
 import android.widget.FrameLayout
 import com.example.podclassic.base.ScreenView
 import com.example.game.core.GameView
 import com.example.game.core.Object
 import com.example.podclassic.game.util.Colors
-import com.example.podclassic.util.Values
 import kotlin.random.Random
 
 class Brick constructor(context: Context) : FrameLayout(context), ScreenView {

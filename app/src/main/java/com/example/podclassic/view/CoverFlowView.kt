@@ -14,6 +14,7 @@ import com.example.podclassic.base.ScreenView
 import com.example.podclassic.util.Icons
 import com.example.podclassic.util.MediaUtil
 import com.example.podclassic.util.ThreadUtil
+import com.example.podclassic.util.VolumeUtil
 import com.example.podclassic.widget.TextView
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.ThreadPoolExecutor
@@ -148,6 +149,7 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
 
     @SuppressLint("ObjectAnimatorBinding")
     override fun slide(slideVal: Int): Boolean {
+
         if (animator?.isRunning == true) {
             duration = (duration * (0.9f + 0.1f * (1f - s(duration.toFloat())))).toLong()
             duration = max(duration, MIN_DURATION)
