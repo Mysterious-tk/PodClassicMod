@@ -23,7 +23,7 @@ object Values {
     var resolution = 0
 
     fun getVersionName(): String {
-        val context = BaseApplication.getContext()
+        val context = BaseApplication.context
         return context.packageManager.getPackageInfo(context.packageName, 0).versionName
     }
 }

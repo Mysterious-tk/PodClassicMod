@@ -1,5 +1,6 @@
 package com.example.podclassic.view
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.view.Gravity
 import android.view.ViewGroup
@@ -10,6 +11,7 @@ import com.example.podclassic.util.AudioFocusManager
 import com.example.podclassic.util.Colors
 import java.io.File
 
+@SuppressLint("ViewConstructor")
 class VideoView(context: Context, val file : File) : FrameLayout(context), ScreenView, AudioFocusManager.OnAudioFocusChangeListener {
 
     private val audioFocusManager = AudioFocusManager(this)

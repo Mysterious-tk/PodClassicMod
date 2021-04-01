@@ -1,18 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+<shortcuts xmlns:tools="http://schemas.android.com/tools"
+    xmlns:android="http://schemas.android.com/apk/res/android">
     <shortcut
         android:enabled="true"
         android:icon="@drawable/ic_play_arrow_blue_500_18dp"
         android:shortcutId="shuffle_play"
         android:shortcutLongLabel="@string/shuffle_play"
         android:shortcutShortLabel="@string/shuffle_play">
-        <intent
-            android:action="android.intent.action.VIEW"
-            android:targetClass="com.example.podclassic.activity.MainActivity"
-            android:targetPackage="com.example.podclassic" />
 
         <intent
-            android:action="ACTION_"
+            android:action="ACTION_SHUFFLE"
             android:targetClass="com.example.podclassic.activity.MainActivity"
             android:targetPackage="com.example.podclassic" />
         <categories android:name="android.shortcut.conversation" />

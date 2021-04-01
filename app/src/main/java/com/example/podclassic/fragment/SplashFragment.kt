@@ -9,7 +9,6 @@ import android.view.ViewGroup
 import androidx.fragment.app.Fragment
 import com.example.podclassic.R
 import com.example.podclassic.`object`.Core
-import com.example.podclassic.util.*
 
 class SplashFragment(val runnable : Runnable) : Fragment() {
 

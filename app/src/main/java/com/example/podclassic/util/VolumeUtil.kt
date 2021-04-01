@@ -11,7 +11,7 @@ import com.example.podclassic.storage.SPManager
 
 object VolumeUtil {
     private val audioManager by lazy {
-        BaseApplication.getContext().getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        BaseApplication.context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     }
 
     val maxVolume by lazy { audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC) }
@@ -21,7 +21,7 @@ object VolumeUtil {
         setMaxStreams(1)
         build()
     }.build().apply {
-        streamId = load(BaseApplication.getContext(), R.raw.click, 0)
+        streamId = load(BaseApplication.context, R.raw.click, 0)
     }
 
     fun getCurrentVolume(): Int {

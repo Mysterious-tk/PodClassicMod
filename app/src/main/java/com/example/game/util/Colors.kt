@@ -8,7 +8,7 @@ import com.example.podclassic.R
 import com.example.podclassic.base.BaseApplication
 
 object Colors {
-    val context: Context by lazy { BaseApplication.getContext() }
+    val context: Context by lazy { BaseApplication.context }
     fun getColor(id : Int) : Int{
         return ContextCompat.getColor(context, id)
     }

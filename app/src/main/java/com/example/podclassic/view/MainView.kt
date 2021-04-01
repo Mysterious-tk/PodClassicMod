@@ -32,7 +32,7 @@ class MainView(context: Context) : ListView(context), ScreenView {
         lateinit var appList : ArrayList<App>
 
         fun loadAppList() {
-            val context = BaseApplication.getContext()
+            val context = BaseApplication.context
             val packageManager = context.packageManager
             val packages: List<PackageInfo> = packageManager.getInstalledPackages(0)
             appList = ArrayList(packages.size)
@@ -222,10 +222,7 @@ class MainView(context: Context) : ListView(context), ScreenView {
 
                 )
 
-                override fun onItemClick(index: Int, listView: ListView): Boolean {
-                    Core.addView(ItemListView(context, itemList, "附加程序", null)
-                    ); return true
-                }
+                override fun onItemClick(index: Int, listView: ListView): Boolean { Core.addView(ItemListView(context, itemList, "附加程序", null)); return true }
 
             }, true),
 

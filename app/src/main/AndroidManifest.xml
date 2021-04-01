@@ -73,6 +73,11 @@
                 <data android:mimeType="audio/*" />
             </intent-filter>
 
+            <intent-filter>
+                <action android:name="ACTION_SHUFFLE" />
+                <category android:name="android.shortcut.conversation" />
+            </intent-filter>
+
             <meta-data
                 android:name="android.app.shortcuts"
                 android:resource="@xml/shortcuts" />

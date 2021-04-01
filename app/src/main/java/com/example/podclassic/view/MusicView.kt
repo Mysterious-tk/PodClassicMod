@@ -94,7 +94,7 @@ class MusicView(context: Context) : ListView(context), ScreenView {
                 }
 
             }, true),
-            Item("文件夹", object : OnItemClickListener {
+            Item("收藏的文件夹", object : OnItemClickListener {
                 override fun onItemClick(index: Int, listView : ListView) : Boolean {
                     val itemList = ArrayList<Item>()
                     val files = SaveMusicLists.saveFolders.getFolders()

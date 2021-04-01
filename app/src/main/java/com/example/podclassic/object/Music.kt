@@ -1,38 +1,27 @@
 package com.example.podclassic.`object`
 
 import android.text.TextUtils
-import com.example.podclassic.util.Values
 
 
-class Music {
-    var name = ""
+class Music(name: String, album: String, singer: String, var path: String, var id: Long) {
+    var name = name
     set(value) {
         if (value.isNotBlank()) {
             field = value
         }
     }
-    var album = Values.NULL
+    var album = album
         set(value) {
             if (value.isNotBlank()) {
                 field = value
             }
         }
-    var singer = Values.NULL
+    var singer = singer
         set(value) {
             if (value.isNotBlank()) {
                 field = value
             }
         }
-    var path : String = ""
-    var id : Long = 0L
-
-    constructor(name : String, album : String, singer : String, path : String, id : Long) {
-        this.name = name
-        this.album = album
-        this.singer = singer
-        this.path = path
-        this.id = id
-    }
 
     override fun hashCode(): Int {
         return path.hashCode()

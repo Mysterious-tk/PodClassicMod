@@ -8,6 +8,7 @@ import android.graphics.Bitmap
 import android.media.MediaPlayer
 import android.media.audiofx.Equalizer
 import android.os.Build
+import android.os.Environment
 import android.os.Handler
 import android.os.Looper
 import com.example.podclassic.base.BaseApplication
@@ -18,6 +19,9 @@ import com.example.podclassic.util.AudioFocusManager
 import com.example.podclassic.util.LyricUtil
 import com.example.podclassic.util.MediaUtil
 import com.example.podclassic.util.ThreadUtil
+import java.io.File
+import java.io.FileWriter
+import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.ThreadPoolExecutor
@@ -60,6 +64,7 @@ object MediaPlayer : MediaPlayer.OnCompletionListener, MediaPlayer.OnErrorListen
         mediaPlayer.reset()
         audioFocusManager.abandonAudioFocus()
         playList.clear()
+        orderedPlayList.clear()
         isPlaying = false
         isPrepared = false
         currentIndex = -1
@@ -118,6 +123,9 @@ object MediaPlayer : MediaPlayer.OnCompletionListener, MediaPlayer.OnErrorListen
                 setEqualizer(SPManager.getInt(SPManager.SP_EQUALIZER))
             }
         }
+
+        val context = BaseApplication.context
+        context.startService(Intent(context, MediaPlayerService::class.java))
     }
 
 
@@ -236,8 +244,6 @@ object MediaPlayer : MediaPlayer.OnCompletionListener, MediaPlayer.OnErrorListen
             onMediaChange()
         }
         onPlayStateChange()
-
-
     }
 
 
@@ -332,7 +338,7 @@ object MediaPlayer : MediaPlayer.OnCompletionListener, MediaPlayer.OnErrorListen
     private var pendingIntent: PendingIntent? = null
 
     fun scheduleToStop(min: Int) {
-        val context = BaseApplication.getContext()
+        val context = BaseApplication.context
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         if (pendingIntent != null) {
             alarmManager.cancel(pendingIntent)
@@ -367,9 +373,11 @@ object MediaPlayer : MediaPlayer.OnCompletionListener, MediaPlayer.OnErrorListen
         private var running = false
 
         fun addTask(music : Music) {
-            next = music
-            if (!running) {
-                execTask()
+            synchronized(BaseApplication.context) {
+                next = music
+                if (!running) {
+                    execTask()
+                }
             }
         }
 
@@ -381,16 +389,18 @@ object MediaPlayer : MediaPlayer.OnCompletionListener, MediaPlayer.OnErrorListen
             threadPoolExecutor.execute {
                 loadImage(music)
                 if (next != null) {
-                    running = false
                     handler.post {
+                        running = false
                         execTask()
                     }
                     return@execute
                 }
-                lyricSet = LyricUtil.getLyric(music)
+                if (SPManager.getBoolean(SPManager.SP_SHOW_LYRIC)) {
+                    lyricSet = LyricUtil.getLyric(music)
+                }
 
-                running = false
                 handler.post {
+                    running = false
                     if (next == null) {
                         onMediaChangeFinished()
                     } else {
@@ -428,15 +438,13 @@ object MediaPlayer : MediaPlayer.OnCompletionListener, MediaPlayer.OnErrorListen
     var lyricSet : LyricUtil.LyricSet? = null
 
     private fun loadImage(music: Music) {
-        synchronized(this) {
+        synchronized(BaseApplication.context) {
             if (image?.isRecycled == false) {
                 image?.recycle()
             }
-            image = null
+            image = MediaUtil.getMusicImage(music)
         }
-        image = MediaUtil.getMusicImage(music)
     }
-
 
     fun next() {
         if (playList.isEmpty()) {
@@ -565,6 +573,13 @@ object MediaPlayer : MediaPlayer.OnCompletionListener, MediaPlayer.OnErrorListen
     }
 
     private fun onProgress(progress: Int) {
+        fun log(text : String) {
+            val file = File(Environment.getExternalStorageDirectory().path + File.separator + "log.txt");
+            val fw = FileWriter(file)
+            fw.write(text)
+            fw.close()
+        }
+        log("onProgress is called" + SimpleDateFormat().format(Date(System.currentTimeMillis())))
         for (item in onProgressListeners) {
             ThreadUtil.runOnUiThread(Runnable { item.onProgress(progress) })
         }

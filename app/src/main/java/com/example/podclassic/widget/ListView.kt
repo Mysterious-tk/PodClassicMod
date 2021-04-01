@@ -330,7 +330,7 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
         fun onItemLongClick(index : Int, listView : ListView) : Boolean { return false }
     }
 
-    class Item {
+    open class Item {
         var name : String = ""
         var onItemClickListener : OnItemClickListener? = null
         var enable : Boolean = false

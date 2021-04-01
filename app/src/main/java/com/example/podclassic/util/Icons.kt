@@ -12,7 +12,7 @@ import com.example.podclassic.base.BaseApplication
 
 @SuppressLint("UseCompatLoadingForDrawables")
 object Icons {
-    private val context = BaseApplication.getContext()
+    private val context = BaseApplication.context
     
     val MENU by lazy { Icon(context.getDrawable(R.drawable.ic_menu_white_24dp)!!) }
     val PREV by lazy { Icon(context.getDrawable(R.drawable.ic_skip_previous_white_24dp)!!) }

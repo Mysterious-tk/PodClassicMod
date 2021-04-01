@@ -1,47 +1,55 @@
 package com.example.podclassic.`object`
 
+import android.content.Context
 import android.view.View
 import com.example.podclassic.activity.MainActivity
 import com.example.podclassic.base.ScreenView
 import com.example.podclassic.storage.SPManager
+import com.example.podclassic.util.MediaUtil
 import com.example.podclassic.util.ThreadUtil
 import com.example.podclassic.view.MainView
 import com.example.podclassic.view.MusicPlayerView
+import com.example.podclassic.widget.AppWidget
 import com.example.podclassic.widget.Screen
 import com.example.podclassic.widget.SlideController
 import com.example.podclassic.widget.TitleBar
 import java.util.*
 
-
 object Core {
+    private lateinit var controller: SlideController
+    private lateinit var titleBar: TitleBar
+    private lateinit var screen: Screen
+    private lateinit var nightMode: View
+    private var activity: MainActivity? = null
 
-    private lateinit var controller : SlideController
-    private lateinit var titleBar : TitleBar
-    private lateinit var screen : Screen
-    private lateinit var nightMode : View
-    private lateinit var context : MainActivity
+    lateinit var context: Context
 
-    var active = false
-
-    fun init(controller: SlideController, screen: Screen, titleBar: TitleBar, darkMode: View, context: MainActivity) {
+    fun bindActivity(controller: SlideController, screen: Screen, titleBar: TitleBar, darkMode: View, context: MainActivity) {
         this.controller = controller
         this.screen = screen
         this.titleBar = titleBar
-        this.context = context
+        this.activity = context
         this.nightMode = darkMode
         setTitle(screen.currentView)
         controller.onTouchListener = object : SlideController.OnTouchListener {
-            override fun onEnterClick(): Boolean { return Core.screen.getView().enter() }
-            override fun onEnterLongClick(): Boolean { return Core.screen.getView().enterLongClick() }
-            override fun onSlide(slideVal: Int): Boolean { return Core.screen.getView().slide(slideVal) }
+            override fun onEnterClick(): Boolean {
+                return screen.getView().enter()
+            }
+
+            override fun onEnterLongClick(): Boolean {
+                return screen.getView().enterLongClick()
+            }
+
+            override fun onSlide(slideVal: Int): Boolean {
+                return screen.getView().slide(slideVal)
+            }
         }
         wake()
 
-        active = true
     }
 
     var lock = false
-    fun lock(lock : Boolean) {
+    fun lock(lock: Boolean) {
         this.lock = lock
         controller.lock(lock)
     }
@@ -51,11 +59,11 @@ object Core {
         screen.addView(view)
     }
 
-    fun getView() : ScreenView {
+    fun getView(): ScreenView {
         return screen.getView()
     }
 
-    fun removeView() : Boolean {
+    fun removeView(): Boolean {
         val view = screen.removeView()
         if (view != null) {
             setTitle(view)
@@ -83,24 +91,20 @@ object Core {
 
     fun exit() {
         MediaPlayer.stop()
-
         /*
         MediaPlayer.release()
-        context.stopService(Intent(context, MediaPlayerService::class.java))
+        activity?.stopService(Intent(activity, MediaPlayerService::class.java))
         VolumeUtil.releaseSoundPool()
-        context.finish()
+        activity?.finish()
         exitProcess(0)
-
-         */
-
-        active = false
+        */
     }
 
     fun setNightMode(darkMode: Boolean) {
         this.nightMode.visibility = if (darkMode) View.VISIBLE else View.GONE
     }
 
-    private var timer : Timer? = null
+    private var timer: Timer? = null
     private var prevTimerSetTime = 0L
 
     private const val DELAY = 10000L
@@ -124,11 +128,18 @@ object Core {
                 }
                 if (screen.currentView !is MusicPlayerView) {
                     ThreadUtil.runOnUiThread(Runnable {
-                        addView(MusicPlayerView(context))
+                        if (activity != null) {
+                            addView(MusicPlayerView(activity!!))
+                        }
                     })
                 }
-
             }
         }, DELAY)
+    }
+
+    fun init() {
+        // 无论是否加载Activity都需要初始化
+        MediaUtil.prepare()
+        AppWidget.updateRemoteViews(null)
     }
 }

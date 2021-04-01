@@ -85,8 +85,12 @@ public class SPManager {
         public static final int M90_ID = 4;
         public static final String M120_NAME = "120 分钟";
         public static final int M120_ID = 5;
+        public static final String M240_NAME = "240 分钟";
+        public static final int M240_ID = 6;
+        public static final String FOREVER_NAME = "持续播放";
+        public static final int FOREVER_ID = 7;
 
-        public static final int values = 6;
+        public static final int values = 8;
 
         public static final String SP_NAME = "auto_stop";
 
@@ -104,6 +108,10 @@ public class SPManager {
                     return M90_NAME;
                 case M120_ID:
                     return M120_NAME;
+                case M240_ID:
+                    return M240_NAME;
+                case FOREVER_ID:
+                    return FOREVER_NAME;
             }
             return "";
         }
@@ -122,6 +130,10 @@ public class SPManager {
                     return 90;
                 case M120_ID:
                     return 120;
+                case M240_ID:
+                    return 240;
+                case FOREVER_ID:
+                    return -1;
             }
             return 0;
         }
@@ -145,11 +157,10 @@ public class SPManager {
     public static final String SP_PLAY_ALL = "play_all";
     public static final String SP_COVER_FLOW = "cover_flow";
     public static final String SP_REPEAT = "repeat";
-    public static final String SP_AUTO_START = "auto_start";
-    public static final String SP_HAS_WIDGET = "has_widget";
+    public static final String SP_HAS_PERMISSION = "has_permission";
 
     private static SharedPreferences getSharedPreferences() {
-        return PreferenceManager.getDefaultSharedPreferences(BaseApplication.getContext());
+        return PreferenceManager.getDefaultSharedPreferences(BaseApplication.context);
     }
 
     public static boolean getBoolean(String sp) {

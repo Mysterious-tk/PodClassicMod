@@ -14,7 +14,6 @@ import com.example.podclassic.base.ScreenView
 import com.example.podclassic.util.Icons
 import com.example.podclassic.util.MediaUtil
 import com.example.podclassic.util.ThreadUtil
-import com.example.podclassic.util.VolumeUtil
 import com.example.podclassic.widget.TextView
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.ThreadPoolExecutor

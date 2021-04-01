@@ -9,7 +9,7 @@ import com.example.podclassic.base.BaseApplication
 import com.example.podclassic.storage.SPManager
 
 class AudioFocusManager(var onAudioFocusChangeListener : OnAudioFocusChangeListener?) : AudioManager.OnAudioFocusChangeListener {
-    private val audioManager by lazy { BaseApplication.getContext().getSystemService(Context.AUDIO_SERVICE) as AudioManager }
+    private val audioManager by lazy { BaseApplication.context.getSystemService(Context.AUDIO_SERVICE) as AudioManager }
 
     val attribute = AudioAttributes
         .Builder()

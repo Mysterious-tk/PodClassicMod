@@ -383,8 +383,10 @@ class MusicPlayerView(context: Context) : RelativeLayout(context), ScreenView, M
         image.setImageBitmap(result)
     }
 
+    @SuppressLint("SetTextI18n")
     override fun onPlayStateChange() {
         progressBar.setMax(MediaPlayer.getDuration())
+        index.text = "${(MediaPlayer.getCurrentIndex() + 1)}/${MediaPlayer.getPlayListSize()}"
     }
 
     override fun onProgress(progress: Int) {

@@ -12,6 +12,7 @@ import android.text.TextUtils
 import com.example.podclassic.`object`.Music
 import com.example.podclassic.`object`.MusicList
 import com.example.podclassic.base.BaseApplication
+import com.example.podclassic.storage.SPManager
 import java.io.File
 import java.text.Collator
 import java.util.*
@@ -30,7 +31,7 @@ object MediaUtil {
     const val PATH = MediaStore.Audio.Media.DATA
 
 
-    private val contentResolver = BaseApplication.getContext().contentResolver
+    private val contentResolver = BaseApplication.context.contentResolver
     private val collator = Collator.getInstance(Locale.CHINA)
 
 
@@ -54,6 +55,9 @@ object MediaUtil {
 
     private var prepared = false
     fun prepare() {
+        if (!SPManager.getBoolean(SPManager.SP_HAS_PERMISSION)) {
+            return
+        }
         if (prepared) {
             return
         }

@@ -19,7 +19,7 @@ class SaveMusics(private val databaseName: String, val name : String) {
     private val list = search(null, null)
 
     private fun getDatabase() : SQLiteDatabase {
-        return DatabaseOpenHelper(BaseApplication.getContext(), databaseName, null, 1).writableDatabase
+        return DatabaseOpenHelper(BaseApplication.context, databaseName, null, 1).writableDatabase
     }
 
     fun size() : Int {
@@ -124,7 +124,7 @@ class SaveMusics(private val databaseName: String, val name : String) {
     }
 
     private fun sendNotification() {
-        val context = BaseApplication.getContext()
+        val context = BaseApplication.context
         context.startService(Intent(context, MediaPlayerService::class.java))
     }
 

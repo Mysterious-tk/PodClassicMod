@@ -21,7 +21,7 @@ public class FileUtil {
         if (Build.VERSION.SDK_INT > Build.VERSION_CODES.P) {
             return null;
         }
-        Context context = BaseApplication.getContext();
+        Context context = BaseApplication.context;
         StorageManager mStorageManager = (StorageManager) context.getSystemService(Context.STORAGE_SERVICE);
         Class<?> storageVolumeClazz;
         try {
@@ -32,8 +32,7 @@ public class FileUtil {
             final int length = Array.getLength(result);
             for (int i = 1; i < length; i++) {
                 Object storageVolumeElement = Array.get(result, i);
-                String path = (String) getPath.invoke(storageVolumeElement);
-                return path;
+                return (String) getPath.invoke(storageVolumeElement);
             }
         } catch (Exception e) {
             return null;
@@ -42,7 +41,7 @@ public class FileUtil {
     }
 
     public static String uriToPath(final Uri uri) {
-        Context context = BaseApplication.getContext();
+        Context context = BaseApplication.context;
         if (DocumentsContract.isDocumentUri(context, uri)) {
             if ("com.android.externalstorage.documents".equals(uri.getAuthority())) {
                 final String docId = DocumentsContract.getDocumentId(uri);

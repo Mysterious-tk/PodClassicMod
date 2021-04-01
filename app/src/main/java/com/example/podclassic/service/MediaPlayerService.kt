@@ -15,6 +15,7 @@ import android.media.session.MediaSession
 import android.media.session.PlaybackState
 import android.os.Build
 import android.os.IBinder
+import android.util.Log
 import com.example.podclassic.R
 import com.example.podclassic.`object`.Core
 import com.example.podclassic.`object`.MediaPlayer
@@ -22,6 +23,7 @@ import com.example.podclassic.activity.MainActivity
 import com.example.podclassic.storage.SaveMusics
 import com.example.podclassic.util.AudioFocusManager
 import com.example.podclassic.util.Colors
+import com.example.podclassic.widget.AppWidget
 
 
 class MediaPlayerService : Service(), MediaPlayer.OnMediaChangeListener,
@@ -56,9 +58,11 @@ class MediaPlayerService : Service(), MediaPlayer.OnMediaChangeListener,
 
     override fun onDestroy() {
         super.onDestroy()
+        Log.d("haotian_wang", "onDestory")
         mediaPlayer.removeOnMediaChangeListener(this)
         audioFocusManager.onAudioFocusChangeListener = null
         stopForeground(true)
+        AppWidget.updateRemoteViews(null)
 
         mediaSession.apply {
             setCallback(null)
@@ -132,8 +136,7 @@ class MediaPlayerService : Service(), MediaPlayer.OnMediaChangeListener,
     }
 
     private val pendingIntentActivity by lazy {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) PendingIntent.getForegroundService(this, 6, Intent(this, MainActivity::class.java).apply {  action = ACTION_MAIN }, PendingIntent.FLAG_UPDATE_CURRENT)
-        else PendingIntent.getService(this, 6, Intent(this, MainActivity::class.java).apply {  action = ACTION_MAIN }, PendingIntent.FLAG_UPDATE_CURRENT)
+        PendingIntent.getActivity(this, 6, Intent(this, MainActivity::class.java).apply {  action = ACTION_MAIN }, PendingIntent.FLAG_UPDATE_CURRENT)
     }
 
     private val pendingIntentFavorite by lazy {
@@ -160,15 +163,19 @@ class MediaPlayerService : Service(), MediaPlayer.OnMediaChangeListener,
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        when (intent?.action) {
-            ACTION_STOP -> Core.exit()
-            ACTION_NEXT -> mediaPlayer.next()
-            ACTION_PAUSE -> mediaPlayer.pause()
-            ACTION_PREV -> mediaPlayer.prev()
-            ACTION_SHUFFLE -> mediaPlayer.shufflePlay()
-            ACTION_FAVORITE -> {
-                val music = mediaPlayer.getCurrent()
-                if (music != null) {
+        val music = mediaPlayer.getCurrent()
+        if (music == null) {
+            if (intent?.action == ACTION_NEXT || intent?.action == ACTION_PAUSE || intent?.action == ACTION_PREV) {
+                mediaPlayer.shufflePlay()
+            }
+        } else {
+            when (intent?.action) {
+                ACTION_STOP -> Core.exit()
+                ACTION_NEXT -> mediaPlayer.next()
+                ACTION_PAUSE -> mediaPlayer.pause()
+                ACTION_PREV -> mediaPlayer.prev()
+                ACTION_SHUFFLE -> mediaPlayer.shufflePlay()
+                ACTION_FAVORITE -> {
                     if (SaveMusics.loveList.contains(music)) {
                         SaveMusics.loveList.remove(music)
                     } else {
@@ -176,8 +183,8 @@ class MediaPlayerService : Service(), MediaPlayer.OnMediaChangeListener,
                     }
                     sendNotification()
                 }
+                else -> sendNotification()
             }
-            else -> sendNotification()
         }
         return super.onStartCommand(intent, flags, startId)
     }
@@ -192,13 +199,13 @@ class MediaPlayerService : Service(), MediaPlayer.OnMediaChangeListener,
     @Suppress("DEPRECATION")
     private fun sendNotification() {
         val music = MediaPlayer.getCurrent()
+        AppWidget.updateRemoteViews(music)
         if (music == null) {
             stopForeground(true)
             return
         }
 
         val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) Notification.Builder(this, packageName) else Notification.Builder(this)
-
 
         val actionPause = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) Notification.Action.Builder(Icon.createWithResource(this, if (mediaPlayer.isPlaying) R.drawable.ic_pause_grey_800_36dp else R.drawable.ic_play_arrow_grey_800_36dp), "pause", pendingIntentPause).build()
         else Notification.Action.Builder(if (mediaPlayer.isPlaying) R.drawable.ic_pause_grey_800_36dp else R.drawable.ic_play_arrow_grey_800_36dp, "pause", pendingIntentPause).build()

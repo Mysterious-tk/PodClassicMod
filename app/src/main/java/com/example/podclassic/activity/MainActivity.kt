@@ -1,7 +1,6 @@
 package com.example.podclassic.activity
 
 import android.Manifest
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Outline
 import android.graphics.Point
@@ -16,17 +15,11 @@ import com.example.podclassic.R
 import com.example.podclassic.`object`.Core
 import com.example.podclassic.`object`.MediaPlayer
 import com.example.podclassic.fragment.SplashFragment
-import com.example.podclassic.service.MediaPlayerService
 import com.example.podclassic.storage.SPManager
-import com.example.podclassic.util.FileUtil
-import com.example.podclassic.util.MediaUtil
-import com.example.podclassic.util.ThreadUtil
-import com.example.podclassic.util.Values
+import com.example.podclassic.util.*
 import com.example.podclassic.view.MainView
 import com.example.podclassic.view.MusicPlayerView
 import kotlinx.android.synthetic.main.activity_main.*
-import kotlin.system.exitProcess
-
 
 class MainActivity : AppCompatActivity() {
 
@@ -37,59 +30,42 @@ class MainActivity : AppCompatActivity() {
     }
 
 
-    override fun onNewIntent(intent: Intent?) {
-        super.onNewIntent(intent)
-        initMediaPlayer(intent)
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         initScreen()
-
         setContentView(R.layout.activity_main)
-
         initView()
 
         if (!SPManager.getBoolean(SPManager.SP_STARTED)) {
             SPManager.setBoolean(SPManager.SP_STARTED, true)
             SPManager.reset()
         }
+        Core.bindActivity(slide_controller, screen, title_bar, dark_mode, this)
 
         checkPermission()
     }
 
     private fun prepare() {
-        Core.init(slide_controller, screen, title_bar, night_mode, this)
-
-        initMediaPlayer(intent)
-        startService(Intent(this, MediaPlayerService::class.java))
-        val autoStop = SPManager.getInt(SPManager.AutoStop.SP_NAME)
-        if (autoStop != 0) {
-            MediaPlayer.scheduleToStop(SPManager.AutoStop.getMinute(autoStop))
-        }
-
         Core.lock(true)
         supportFragmentManager
             .beginTransaction()
             .replace(R.id.frame_layout, SplashFragment(Runnable {
-                MediaUtil.prepare()
+                //UI相关
                 MainView.loadAppList()
-                if (SPManager.getBoolean(SPManager.SP_AUTO_START)) {
-                    MediaPlayer.shufflePlay()
-                    if (Core.getView() !is MusicPlayerView) {
-                        ThreadUtil.runOnUiThread(Runnable {
-                            Core.addView(MusicPlayerView(this))
-                        })
-                    }
+                PinyinUtil.load()
+                MediaUtil.prepare()
+                if (initMediaPlayer()) {
+                    ThreadUtil.runOnUiThread(Runnable {
+                        Core.addView(MusicPlayerView(this))
+                    })
                 }
             }))
             .commit()
     }
 
-
     override fun onBackPressed() {
         return
-    /*
+        /*
         if (Core.lock) {
             return
         }
@@ -107,13 +83,23 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun initMediaPlayer(intent: Intent?) {
+    private fun initMediaPlayer() : Boolean {
         val uri = intent?.data
-        if (uri != null) {
-            MediaPlayer.add(MediaUtil.getMusic(FileUtil.uriToPath(uri)))
-        }
-        if ((uri != null || intent?.action == MediaPlayerService.ACTION_MAIN) && Core.getView() !is MusicPlayerView) {
-            Core.addView(MusicPlayerView(this))
+        val action = intent?.action
+        val autoStop = SPManager.getInt(SPManager.AutoStop.SP_NAME)
+        return when {
+            action == "ACTION_SHUFFLE" || autoStop != 0 -> {
+                MediaPlayer.shufflePlay()
+                if (autoStop != SPManager.AutoStop.FOREVER_ID) {
+                    MediaPlayer.scheduleToStop(SPManager.AutoStop.getMinute(autoStop))
+                }
+                true
+            }
+            uri != null -> {
+                MediaPlayer.add(MediaUtil.getMusic(FileUtil.uriToPath(uri)))
+                true
+            }
+            else -> false
         }
     }
 
@@ -166,6 +152,7 @@ class MainActivity : AppCompatActivity() {
         }
         frame_layout.clipToOutline = true
 
+        window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or View.SYSTEM_UI_FLAG_FULLSCREEN;
     }
 
     private fun checkPermission() {
@@ -179,9 +166,12 @@ class MainActivity : AppCompatActivity() {
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (grantResults.isNotEmpty() && grantResults[0] != PackageManager.PERMISSION_GRANTED) {
-            exitProcess(0)
+            SPManager.setBoolean(SPManager.SP_HAS_PERMISSION, false)
+            Core.exit()
         } else {
+            SPManager.setBoolean(SPManager.SP_HAS_PERMISSION, true)
             prepare()
         }
     }
 }
+

@@ -54,7 +54,9 @@ class SettingsView(context: Context) : ListView(context), ScreenView {
                     Item("30 分钟", object : OnItemClickListener { override fun onItemClick(index: Int, listView: ListView) : Boolean {scheduleToStop(30); return true } }, false),
                     Item("60 分钟", object : OnItemClickListener { override fun onItemClick(index: Int, listView: ListView) : Boolean {scheduleToStop(60); return true } }, false),
                     Item("90 分钟", object : OnItemClickListener { override fun onItemClick(index: Int, listView: ListView) : Boolean {scheduleToStop(90); return true } }, false),
-                    Item("120 分钟", object : OnItemClickListener { override fun onItemClick(index: Int, listView: ListView) : Boolean {scheduleToStop(120); return true } }, false)
+                    Item("120 分钟", object : OnItemClickListener { override fun onItemClick(index: Int, listView: ListView) : Boolean {scheduleToStop(120); return true } }, false),
+                    Item("240 分钟", object : OnItemClickListener { override fun onItemClick(index: Int, listView: ListView) : Boolean {scheduleToStop(240); return true } }, false)
+
                 )
                 override fun onItemClick(index : Int, listView : ListView) : Boolean { Core.addView(ItemListView(context, itemList, "睡眠", null)); return true }
             }, true),
@@ -86,15 +88,7 @@ class SettingsView(context: Context) : ListView(context), ScreenView {
                 }
             }, MediaPlayer.getPlayModeString()),
 
-            Item("循环播放", object : OnItemClickListener {
-                override fun onItemClick(index : Int, listView : ListView) : Boolean {
-                    SPManager.getBoolean(SPManager.SP_REPEAT).let {
-                        SPManager.setBoolean(SPManager.SP_REPEAT, !it)
-                        listView.getCurrentItem().rightText = if (it) "关闭" else "打开"
-                    }
-                    return true
-                }
-            }, if (SPManager.getBoolean(SPManager.SP_REPEAT))  "打开" else "关闭" ),
+            SwitchBar("循环播放", SPManager.SP_REPEAT),
 
             Item("随机播放", object : OnItemClickListener {
                 override fun onItemClick(index : Int, listView : ListView) : Boolean {
@@ -119,16 +113,7 @@ class SettingsView(context: Context) : ListView(context), ScreenView {
 
             }, SPManager.NightMode.getString(SPManager.getInt(SPManager.NightMode.SP_NAME))),
 
-            Item("与其它应用同时播放", object : OnItemClickListener {
-                override fun onItemClick(index : Int, listView : ListView) : Boolean {
-                    SPManager.getBoolean(SPManager.SP_AUDIO_FOCUS).let {
-                        SPManager.setBoolean(SPManager.SP_AUDIO_FOCUS, !it)
-                        listView.getCurrentItem().rightText = if (it) "打开" else "关闭"
-                    }
-                    return true
-                }
-            }, if (SPManager.getBoolean(SPManager.SP_AUDIO_FOCUS))  "关闭" else "打开" ),
-
+            SwitchBar("与其它应用同时播放", SPManager.SP_AUDIO_FOCUS),
 
             Item("按键音", object : OnItemClickListener {
                 override fun onItemClick(index : Int, listView: ListView) : Boolean {
@@ -152,37 +137,13 @@ class SettingsView(context: Context) : ListView(context), ScreenView {
                 }
             }, if (SPManager.getBoolean(SPManager.SP_THEME))  "红色" else "黑色" ),
 
-            Item("显示歌词", object : OnItemClickListener {
-                override fun onItemClick(index : Int, listView : ListView) : Boolean {
-                    SPManager.getBoolean(SPManager.SP_SHOW_LYRIC).let {
-                        SPManager.setBoolean(SPManager.SP_SHOW_LYRIC, !it)
-                        listView.getCurrentItem().rightText = if (it) "关闭" else "打开"
-                    }
-                    return true
-                }
-            }, if (SPManager.getBoolean(SPManager.SP_SHOW_LYRIC))  "打开" else "关闭" ),
+            SwitchBar("显示歌词", SPManager.SP_SHOW_LYRIC),
 
-            Item("显示歌手及专辑信息", object : OnItemClickListener {
-                override fun onItemClick(index : Int, listView: ListView) : Boolean {
-                    SPManager.getBoolean(SPManager.SP_SHOW_INFO).let {
-                        SPManager.setBoolean(SPManager.SP_SHOW_INFO, !it)
-                        listView.getCurrentItem().rightText = if (it) "关闭" else "打开"
-                    }
-                    return true
-                }
-            }, if (SPManager.getBoolean(SPManager.SP_SHOW_INFO))  "打开" else "关闭" ),
+            SwitchBar("显示歌手及专辑信息", SPManager.SP_SHOW_INFO),
 
-            Item("显示时间", object : OnItemClickListener {
-                override fun onItemClick(index : Int, listView: ListView) : Boolean {
-                    SPManager.getBoolean(SPManager.SP_SHOW_TIME).let {
-                        SPManager.setBoolean(SPManager.SP_SHOW_TIME, !it)
-                        listView.getCurrentItem().rightText = if (it) "关闭" else "打开"
-                    }
-                    return true
-                }
-            }, if (SPManager.getBoolean(SPManager.SP_SHOW_TIME))  "打开" else "关闭" ),
+            SwitchBar("显示时间", SPManager.SP_SHOW_TIME),
 
-            Item("启动后自动停止播放", object : OnItemClickListener {
+            Item("启动后自动开始播放", object : OnItemClickListener {
                 override fun onItemClick(index : Int, listView: ListView) : Boolean {
                     var autoStop = SPManager.getInt(SPManager.AutoStop.SP_NAME)
                     autoStop ++
@@ -193,25 +154,7 @@ class SettingsView(context: Context) : ListView(context), ScreenView {
                 }
             }, SPManager.AutoStop.getString(SPManager.getInt(SPManager.AutoStop.SP_NAME))),
 
-            Item("启动后自动开始播放", object : OnItemClickListener {
-                override fun onItemClick(index : Int, listView: ListView) : Boolean {
-                    SPManager.getBoolean(SPManager.SP_AUTO_START).let {
-                        SPManager.setBoolean(SPManager.SP_AUTO_START, !it)
-                        listView.getCurrentItem().rightText = if (it) "关闭" else "打开"
-                    }
-                    return true
-                }
-            }, if (SPManager.getBoolean(SPManager.SP_AUTO_START))  "打开" else "关闭" ),
-
-            Item("CoverFlow", object : OnItemClickListener {
-                override fun onItemClick(index : Int, listView : ListView) : Boolean {
-                    SPManager.getBoolean(SPManager.SP_COVER_FLOW).let {
-                        SPManager.setBoolean(SPManager.SP_COVER_FLOW, !it)
-                        listView.getCurrentItem().rightText = if (it) "关闭" else "打开"
-                    }
-                    return true
-                }
-            }, if (SPManager.getBoolean(SPManager.SP_COVER_FLOW))  "打开" else "关闭" ),
+            SwitchBar("CoverFlow", SPManager.SP_COVER_FLOW),
 
             Item("Reset All Settings", object : OnItemClickListener {
                 override fun onItemClick(index : Int, listView: ListView) : Boolean {
@@ -229,4 +172,14 @@ class SettingsView(context: Context) : ListView(context), ScreenView {
         return ScreenView.LAUNCH_MODE_NORMAL
     }
 
+    private class SwitchBar(title: String, bindSP: String) : Item(title, object : OnItemClickListener {
+            override fun onItemClick(index: Int, listView: ListView): Boolean {
+                SPManager.getBoolean(bindSP).let {
+                    SPManager.setBoolean(bindSP, !it)
+                    listView.getCurrentItem().rightText = if (it) "关闭" else "打开"
+                }
+                return true
+            }
+        }, if (SPManager.getBoolean(bindSP)) "打开" else "关闭") {
+    }
 }
