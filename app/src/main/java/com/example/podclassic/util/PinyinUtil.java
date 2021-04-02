@@ -19,7 +19,6 @@ public class PinyinUtil {
                 return new HashMap<>();
             } else {
                 return (HashMap) obj;
-
             }
         } catch (IOException | ClassNotFoundException e) {
             return new HashMap<>();
