@@ -28,16 +28,21 @@ class VideoView(context: Context, val file : File) : FrameLayout(context), Scree
         setBackgroundColor(Colors.text)
 
         audioFocusManager.requestAudioFocus()
-        videoView.setVideoPath(file.toString())
-        videoView.setOnErrorListener { _, _, _ -> return@setOnErrorListener true }
-        videoView.start()
+        videoView.apply {
+            setVideoPath(file.toString())
+            setOnErrorListener { _, _, _ -> return@setOnErrorListener true }
+            start()
+        }
+
     }
 
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
-        videoView.stopPlayback()
-        videoView.suspend()
-        videoView.setOnErrorListener(null)
+        videoView.apply {
+            stopPlayback()
+            suspend()
+            setOnErrorListener(null)
+        }
         removeAllViews()
         audioFocusManager.abandonAudioFocus()
     }

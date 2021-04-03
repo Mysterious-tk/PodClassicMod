@@ -1,5 +1,6 @@
 package com.example.podclassic.view
 
+import android.annotation.SuppressLint
 import android.content.Context
 import com.example.podclassic.`object`.Core
 import com.example.podclassic.`object`.MediaPlayer
@@ -15,6 +16,7 @@ import java.util.*
 import kotlin.collections.ArrayList
 
 
+@SuppressLint("ViewConstructor")
 class FileView(context: Context, val file: File) : ListView(context), ScreenView {
 
     private var hasAudio = false
@@ -39,6 +41,7 @@ class FileView(context: Context, val file: File) : ListView(context), ScreenView
         if (list.isEmpty()) {
             itemList.add(Item("无内容", null, false))
         } else {
+            itemList.ensureCapacity(list.size)
             for (file in list) {
                 if (FileUtil.isAudio(file)) {
                     hasAudio = true
@@ -109,17 +112,12 @@ class FileView(context: Context, val file: File) : ListView(context), ScreenView
 
         if (list[id].isDirectory) {
             val folder = list[id].listFiles()
-            var hasAudio = false
             for (file in folder) {
                 if (FileUtil.isAudio(file)) {
-                    hasAudio = true
-                    break
+                    SaveMusicLists.saveFolders.add(list[id].path)
+                    shake()
+                    return true
                 }
-            }
-            if (hasAudio) {
-                shake()
-                SaveMusicLists.saveFolders.add(list[id].path)
-                return true
             }
         } else if (FileUtil.isAudio(list[id])) {
             SaveMusics.loveList.add(MediaUtil.getMusic(list[id].path))

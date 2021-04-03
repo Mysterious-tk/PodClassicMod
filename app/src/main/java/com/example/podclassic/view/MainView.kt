@@ -25,7 +25,6 @@ class MainView(context: Context) : ListView(context), ScreenView {
     companion object {
         const val TITLE = Values.POD
 
-
         class App(val name: String, val intent: Intent)
 
         lateinit var appList : ArrayList<App>

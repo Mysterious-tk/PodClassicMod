@@ -1,5 +1,6 @@
 package com.example.podclassic.view
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -10,11 +11,11 @@ import kotlin.math.max
 import kotlin.math.min
 
 
-open class ImageView(context: Context, val list : ArrayList<File>, var index : Int) : androidx.appcompat.widget.AppCompatImageView(context),ScreenView {
+@SuppressLint("ViewConstructor")
+class ImageView(context: Context, val list : ArrayList<File>, var index : Int) : androidx.appcompat.widget.AppCompatImageView(context),ScreenView {
     private var currentBitmap : Bitmap? = null
 
     init {
-
         setBackgroundColor(Colors.text)
     }
 
@@ -44,7 +45,6 @@ open class ImageView(context: Context, val list : ArrayList<File>, var index : I
         }
         index = sv
         setImageBitmap(null)
-        currentBitmap?.recycle()
         loadImage(list[index])
         return true
     }

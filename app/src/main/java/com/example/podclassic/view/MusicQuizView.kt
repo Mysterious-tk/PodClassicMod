@@ -63,16 +63,17 @@ class MusicQuizView(context: Context) : RelativeLayout(context), ScreenView, Med
     private var started = false
 
     init {
-        timerView.textVisibility = View.INVISIBLE
-        timerView.setMax(MAX_TIME)
-        timerView.id = R.id.timer_view
-        val layoutParams_timerView = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
-        layoutParams_timerView.setMargins(DEFAULT_PADDING,DEFAULT_PADDING,DEFAULT_PADDING,DEFAULT_PADDING)
-        layoutParams_timerView.addRule(ALIGN_PARENT_BOTTOM)
-        val layoutParams_itemList = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
-        layoutParams_itemList.addRule(ABOVE, timerView.id)
-        addView(itemList, layoutParams_itemList)
-        addView(timerView, layoutParams_timerView)
+        timerView.apply {
+            textVisibility = View.INVISIBLE
+            setMax(MAX_TIME)
+            id = R.id.timer_view
+        }
+        addView(itemList, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT).apply { addRule(ABOVE, timerView.id) })
+        addView(timerView, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
+            .apply {
+                setMargins(DEFAULT_PADDING,DEFAULT_PADDING,DEFAULT_PADDING,DEFAULT_PADDING)
+                addRule(ALIGN_PARENT_BOTTOM)
+            })
         mediaPlayer.setOnPreparedListener(this)
     }
 
@@ -108,13 +109,17 @@ class MusicQuizView(context: Context) : RelativeLayout(context), ScreenView, Med
         }
 
         try {
-            mediaPlayer.reset()
-            mediaPlayer.setDataSource(pack?.selectedMusic?.path)
-            mediaPlayer.prepareAsync()
+            mediaPlayer.apply {
+                reset()
+                setDataSource(pack?.selectedMusic?.path)
+                prepareAsync()
+            }
         } catch (ignore : Exception) {
-            mediaPlayer.reset()
-            mediaPlayer.setDataSource(pack?.selectedMusic?.path)
-            mediaPlayer.prepareAsync()
+            mediaPlayer.apply {
+                reset()
+                setDataSource(pack?.selectedMusic?.path)
+                prepareAsync()
+            }
         }
 
         timer?.schedule(object : TimerTask() {
@@ -165,7 +170,7 @@ class MusicQuizView(context: Context) : RelativeLayout(context), ScreenView, Med
 
     private fun selectMusics() : ArrayList<Music> {
         musics.shuffle()
-        val list = ArrayList<Music>()
+        val list = ArrayList<Music>(MAX_SIZE)
         for (i in 0 until min(MAX_SIZE, musics.size)) {
             list.add(musics[i])
         }

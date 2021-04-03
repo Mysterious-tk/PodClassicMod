@@ -1,5 +1,6 @@
 package com.example.podclassic.view
 
+import android.annotation.SuppressLint
 import android.content.Context
 import com.example.podclassic.`object`.Core
 import com.example.podclassic.`object`.MusicList
@@ -7,18 +8,21 @@ import com.example.podclassic.base.ScreenView
 import com.example.podclassic.storage.SaveMusicLists
 import com.example.podclassic.widget.ListView
 
+@SuppressLint("ViewConstructor")
 class AlbumListView : ListView, ScreenView {
     companion object {
         const val LONG_CLICK_ADD = 0
         const val LONG_CLICK_REMOVE = 1
     }
 
-    private var musicList : ArrayList<MusicList> = ArrayList()
-    private var title : String? = null
+    private var musicList : ArrayList<MusicList>
+    private val title : String
     private var longClick  = LONG_CLICK_ADD
     constructor(context: Context, list : ArrayList<String>, type : Int, longClick : Int, title : String) : super(context) {
         this.title = title
         this.longClick = longClick
+        this.musicList = ArrayList(list.size)
+        itemList.ensureCapacity(list.size)
         for (string in list) {
             itemList.add(Item(string, null, true))
             val musicList = MusicList()
@@ -33,7 +37,7 @@ class AlbumListView : ListView, ScreenView {
         this.musicList = list
         this.title = title
         val hasAll = list.size >= 2 && list[0].type != list[1].type
-
+        itemList.ensureCapacity(list.size)
         for (musicList in list) {
             itemList.add(Item(musicList.name, null, true))
         }
@@ -87,7 +91,7 @@ class AlbumListView : ListView, ScreenView {
     }
 
     override fun getTitle(): String {
-        return title!!
+        return title
     }
 
     override fun getLaunchMode(): Int {

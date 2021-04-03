@@ -14,9 +14,9 @@ import com.example.podclassic.widget.ListView
 
 @SuppressLint("ViewConstructor")
 class MusicListView : ListView, ScreenView, MediaPlayer.OnMediaChangeListener {
-    private var musicList : ArrayList<Music>? = null
-    private var name : String? = null
-    private var onLongClick : Int? = null
+    private val musicList : ArrayList<Music>
+    private val name : String
+    private val onLongClick : Int
     constructor(context: Context, musicList: ArrayList<Music>, name : String) : super(context) {
         this.musicList = musicList
         this.name = name
@@ -52,16 +52,16 @@ class MusicListView : ListView, ScreenView, MediaPlayer.OnMediaChangeListener {
         const val LONG_CLICK_REMOVE_CURRENT = 2
     }
 
-    override fun getTitle(): String { return name!! }
+    override fun getTitle(): String { return name }
 
     private fun init() {
-        val showInfo = SPManager.getBoolean(SPManager.SP_SHOW_INFO)
-        if (showInfo) {
-            for (music in musicList!!) {
+        itemList.ensureCapacity(musicList.size)
+        if (SPManager.getBoolean(SPManager.SP_SHOW_INFO)) {
+            for (music in musicList) {
                 itemList.add(Item("${music.name} - ${music.singer} - ${music.album}", null, false))
             }
         } else {
-            for (music in musicList!!) {
+            for (music in musicList) {
                 itemList.add(Item(music.name, null, false))
             }
         }
@@ -91,15 +91,15 @@ class MusicListView : ListView, ScreenView, MediaPlayer.OnMediaChangeListener {
     }
 
     override fun onItemCreated(index : Int, itemView : ItemView) {
-        if (musicList!!.isEmpty()) {
+        if (musicList.isEmpty()) {
             return
         }
-        itemView.setPlaying(musicList!![index] == MediaPlayer.getCurrent())
+        itemView.setPlaying(musicList[index] == MediaPlayer.getCurrent())
     }
 
     override fun enter() : Boolean {
-        return if (index in 0 until musicList!!.size) {
-            MediaPlayer.setPlayList(musicList!!, index)
+        return if (index in 0 until musicList.size) {
+            MediaPlayer.setPlayList(musicList, index)
             Core.addView(MusicPlayerView(context))
             true
         } else {
@@ -108,12 +108,12 @@ class MusicListView : ListView, ScreenView, MediaPlayer.OnMediaChangeListener {
     }
 
     override fun enterLongClick() : Boolean {
-        if (index !in 0 until musicList!!.size) {
+        if (index !in 0 until musicList.size) {
             return false
         }
         when (onLongClick) {
             LONG_CLICK_SET_LOVE -> {
-                SaveMusics.loveList.add(musicList!![index])
+                SaveMusics.loveList.add(musicList[index])
                 shake()
             }
             LONG_CLICK_REMOVE_LOVE -> {
