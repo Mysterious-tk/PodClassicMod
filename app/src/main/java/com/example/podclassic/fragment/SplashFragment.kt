@@ -12,23 +12,21 @@ import com.example.podclassic.`object`.Core
 
 class SplashFragment(val runnable : Runnable) : Fragment() {
 
-    private val asyncTask = @SuppressLint("StaticFieldLeak")
-    object : AsyncTask<Unit, Unit, Unit>() {
-        override fun doInBackground(vararg params: Unit?) {
-            runnable.run()
-        }
-
-        override fun onPostExecute(result: Unit?) {
-            fragmentManager
-                ?.beginTransaction()
-                ?.remove(this@SplashFragment)
-                ?.commitAllowingStateLoss()
-            Core.lock(false)
-        }
-    }
-
+    @SuppressLint("StaticFieldLeak")
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
-        asyncTask.execute()
+        object : AsyncTask<Unit, Unit, Unit>() {
+            override fun doInBackground(vararg params: Unit?) {
+                runnable.run()
+            }
+
+            override fun onPostExecute(result: Unit?) {
+                fragmentManager
+                    ?.beginTransaction()
+                    ?.remove(this@SplashFragment)
+                    ?.commitAllowingStateLoss()
+                Core.lock(false)
+            }
+        }.execute()
         return inflater.inflate(R.layout.fragment_splash, container, false)
     }
 }

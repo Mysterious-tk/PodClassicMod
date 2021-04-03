@@ -1,4 +1,4 @@
-package com.example.podclassic.util
+    package com.example.podclassic.util
 
 import android.content.ContentUris
 import android.database.Cursor
@@ -193,16 +193,24 @@ object MediaUtil {
     fun getMusic(path: String) : Music {
         val list = searchMusic("${PATH}=?", path)
         if (list.isEmpty()) {
-            val mediaMetadataRetriever = MediaMetadataRetriever()
-            mediaMetadataRetriever.setDataSource(path)
-            val name = mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)
-            val singer = mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)
-            val album = mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM)
-            mediaMetadataRetriever.release()
-            return Music(name, singer, album, path, 0L)
+            return getMusicFromFile(path)
         }
         return list[0]
     }
+
+    fun getMusicFromFile(path: String) : Music {
+        val mediaMetadataRetriever = MediaMetadataRetriever()
+        mediaMetadataRetriever.setDataSource(path)
+        var name = mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)
+        if (name == null) {
+            name = path.substring(path.lastIndexOf(File.separatorChar), path.lastIndexOf('.'))
+        }
+        val singer = mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)
+        val album = mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM)
+        mediaMetadataRetriever.release()
+        return Music(name, singer, album, path, 0L)
+    }
+
 
     fun searchAlbum(by: String, target: String): ArrayList<MusicList> {
         val uri = MediaStore.Audio.Albums.EXTERNAL_CONTENT_URI

@@ -2,7 +2,6 @@ package com.example.podclassic.view
 
 import android.animation.Animator
 import android.animation.ValueAnimator
-import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.*
 import android.view.Gravity
@@ -146,7 +145,6 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
 
     private var slides = 0
 
-    @SuppressLint("ObjectAnimatorBinding")
     override fun slide(slideVal: Int): Boolean {
 
         if (animator?.isRunning == true) {
@@ -177,7 +175,7 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
             val sgn = if (slides > 0) 1 else -1
             slides -= sgn
 
-            if (slides <= 18) {
+            if (slides <= 16) {
                 duration = (duration * (1f + 0.1f * (s(abs(slides).toFloat())))).toLong()
                 duration = min(duration, DEFAULT_DURATION)
             } else {

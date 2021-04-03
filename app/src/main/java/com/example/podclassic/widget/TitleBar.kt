@@ -1,6 +1,5 @@
 package com.example.podclassic.widget
 
-import android.annotation.SuppressLint
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -46,8 +45,7 @@ class TitleBar(context: Context, attributeSet: AttributeSet) : FrameLayout(conte
         addView(title, layoutParams3)
     }
 
-    @SuppressLint("SimpleDateFormat")
-    private val simpleDateFormat = SimpleDateFormat("HH:mm")
+    private val simpleDateFormat = SimpleDateFormat("HH:mm",  Locale.getDefault())
 
     fun showTime() {
         showTime = true

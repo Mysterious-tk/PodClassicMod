@@ -1,6 +1,5 @@
 package com.example.podclassic.view
 
-import android.annotation.SuppressLint
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -49,8 +48,7 @@ class MainView(context: Context) : ListView(context), ScreenView {
                 intent.flags = Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED or Intent.FLAG_ACTIVITY_NEW_TASK
 
                 var mainActivity : String? = null
-                @SuppressLint("WrongConstant") val list: List<ResolveInfo> =
-                    packageManager.queryIntentActivities(intent, PackageManager.GET_ACTIVITIES)
+                val list: List<ResolveInfo> = packageManager.queryIntentActivities(intent, PackageManager.GET_ACTIVITIES)
                 for (info in list) {
                     if (info.activityInfo.packageName == packageName) {
                         mainActivity = info.activityInfo.name

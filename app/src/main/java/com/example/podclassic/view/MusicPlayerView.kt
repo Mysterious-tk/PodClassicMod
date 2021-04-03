@@ -295,7 +295,7 @@ class MusicPlayerView(context: Context) : RelativeLayout(context), ScreenView, M
 
     private var lyricSet : LyricUtil.LyricSet? = null
 
-    @SuppressLint("SetTextI18n", "RtlHardcoded")
+    @SuppressLint( "RtlHardcoded")
     override fun onMediaChangeFinished() {
         if (!hasWindowFocus()) {
             return

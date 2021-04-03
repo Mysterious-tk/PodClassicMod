@@ -160,7 +160,8 @@ class SettingsView(context: Context) : ListView(context), ScreenView {
                 override fun onItemClick(index : Int, listView: ListView) : Boolean {
                     Core.addView(ItemListView(context, arrayListOf(
                         Item("Cancel", object : OnItemClickListener { override fun onItemClick(index: Int, listView: ListView) : Boolean { Core.removeView(); return true } }, false),
-                        Item("Reset", object : OnItemClickListener { override fun onItemClick(index: Int, listView: ListView) : Boolean { SPManager.reset();Core.exit(); return true } }, false)
+                        Item("Reset", object : OnItemClickListener { override fun onItemClick(index: Int, listView: ListView) : Boolean { SPManager.reset();
+                            Core.exit(); return true } }, false)
                     ), "Reset All", null))
                     return true
                 }

@@ -19,8 +19,8 @@ class FileView(context: Context, val file: File) : ListView(context), ScreenView
 
     private var hasAudio = false
     val list: ArrayList<File> = file.let{
-        val arrayList = ArrayList<File>()
         val array = file.listFiles()
+        val arrayList = ArrayList<File>(array.size)
         if (array != null) {
             for (file in file.listFiles()) {
                 if (!file.name.startsWith(".")) {
@@ -33,14 +33,17 @@ class FileView(context: Context, val file: File) : ListView(context), ScreenView
         arrayList
     }
 
-    private val musicList = ArrayList<File>()
+    private val musicList = ArrayList<File>(list.size)
 
     init {
         if (list.isEmpty()) {
             itemList.add(Item("无内容", null, false))
         } else {
             for (file in list) {
-                hasAudio = hasAudio || FileUtil.isAudio(file)
+                if (FileUtil.isAudio(file)) {
+                    hasAudio = true
+                    musicList.add(file)
+                }
                 itemList.add(Item(file.name, null, file.isDirectory))
             }
 
@@ -57,6 +60,12 @@ class FileView(context: Context, val file: File) : ListView(context), ScreenView
         }
         if (hasAudio && index == 0) {
             val musics = MediaUtil.searchMusic("${MediaUtil.PATH} like ?", "${file.path}%")
+            if (musics.isEmpty()) {
+                musics.ensureCapacity(musicList.size)
+                for (file in musicList) {
+                    musics.add(MediaUtil.getMusicFromFile(file.path))
+                }
+            }
             val lastIndex = file.path.length
             val iterator = musics.iterator()
             while (iterator.hasNext()) {
@@ -93,7 +102,11 @@ class FileView(context: Context, val file: File) : ListView(context), ScreenView
         if (list.isEmpty()) {
             return false
         }
+        if (hasAudio && index == 0) {
+            return false
+        }
         val id = if (hasAudio) index - 1 else index
+
         if (list[id].isDirectory) {
             val folder = list[id].listFiles()
             var hasAudio = false

@@ -1,6 +1,6 @@
 package com.example.podclassic.`object`
 
-import android.content.Context
+import android.annotation.SuppressLint
 import android.view.View
 import com.example.podclassic.activity.MainActivity
 import com.example.podclassic.base.ScreenView
@@ -15,14 +15,13 @@ import com.example.podclassic.widget.SlideController
 import com.example.podclassic.widget.TitleBar
 import java.util.*
 
+@SuppressLint("StaticFieldLeak")
 object Core {
     private lateinit var controller: SlideController
     private lateinit var titleBar: TitleBar
     private lateinit var screen: Screen
     private lateinit var nightMode: View
     private var activity: MainActivity? = null
-
-    lateinit var context: Context
 
     fun bindActivity(controller: SlideController, screen: Screen, titleBar: TitleBar, darkMode: View, context: MainActivity) {
         this.controller = controller

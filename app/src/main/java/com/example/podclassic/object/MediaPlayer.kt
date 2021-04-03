@@ -8,7 +8,6 @@ import android.graphics.Bitmap
 import android.media.MediaPlayer
 import android.media.audiofx.Equalizer
 import android.os.Build
-import android.os.Environment
 import android.os.Handler
 import android.os.Looper
 import com.example.podclassic.base.BaseApplication
@@ -19,9 +18,6 @@ import com.example.podclassic.util.AudioFocusManager
 import com.example.podclassic.util.LyricUtil
 import com.example.podclassic.util.MediaUtil
 import com.example.podclassic.util.ThreadUtil
-import java.io.File
-import java.io.FileWriter
-import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.ThreadPoolExecutor
@@ -45,6 +41,46 @@ object MediaPlayer : MediaPlayer.OnCompletionListener, MediaPlayer.OnErrorListen
     private var currentPlayMode = SPManager.getInt(SPManager.SP_PLAY_MODE)
 
     private val audioFocusManager = AudioFocusManager(this)
+
+    var isPrepared = false
+    var isPlaying = false
+
+    val equalizerList = ArrayList<String>(10)
+
+
+    private val mediaPlayer = MediaPlayer().apply {
+        setOnCompletionListener(this@MediaPlayer)
+        setOnErrorListener(this@MediaPlayer)
+        setOnPreparedListener(this@MediaPlayer)
+        setAudioAttributes(audioFocusManager.attribute)
+    }
+    private val equalizer = Equalizer(0, mediaPlayer.audioSessionId)
+
+    init {
+        MediaUtil.prepare()
+        equalizer.apply {
+            if (hasControl()) {
+                enabled = true
+                for (i in 0 until numberOfPresets) {
+                    equalizerList.add(getPresetName(i.toShort()))
+                }
+                setEqualizer(SPManager.getInt(SPManager.SP_EQUALIZER))
+            }
+        }
+
+        val context = BaseApplication.context
+        context.startService(Intent(context, MediaPlayerService::class.java))
+    }
+
+    fun setEqualizer(index: Int): Boolean {
+        return if (index in 0 until equalizerList.size) {
+            SPManager.setInt(SPManager.SP_EQUALIZER, index)
+            equalizer.usePreset(index.toShort())
+            true
+        } else {
+            false
+        }
+    }
 
     fun release() {
         stop()
@@ -96,46 +132,6 @@ object MediaPlayer : MediaPlayer.OnCompletionListener, MediaPlayer.OnErrorListen
             PLAY_MODE_ORDER -> PLAY_MODE_ORDER_STRING
             PLAY_MODE_SINGLE -> PLAY_MODE_SINGLE_STRING
             else -> ""
-        }
-    }
-
-    var isPrepared = false
-    var isPlaying = false
-
-    val equalizerList = ArrayList<String>(10)
-
-
-    private val mediaPlayer = MediaPlayer().apply {
-        setOnCompletionListener(this@MediaPlayer)
-        setOnErrorListener(this@MediaPlayer)
-        setOnPreparedListener(this@MediaPlayer)
-        setAudioAttributes(audioFocusManager.attribute)
-    }
-    private val equalizer = Equalizer(0, mediaPlayer.audioSessionId)
-
-    init {
-        equalizer.apply {
-            if (hasControl()) {
-                enabled = true
-                for (i in 0 until numberOfPresets) {
-                    equalizerList.add(getPresetName(i.toShort()))
-                }
-                setEqualizer(SPManager.getInt(SPManager.SP_EQUALIZER))
-            }
-        }
-
-        val context = BaseApplication.context
-        context.startService(Intent(context, MediaPlayerService::class.java))
-    }
-
-
-    fun setEqualizer(index: Int): Boolean {
-        return if (index in 0 until equalizerList.size) {
-            SPManager.setInt(SPManager.SP_EQUALIZER, index)
-            equalizer.usePreset(index.toShort())
-            true
-        } else {
-            false
         }
     }
 
@@ -373,38 +369,53 @@ object MediaPlayer : MediaPlayer.OnCompletionListener, MediaPlayer.OnErrorListen
         private var running = false
 
         fun addTask(music : Music) {
-            synchronized(BaseApplication.context) {
-                next = music
-                if (!running) {
-                    execTask()
+            synchronized(Core) {
+                if (running) {
+                    next = music
+                } else {
+                    execTask(music)
                 }
             }
         }
 
-        private fun execTask() {
-            val music = next!!
-            next = null
-
-            running = true
-            threadPoolExecutor.execute {
-                loadImage(music)
+        private fun execTask(music : Music) {
+            synchronized(Core) {
                 if (next != null) {
-                    handler.post {
-                        running = false
-                        execTask()
+                    if (music == next) {
+                        next = null
+                    } else {
+                        execTask(next!!)
+                        return
                     }
-                    return@execute
                 }
+            }
+            threadPoolExecutor.execute {
+                running = true
+                if (image?.isRecycled == false) {
+                    val temp = image
+                    image = null
+                    temp?.recycle()
+                }
+                image = MediaUtil.getMusicImage(music)
+                synchronized(Core) {
+                    if (next != null) {
+                        execTask(next!!)
+                        return@execute
+                    }
+                }
+
                 if (SPManager.getBoolean(SPManager.SP_SHOW_LYRIC)) {
                     lyricSet = LyricUtil.getLyric(music)
                 }
 
-                handler.post {
-                    running = false
+                synchronized(Core) {
                     if (next == null) {
-                        onMediaChangeFinished()
+                        running = false
+                        handler.post {
+                            onMediaChangeFinished()
+                        }
                     } else {
-                        execTask()
+                        execTask(next!!)
                     }
                 }
             }
@@ -436,15 +447,6 @@ object MediaPlayer : MediaPlayer.OnCompletionListener, MediaPlayer.OnErrorListen
 
     var image : Bitmap? = null
     var lyricSet : LyricUtil.LyricSet? = null
-
-    private fun loadImage(music: Music) {
-        synchronized(BaseApplication.context) {
-            if (image?.isRecycled == false) {
-                image?.recycle()
-            }
-            image = MediaUtil.getMusicImage(music)
-        }
-    }
 
     fun next() {
         if (playList.isEmpty()) {
@@ -573,13 +575,6 @@ object MediaPlayer : MediaPlayer.OnCompletionListener, MediaPlayer.OnErrorListen
     }
 
     private fun onProgress(progress: Int) {
-        fun log(text : String) {
-            val file = File(Environment.getExternalStorageDirectory().path + File.separator + "log.txt");
-            val fw = FileWriter(file)
-            fw.write(text)
-            fw.close()
-        }
-        log("onProgress is called" + SimpleDateFormat().format(Date(System.currentTimeMillis())))
         for (item in onProgressListeners) {
             ThreadUtil.runOnUiThread(Runnable { item.onProgress(progress) })
         }
