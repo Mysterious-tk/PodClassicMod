@@ -199,6 +199,7 @@ class MediaPlayerService : Service(), MediaPlayer.OnMediaChangeListener,
     @Suppress("DEPRECATION")
     private fun sendNotification() {
         val music = MediaPlayer.getCurrent()
+        val image = MediaPlayer.image
         AppWidget.updateRemoteViews(music)
         if (music == null) {
             stopForeground(true)
@@ -221,7 +222,7 @@ class MediaPlayerService : Service(), MediaPlayer.OnMediaChangeListener,
             setOnlyAlertOnce(true)
             setDeleteIntent(actionStop.actionIntent)
             setContentIntent(contentIntent)
-            setLargeIcon(MediaPlayer.image)
+            setLargeIcon(image)
             setOngoing(mediaPlayer.isPlaying)
             addAction(actionPrev)
             addAction(actionPause)
@@ -250,7 +251,7 @@ class MediaPlayerService : Service(), MediaPlayer.OnMediaChangeListener,
             .putString(MediaMetadata.METADATA_KEY_TITLE, music.name)
             .putString(MediaMetadata.METADATA_KEY_ALBUM, music.album)
             .putString(MediaMetadata.METADATA_KEY_ARTIST, music.singer)
-            .putBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON, mediaPlayer.image)
+            .putBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON, image)
             .build()
         mediaSession.setMetadata(mediaMetadata)
     }

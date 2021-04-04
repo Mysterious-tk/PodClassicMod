@@ -10,7 +10,7 @@ object Values {
     const val RESOLUTION_HIGH = 1440
     const val RESOLUTION_LOW = 720
 
-    const val IMAGE_WIDTH = 512
+    const val IMAGE_WIDTH = 400
 
     val DEFAULT_PADDING by lazy {
         when {

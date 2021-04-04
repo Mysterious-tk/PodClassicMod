@@ -391,12 +391,11 @@ object MediaPlayer : MediaPlayer.OnCompletionListener, MediaPlayer.OnErrorListen
             }
             threadPoolExecutor.execute {
                 running = true
-                if (image?.isRecycled == false) {
-                    val temp = image
-                    image = null
-                    temp?.recycle()
-                }
+                val temp : Bitmap? = image
                 image = MediaUtil.getMusicImage(music)
+                if (temp?.isRecycled == false) {
+                    temp.recycle()
+                }
                 synchronized(Core) {
                     if (next != null) {
                         execTask(next!!)
@@ -446,7 +445,13 @@ object MediaPlayer : MediaPlayer.OnCompletionListener, MediaPlayer.OnErrorListen
     }
 
     var image : Bitmap? = null
+        get() {
+            return field?.copy(Bitmap.Config.RGB_565, false)
+        }
+        private set
+
     var lyricSet : LyricUtil.LyricSet? = null
+        private set
 
     fun next() {
         if (playList.isEmpty()) {

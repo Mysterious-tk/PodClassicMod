@@ -95,11 +95,11 @@ class MainView(context: Context) : ListView(context), ScreenView {
                 override fun onItemClick(index: Int, listView: ListView): Boolean {
                     Core.addView(
                         ItemListView(context, getItemList(), "照片", object : OnItemClickListener {
-                                override fun onItemClick(index: Int, listView: ListView): Boolean {
-                                    Core.addView(ImageView(context, list, index))
-                                    return true
-                                }
-                            })
+                            override fun onItemClick(index: Int, listView: ListView): Boolean {
+                                Core.addView(ImageView(context, list, index))
+                                return true
+                            }
+                        })
                     )
                     return true
                 }
@@ -119,16 +119,16 @@ class MainView(context: Context) : ListView(context), ScreenView {
                 override fun onItemClick(index: Int, listView: ListView): Boolean {
                     Core.addView(
                         ItemListView(context, getItemList(), "视频", object : OnItemClickListener {
-                                override fun onItemClick(index: Int, listView: ListView): Boolean {
-                                    val file = list[index]
-                                    return if (file.exists()) {
-                                        Core.addView(VideoView(context, list[index]))
-                                        true
-                                    } else {
-                                        false
-                                    }
+                            override fun onItemClick(index: Int, listView: ListView): Boolean {
+                                val file = list[index]
+                                return if (file.exists()) {
+                                    Core.addView(VideoView(context, list[index]))
+                                    true
+                                } else {
+                                    false
                                 }
-                            })
+                            }
+                        })
                     )
                     return true
                 }
@@ -140,7 +140,12 @@ class MainView(context: Context) : ListView(context), ScreenView {
                     val itemList = ArrayList<Item>()
                     itemList.add(Item("内部存储", object : OnItemClickListener {
                         override fun onItemClick(index: Int, listView: ListView): Boolean {
-                            Core.addView(FileView(context, Environment.getExternalStorageDirectory()))
+                            Core.addView(
+                                FileView(
+                                    context,
+                                    Environment.getExternalStorageDirectory()
+                                )
+                            )
                             return true
                         }
                     }, true))
@@ -194,7 +199,7 @@ class MainView(context: Context) : ListView(context), ScreenView {
                             ); return true
                         }
 
-                    }, true) ,
+                    }, true),
 
 
                     Item("所有程序", object : OnItemClickListener {
@@ -204,9 +209,13 @@ class MainView(context: Context) : ListView(context), ScreenView {
                             for (app in appList) {
                                 itemList.add(Item(app.name, null, true))
                             }
-                            Core.addView(ItemListView(context, itemList, "所有程序",
+                            Core.addView(
+                                ItemListView(context, itemList, "所有程序",
                                     object : OnItemClickListener {
-                                        override fun onItemClick(index: Int, listView: ListView): Boolean {
+                                        override fun onItemClick(
+                                            index: Int,
+                                            listView: ListView
+                                        ): Boolean {
                                             context.startActivity(appList[index].intent)
                                             return true
                                         }
@@ -219,7 +228,16 @@ class MainView(context: Context) : ListView(context), ScreenView {
 
                 )
 
-                override fun onItemClick(index: Int, listView: ListView): Boolean { Core.addView(ItemListView(context, itemList, "附加程序", null)); return true }
+                override fun onItemClick(index: Int, listView: ListView): Boolean {
+                    Core.addView(
+                        ItemListView(
+                            context,
+                            itemList,
+                            "附加程序",
+                            null
+                        )
+                    ); return true
+                }
 
             }, true),
 
