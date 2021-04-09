@@ -16,6 +16,7 @@ import com.example.podclassic.storage.SPManager
 import com.example.podclassic.storage.SaveMusics
 import com.example.podclassic.util.AudioFocusManager
 import com.example.podclassic.util.LyricUtil
+import com.example.podclassic.util.LyricUtil.Lyric
 import com.example.podclassic.util.MediaUtil
 import com.example.podclassic.util.ThreadUtil
 import java.util.*
@@ -345,7 +346,12 @@ object MediaPlayer : MediaPlayer.OnCompletionListener, MediaPlayer.OnErrorListen
         } else {
             val intent = Intent(context, MediaPlayerService::class.java)
             intent.action = MediaPlayerService.ACTION_STOP
-            pendingIntent = PendingIntent.getService(context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT)
+            pendingIntent = PendingIntent.getService(
+                context,
+                0,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT
+            )
             stopTime = System.currentTimeMillis() + min * 60 * 1000
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 alarmManager.setExactAndAllowWhileIdle(
@@ -359,16 +365,24 @@ object MediaPlayer : MediaPlayer.OnCompletionListener, MediaPlayer.OnErrorListen
         }
     }
 
+
+
     private object ThreadManager {
         private val handler = Handler(Looper.getMainLooper())
 
-        private val threadPoolExecutor = ThreadPoolExecutor(1, 1, 10000L, TimeUnit.MILLISECONDS, LinkedBlockingQueue())
+        private val threadPoolExecutor = ThreadPoolExecutor(
+            1,
+            1,
+            10000L,
+            TimeUnit.MILLISECONDS,
+            LinkedBlockingQueue()
+        )
         //ThreadPoolExecutor(0, Integer.MAX_VALUE, 60L, TimeUnit.SECONDS, SynchronousQueue<Runnable>())
 
         private var next : Music? = null
         private var running = false
 
-        fun addTask(music : Music) {
+        fun addTask(music: Music) {
             synchronized(Core) {
                 if (running) {
                     next = music
@@ -378,7 +392,7 @@ object MediaPlayer : MediaPlayer.OnCompletionListener, MediaPlayer.OnErrorListen
             }
         }
 
-        private fun execTask(music : Music) {
+        private fun execTask(music: Music) {
             synchronized(Core) {
                 if (next != null) {
                     if (music == next) {
@@ -391,24 +405,20 @@ object MediaPlayer : MediaPlayer.OnCompletionListener, MediaPlayer.OnErrorListen
             }
             threadPoolExecutor.execute {
                 running = true
-                val temp : Bitmap? = image
-                image = MediaUtil.getMusicImage(music)
-                if (temp?.isRecycled == false) {
-                    temp.recycle()
-                }
+
+                val image = MediaUtil.getMusicImage(music)
                 synchronized(Core) {
-                    if (next != null) {
+                    if (next != null && next != music) {
+                        next = null
                         execTask(next!!)
                         return@execute
                     }
                 }
-
-                if (SPManager.getBoolean(SPManager.SP_SHOW_LYRIC)) {
-                    lyricSet = LyricUtil.getLyric(music)
-                }
+                val lyrics = if (SPManager.getBoolean(SPManager.SP_SHOW_LYRIC)) LyricUtil.getLyric(music) else null
+                MusicInfo.load(lyrics, image, music)
 
                 synchronized(Core) {
-                    if (next == null) {
+                    if (next == null || next == music) {
                         running = false
                         handler.post {
                             onMediaChangeFinished()
@@ -419,7 +429,67 @@ object MediaPlayer : MediaPlayer.OnCompletionListener, MediaPlayer.OnErrorListen
                 }
             }
         }
+    }
 
+    private object MusicInfo {
+        private var lyrics: ArrayList<Lyric>? = null
+        var image: Bitmap? = null
+            get() {
+                return field?.copy(Bitmap.Config.RGB_565, false)
+            }
+            private set
+        var music: Music? = null
+            private set
+
+        private var prevIndex = 0
+        fun getLyric(time: Int): String {
+            lyrics?.let {
+                if (prevIndex >= 0 && prevIndex < it.size - 1 && it[prevIndex].time <= time && it[prevIndex + 1].time > time) {
+                    return it[prevIndex].lyric
+                } else if (prevIndex >= 0 && prevIndex < it.size - 2 && it[prevIndex + 1].time <= time && it[prevIndex + 2].time > time) {
+                    return it[++prevIndex].lyric
+                }
+                var left = 0
+                var right = it.size - 1
+                while (left <= right) {
+                    val mid = (left + right) / 2
+                    if (it[mid].time > time) {
+                        right = mid - 1
+                    } else {
+                        left = mid + 1
+                    }
+                }
+                if (right < 0) {
+                    right = 0
+                }
+                prevIndex = right
+                return it[right].lyric
+            }
+            return ""
+        }
+
+        fun load(lyrics : ArrayList<Lyric>?, image : Bitmap?, music: Music) {
+            synchronized(Core) {
+                this.image?.recycle()
+                this.image = image
+                this.lyrics = lyrics
+                this.music = music
+                prevIndex = 0
+            }
+        }
+    }
+
+    fun getImage() : Bitmap? {
+        val current = getCurrent() ?: return null
+        return if (MusicInfo.music == current) {
+            MusicInfo.image
+        } else {
+            MediaUtil.getMusicImage(current)
+        }
+    }
+
+    fun getLyric(progress: Int) : String {
+        return MusicInfo.getLyric(progress)
     }
 
     private fun startMediaPlayer() {
@@ -443,15 +513,6 @@ object MediaPlayer : MediaPlayer.OnCompletionListener, MediaPlayer.OnErrorListen
         mediaPlayer.setDataSource(music.path)
         mediaPlayer.prepareAsync()
     }
-
-    var image : Bitmap? = null
-        get() {
-            return field?.copy(Bitmap.Config.RGB_565, false)
-        }
-        private set
-
-    var lyricSet : LyricUtil.LyricSet? = null
-        private set
 
     fun next() {
         if (playList.isEmpty()) {

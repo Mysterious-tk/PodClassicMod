@@ -293,8 +293,6 @@ class MusicPlayerView(context: Context) : RelativeLayout(context), ScreenView, M
         }
     }
 
-    private var lyricSet : LyricUtil.LyricSet? = null
-
     @SuppressLint( "RtlHardcoded")
     override fun onMediaChangeFinished() {
         if (!hasWindowFocus()) {
@@ -313,7 +311,7 @@ class MusicPlayerView(context: Context) : RelativeLayout(context), ScreenView, M
         progressBar.setCurrent(progress)
 
 
-        val bitmap = MediaPlayer.image
+        val bitmap = MediaPlayer.getImage()
         if (bitmap == null) {
             name.gravity = Gravity.CENTER
             singer.gravity = Gravity.CENTER
@@ -332,12 +330,7 @@ class MusicPlayerView(context: Context) : RelativeLayout(context), ScreenView, M
                 post { loadImage(bitmap) }
             }
         }
-        if (lyric != null) {
-            if (MediaPlayer.lyricSet != null) {
-                lyricSet = MediaPlayer.lyricSet
-                lyric.text = lyricSet?.getLyric(progress)
-            }
-        }
+        lyric?.setBufferedText(MediaPlayer.getLyric(progress))
     }
 
     @SuppressLint("SetTextI18n")
@@ -361,8 +354,7 @@ class MusicPlayerView(context: Context) : RelativeLayout(context), ScreenView, M
 
         index.text = "${(MediaPlayer.getCurrentIndex() + 1)}/${MediaPlayer.getPlayListSize()}"
 
-        lyricSet = null
-        lyric?.text = null
+        lyric?.setBufferedText(null)
         if (name.gravity == Gravity.CENTER) {
             image.setImageBitmap(null)
         } else {
@@ -391,9 +383,7 @@ class MusicPlayerView(context: Context) : RelativeLayout(context), ScreenView, M
 
     override fun onProgress(progress: Int) {
         progressBar.setCurrent(progress)
-        if (lyric != null && lyricSet != null) {
-            lyric.setBufferedText(lyricSet?.getLyric(progress))
-        }
+        lyric?.setBufferedText(MediaPlayer.getLyric(progress))
     }
 
     private var hasHeight = false

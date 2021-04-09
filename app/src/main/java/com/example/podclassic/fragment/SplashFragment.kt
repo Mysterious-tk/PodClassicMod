@@ -8,7 +8,6 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
 import com.example.podclassic.R
-import com.example.podclassic.`object`.Core
 
 class SplashFragment(val runnable : Runnable) : Fragment() {
 
@@ -24,7 +23,6 @@ class SplashFragment(val runnable : Runnable) : Fragment() {
                     ?.beginTransaction()
                     ?.remove(this@SplashFragment)
                     ?.commitAllowingStateLoss()
-                Core.lock(false)
             }
         }.execute()
         return inflater.inflate(R.layout.fragment_splash, container, false)

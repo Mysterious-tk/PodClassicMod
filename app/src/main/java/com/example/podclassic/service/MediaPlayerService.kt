@@ -199,7 +199,7 @@ class MediaPlayerService : Service(), MediaPlayer.OnMediaChangeListener,
     @Suppress("DEPRECATION")
     private fun sendNotification() {
         val music = MediaPlayer.getCurrent()
-        val image = MediaPlayer.image
+        val image = MediaPlayer.getImage()
         AppWidget.updateRemoteViews(music)
         if (music == null) {
             stopForeground(true)

@@ -46,10 +46,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun prepare() {
-        Core.lock(true)
         supportFragmentManager
             .beginTransaction()
             .replace(R.id.frame_layout, SplashFragment(Runnable {
+                Core.lock(true)
                 //UI相关
                 MainView.loadAppList()
                 PinyinUtil.load()
@@ -59,6 +59,8 @@ class MainActivity : AppCompatActivity() {
                         Core.addView(MusicPlayerView(this))
                     })
                 }
+                Core.lock(false)
+                Core.active = true
             }))
             .commit()
     }
@@ -88,7 +90,7 @@ class MainActivity : AppCompatActivity() {
         val action = intent?.action
         val autoStop = SPManager.getInt(SPManager.AutoStop.SP_NAME)
         return when {
-            action == "ACTION_SHUFFLE" || autoStop != 0 -> {
+            action == "ACTION_SHUFFLE" || (!Core.active && autoStop != 0) -> {
                 MediaPlayer.shufflePlay()
                 if (autoStop != SPManager.AutoStop.FOREVER_ID) {
                     MediaPlayer.scheduleToStop(SPManager.AutoStop.getMinute(autoStop))

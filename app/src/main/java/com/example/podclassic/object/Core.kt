@@ -47,7 +47,8 @@ object Core {
 
     }
 
-    var lock = false
+    var active = false
+    private var lock = false
     fun lock(lock: Boolean) {
         this.lock = lock
         controller.lock(lock)

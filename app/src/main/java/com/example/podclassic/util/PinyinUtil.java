@@ -10,7 +10,9 @@ import java.util.HashMap;
 public class PinyinUtil {
 
     public static void load() {
-        pinyin = readPinyin();
+        if (pinyin == null) {
+            pinyin = readPinyin();
+        }
     }
     private static HashMap<Character, Character> readPinyin() {
         try (ObjectInputStream in = new ObjectInputStream(BaseApplication.context.getResources().openRawResource(R.raw.pinyin))) {

@@ -72,7 +72,7 @@ class AppWidget : AppWidgetProvider() {
             remoteViews.setOnClickPendingIntent(R.id.btn_next, pendingIntentNext)
             remoteViews.setOnClickPendingIntent(R.id.btn_favorite, pendingIntentFavorite)
             remoteViews.setOnClickPendingIntent(R.id.root, pendingIntentActivity)
-            MediaPlayer.image.apply {
+            MediaPlayer.getImage().apply {
                 if (music == null || this == null) {
                     remoteViews.setImageViewResource(R.id.image, R.drawable.ic_default)
                 } else {

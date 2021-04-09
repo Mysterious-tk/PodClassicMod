@@ -14,7 +14,7 @@ import java.util.ArrayList;
 public class LyricUtil {
     private LyricUtil() {}
 
-    public static LyricSet getLyric(Music music) {
+    public static ArrayList<Lyric> getLyric(Music music) {
         String path = music.getPath();
         File lyricFile = new File(path.substring(0, path.lastIndexOf('.')) + ".lrc");
         if (lyricFile.exists() && lyricFile.isFile()) {
@@ -129,8 +129,8 @@ public class LyricUtil {
     }
 
     public static class Lyric{
-        private final int time;
-        private final String lyric;
+        public final int time;
+        public final String lyric;
 
         public Lyric(int time, String lyric) {
             this.time = time;
@@ -138,43 +138,9 @@ public class LyricUtil {
         }
     }
 
-    public static class LyricSet {
-        private final ArrayList<Lyric> lyrics;
-        private int prevIndex = 0;
-        public Music music;
-        public LyricSet(ArrayList<Lyric> lyrics, Music music) {
-            this.lyrics = lyrics;
-            this.music = music;
-        }
 
-        public String getLyric(int time) {
-            if (prevIndex < lyrics.size() - 1 && lyrics.get(prevIndex).time <= time && lyrics.get(prevIndex + 1).time > time) {
-                return lyrics.get(prevIndex).lyric;
-            } else if (prevIndex < lyrics.size() - 2 && lyrics.get(prevIndex + 1).time <= time && lyrics.get(prevIndex + 2).time > time) {
-                return lyrics.get(++prevIndex).lyric;
-            }
 
-            int left = 0;
-            int right = lyrics.size() - 1;
-
-            while (left <= right) {
-                int mid = (left + right) / 2;
-                if (lyrics.get(mid).time > time) {
-                    right = mid - 1;
-                } else {
-                    left = mid + 1;
-                }
-            }
-            if (right < 0) {
-                right = 0;
-            }
-            prevIndex = right;
-            return lyrics.get(right).lyric;
-        }
-
-    }
-
-    private static LyricSet decodeLyric(String lyric, Music music) {
+    private static ArrayList<Lyric> decodeLyric(String lyric, Music music) {
         ArrayList<Lyric> list = new ArrayList<>();
         String content;
         String time;
@@ -211,7 +177,7 @@ public class LyricUtil {
             }
         }
         if (!list.isEmpty()) {
-            return new LyricSet(list, music);
+            return list;
         }
         return null;
     }

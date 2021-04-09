@@ -30,6 +30,9 @@ class MainView(context: Context) : ListView(context), ScreenView {
         lateinit var appList : ArrayList<App>
 
         fun loadAppList() {
+            if (this::appList.isInitialized) {
+                return
+            }
             val context = BaseApplication.context
             val packageManager = context.packageManager
             val packages: List<PackageInfo> = packageManager.getInstalledPackages(0)
