@@ -6,7 +6,7 @@ import kotlin.random.Random
 
 class Object(val view : View, var x: Int, var y : Int, var width : Int, var height : Int) {
     companion object {
-        val MAX_VEL = if (Values.resolution < Values.RESOLUTION_LOW) 6 else 10
+        val MAX_VEL = if (Values.screenWidth < Values.RESOLUTION_LOW) 6 else 10
     }
 
     var hitable = true

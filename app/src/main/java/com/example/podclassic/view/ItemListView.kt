@@ -6,7 +6,7 @@ import com.example.podclassic.base.ScreenView
 import com.example.podclassic.widget.ListView
 
 @SuppressLint("ViewConstructor")
-class ItemListView(context: Context, itemList : ArrayList<Item>, private val title : String, defaultListener: OnItemClickListener?, max_size: Int) : ListView(context, max_size), ScreenView {
+open class ItemListView(context: Context, itemList : ArrayList<Item>, private val title : String, defaultListener: OnItemClickListener?, max_size: Int) : ListView(context, max_size), ScreenView {
 
     constructor(context: Context, itemList: ArrayList<Item>, TITLE: String, defaultListener: OnItemClickListener?) : this(context, itemList, TITLE, defaultListener, DEFAULT_MAX_SIZE)
 
@@ -34,6 +34,12 @@ class ItemListView(context: Context, itemList : ArrayList<Item>, private val tit
 
     override fun getLaunchMode(): Int {
         return ScreenView.LAUNCH_MODE_NORMAL
+    }
+
+    override fun onStart() {
+    }
+
+    override fun onStop() {
     }
 
 }

@@ -1,4 +1,4 @@
-package com.example.podclassic.game.util
+package com.example.game.util
 
 import android.content.Context
 import android.graphics.LinearGradient

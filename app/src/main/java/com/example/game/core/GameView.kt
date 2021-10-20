@@ -6,7 +6,7 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.util.AttributeSet
 import android.view.ViewGroup
-import com.example.podclassic.game.util.Colors
+import com.example.game.util.Colors
 import com.example.podclassic.util.ThreadUtil
 import java.util.*
 
@@ -65,7 +65,7 @@ class GameView : ViewGroup {
         timer = Timer()
         timer?.schedule( object : TimerTask() {
             override fun run() {
-                ThreadUtil.runOnUiThread(Runnable{ refresh() })
+                ThreadUtil.runOnUiThread { refresh() }
 
             }
         }, 0, 1000 / FPS )

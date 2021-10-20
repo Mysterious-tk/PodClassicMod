@@ -19,4 +19,11 @@ object ThreadUtil {
     fun newThread(runnable: Runnable) {
         threadPoolExecutor.execute(runnable)
     }
+
+    fun newThread(doInBackground: Runnable, onFinished : Runnable) {
+        threadPoolExecutor.execute {
+            doInBackground.run()
+            runOnUiThread(onFinished)
+        }
+    }
 }

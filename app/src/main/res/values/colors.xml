@@ -4,7 +4,8 @@
     <color name="colorAccent">#FF0000</color>
     <color name="colorPrimaryDark">#88000000</color>
 
-    <color name="main">#2196F3</color>
+    <color name="main">#2979FF</color>
+    <color name="main_light">#82B1FF</color>
 
     <color name="background_dark_1">#E0E0E0</color>
     <color name="background_dark_2">#BDBDBD</color>
@@ -14,6 +15,7 @@
     <color name="line">#000000</color>
 
     <color name="transparent">#00000000</color>
+
     <color name="battery_green">#4CAF50</color>
     <color name="battery_red">#F44336</color>
     <color name="battery_yellow">#FFC107</color>

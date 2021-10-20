@@ -4,10 +4,13 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.Outline
 import android.graphics.Point
+import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import android.view.ViewOutlineProvider
-import android.widget.RelativeLayout
+import android.widget.FrameLayout
+import android.widget.LinearLayout
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -19,15 +22,13 @@ import com.example.podclassic.storage.SPManager
 import com.example.podclassic.util.*
 import com.example.podclassic.view.MainView
 import com.example.podclassic.view.MusicPlayerView
-import kotlinx.android.synthetic.main.activity_main.*
 
 class MainActivity : AppCompatActivity() {
 
     companion object {
         const val TOP_MARGIN = 24
-        var screenRatio = 0f
-        var statusBarHeight = 0
     }
+    private var statusBarHeight = 0
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -40,7 +41,7 @@ class MainActivity : AppCompatActivity() {
             SPManager.setBoolean(SPManager.SP_STARTED, true)
             SPManager.reset()
         }
-        Core.bindActivity(slide_controller, screen, title_bar, dark_mode, this)
+        Core.bindActivity(findViewById(R.id.slide_controller), findViewById(R.id.screen), findViewById(R.id.title_bar), findViewById(R.id.dark_mode), this)
 
         checkPermission()
     }
@@ -48,34 +49,40 @@ class MainActivity : AppCompatActivity() {
     private fun prepare() {
         supportFragmentManager
             .beginTransaction()
-            .replace(R.id.frame_layout, SplashFragment(Runnable {
+            .replace(R.id.frame_layout, SplashFragment {
                 Core.lock(true)
                 //UI相关
-                MainView.loadAppList()
+                /*
+                if (Values.LAUNCHER) {
+                    MainView.loadAppList()
+                }
+
+                 */
                 PinyinUtil.load()
-                MediaUtil.prepare()
+
+                //MediaStoreUtil.prepare()
                 if (initMediaPlayer()) {
-                    ThreadUtil.runOnUiThread(Runnable {
+                    ThreadUtil.runOnUiThread {
                         Core.addView(MusicPlayerView(this))
-                    })
+                    }
                 }
                 Core.lock(false)
                 Core.active = true
-            }))
+            })
             .commit()
     }
 
     override fun onBackPressed() {
-        return
-        /*
-        if (Core.lock) {
-            return
+        if (Values.LAUNCHER) {
+            if (Core.lock) {
+                return
+            }
+            Core.removeView()
+        } else {
+            if (!Core.removeView()) {
+                Core.exit()
+            }
         }
-        if (!Core.removeView()) {
-            Core.exit()
-        }
-
-         */
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -98,7 +105,7 @@ class MainActivity : AppCompatActivity() {
                 true
             }
             uri != null -> {
-                MediaPlayer.add(MediaUtil.getMusic(FileUtil.uriToPath(uri)))
+                MediaPlayer.add(MediaStoreUtil.getMusic(FileUtil.uriToPath(uri)))
                 true
             }
             else -> false
@@ -112,16 +119,23 @@ class MainActivity : AppCompatActivity() {
         }
 
         val point = Point()
-        windowManager.defaultDisplay.getSize(point)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            display?.getRealSize(point)
+        } else {
+            windowManager.defaultDisplay.getSize(point)
+        }
 
         val height = point.y
         val width = point.x
 
-        Values.resolution = width
-        screenRatio = height.toFloat() / width.toFloat()
+        Values.screenWidth = width
+        Values.screenHeight = height
+
     }
 
     private fun initView() {
+        /*
         val layoutParams = slide_controller.layoutParams as RelativeLayout.LayoutParams
 
         when {
@@ -140,19 +154,42 @@ class MainActivity : AppCompatActivity() {
             }
             screenRatio >= 21f / 10f -> {
                 layoutParams.topMargin = layoutParams.topMargin * 2
-            } else -> {
+            }
+            else -> {
                 layoutParams.topMargin = layoutParams.topMargin * 3 / 2
             }
         }
 
         (frame_layout.layoutParams as RelativeLayout.LayoutParams).topMargin = statusBarHeight + TOP_MARGIN
-
-        frame_layout.outlineProvider = object : ViewOutlineProvider() {
-            override fun getOutline(view: View, outline: Outline) {
-                outline.setRoundRect(0, 0, view.width, view.height, 14f)
+         */
+        val frameLayout = findViewById<FrameLayout>(R.id.frame_layout)
+        val layoutParams = (frameLayout.layoutParams as LinearLayout.LayoutParams)
+        val screenRatio = Values.screenHeight / Values.screenWidth
+        val topMargin = statusBarHeight + when {
+            screenRatio <= 16f / 9f -> {
+                0
+            }
+            screenRatio <= 17f / 9f -> {
+                TOP_MARGIN / 2
+            }
+            screenRatio >= 21f / 10f -> {
+                TOP_MARGIN * 2
+            }
+            else -> {
+                TOP_MARGIN
             }
         }
-        frame_layout.clipToOutline = true
+
+        layoutParams.topMargin = topMargin
+
+
+
+        frameLayout.outlineProvider = object : ViewOutlineProvider() {
+            override fun getOutline(view: View, outline: Outline) {
+                outline.setRoundRect(0, 0, view.width, view.height, 16f)
+            }
+        }
+        frameLayout.clipToOutline = true
 
         //隐藏虚拟按键
         //window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or View.SYSTEM_UI_FLAG_FULLSCREEN;
@@ -160,7 +197,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun checkPermission() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE), 1)
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.READ_EXTERNAL_STORAGE), 1)
         } else {
             prepare()
         }
@@ -169,10 +206,8 @@ class MainActivity : AppCompatActivity() {
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (grantResults.isNotEmpty() && grantResults[0] != PackageManager.PERMISSION_GRANTED) {
-            SPManager.setBoolean(SPManager.SP_HAS_PERMISSION, false)
             Core.exit()
         } else {
-            SPManager.setBoolean(SPManager.SP_HAS_PERMISSION, true)
             prepare()
         }
     }

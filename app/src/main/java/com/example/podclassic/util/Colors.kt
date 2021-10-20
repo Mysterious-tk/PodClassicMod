@@ -19,6 +19,7 @@ object Colors {
     val line by lazy { ContextCompat.getColor(BaseApplication.context, R.color.line) }
 
     val main by lazy { ContextCompat.getColor(BaseApplication.context, R.color.main) }
+    val main_light by lazy { ContextCompat.getColor(BaseApplication.context, R.color.main_light) }
 
     val battery_green by lazy { ContextCompat.getColor(BaseApplication.context, R.color.battery_green) }
     val battery_red by lazy { ContextCompat.getColor(BaseApplication.context, R.color.battery_red) }
@@ -30,7 +31,7 @@ object Colors {
     private val gray by lazy { ContextCompat.getColor(BaseApplication.context, R.color.gray) }
     val white by lazy { ContextCompat.getColor(BaseApplication.context, R.color.white) }
 
-    fun getShader(x0 : Float, y0 : Float, x1 : Float, y1 : Float, c1 : Int, c2 : Int) : Shader {
-        return LinearGradient(x0, y0, x1, y1, c1, c2, Shader.TileMode.CLAMP)
+    fun getShader(x0 : Float, y0 : Float, x1 : Float, y1 : Float, c1 : Int, c2 : Int, tileMode: Shader.TileMode = Shader.TileMode.CLAMP) : Shader {
+        return LinearGradient(x0, y0, x1, y1, c1, c2, tileMode)
     }
 }

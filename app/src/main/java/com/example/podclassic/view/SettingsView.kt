@@ -2,15 +2,20 @@ package com.example.podclassic.view
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.os.Build
 import android.os.Environment
 import android.os.StatFs
+import android.util.Base64
 import com.example.podclassic.`object`.Core
 import com.example.podclassic.`object`.MediaPlayer
 import com.example.podclassic.base.ScreenView
 import com.example.podclassic.storage.SPManager
-import com.example.podclassic.util.MediaUtil
+import com.example.podclassic.util.MediaStoreUtil
 import com.example.podclassic.util.Values
 import com.example.podclassic.widget.ListView
+import com.example.podclassic.widget.SwitchBar
+import java.util.*
+import kotlin.collections.ArrayList
 
 class SettingsView(context: Context) : ListView(context), ScreenView {
 
@@ -29,13 +34,16 @@ class SettingsView(context: Context) : ListView(context), ScreenView {
                     val blockSizeLong = statFs.blockSizeLong
                     Core.addView(ItemListView(context, arrayListOf(
                         Item(Values.POD, null, false),
-                        Item("歌曲", null, MediaUtil.musics.size.toString()),
-                        Item("视频", null, MediaUtil.getVideoSize().toString()),
-                        Item("照片", null, MediaUtil.getPhotoSize().toString()),
+                        Item("歌曲", null, MediaStoreUtil.musics.size.toString()),
+                        Item("视频", null, MediaStoreUtil.getVideoSize().toString()),
+                        Item("照片", null, MediaStoreUtil.getPhotoSize().toString()),
                         Item("容量", null, (blockSizeLong * statFs.blockCountLong / 1024 / 1024 / 1024).toString() + " GB"),
                         Item("可用容量", null, (blockSizeLong * statFs.availableBlocksLong / 1024 / 1024 / 1024).toString() + " GB"),
                         Item("版本", null, Values.getVersionName()),
-                        Item("S/N", null, android.os.Build.SERIAL),
+                        Item("S/N", null,
+                            Base64.encodeToString(Build.ID.encodeToByteArray(), Base64.NO_PADDING).trim()
+                                .uppercase(Locale.ROOT)
+                        ),//android.os.Build.SERIAL),
                         Item("型号", null, "MA446ZP"),
                         Item("格式", null, "Windows")
                     ), "关于本机", null))
@@ -113,9 +121,9 @@ class SettingsView(context: Context) : ListView(context), ScreenView {
 
             }, SPManager.NightMode.getString(SPManager.getInt(SPManager.NightMode.SP_NAME))),
 
-            SwitchBar("与其它应用同时播放", SPManager.SP_AUDIO_FOCUS),
+            SwitchBar("与其它应用同时播放", SPManager.SP_AUDIO_FOCUS, true),
 
-            Item("按键音", object : OnItemClickListener {
+            Item("按键反馈", object : OnItemClickListener {
                 override fun onItemClick(index : Int, listView: ListView) : Boolean {
                     var sound = SPManager.getInt(SPManager.Sound.SP_NAME)
                     sound ++
@@ -160,27 +168,19 @@ class SettingsView(context: Context) : ListView(context), ScreenView {
                 override fun onItemClick(index : Int, listView: ListView) : Boolean {
                     Core.addView(ItemListView(context, arrayListOf(
                         Item("Cancel", object : OnItemClickListener { override fun onItemClick(index: Int, listView: ListView) : Boolean { Core.removeView(); return true } }, false),
-                        Item("Reset", object : OnItemClickListener { override fun onItemClick(index: Int, listView: ListView) : Boolean { SPManager.reset();
-                            Core.exit(); return true } }, false)
+                        Item("Reset", object : OnItemClickListener { override fun onItemClick(index: Int, listView: ListView) : Boolean { SPManager.reset();Core.exit(); return true } }, false)
                     ), "Reset All", null))
                     return true
                 }
             }, true)
-            )
+        )
     }
 
     override fun getLaunchMode(): Int {
         return ScreenView.LAUNCH_MODE_NORMAL
     }
 
-    private class SwitchBar(title: String, bindSP: String) : Item(title, object : OnItemClickListener {
-            override fun onItemClick(index: Int, listView: ListView): Boolean {
-                SPManager.getBoolean(bindSP).let {
-                    SPManager.setBoolean(bindSP, !it)
-                    listView.getCurrentItem().rightText = if (it) "关闭" else "打开"
-                }
-                return true
-            }
-        }, if (SPManager.getBoolean(bindSP)) "打开" else "关闭") {
-    }
+    override fun onStart() {}
+
+    override fun onStop() {}
 }

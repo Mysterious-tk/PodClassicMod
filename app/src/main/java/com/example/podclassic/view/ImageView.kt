@@ -19,17 +19,6 @@ class ImageView(context: Context, val list : ArrayList<File>, var index : Int) :
         setBackgroundColor(Colors.text)
     }
 
-    override fun onAttachedToWindow() {
-        super.onAttachedToWindow()
-        post { loadImage(list[index]) }
-    }
-
-    override fun onDetachedFromWindow() {
-        super.onDetachedFromWindow()
-        setImageBitmap(null)
-        currentBitmap?.recycle()
-    }
-
     override fun enter(): Boolean {
         return false
     }
@@ -72,5 +61,14 @@ class ImageView(context: Context, val list : ArrayList<File>, var index : Int) :
 
     override fun getLaunchMode(): Int {
         return ScreenView.LAUNCH_MODE_NORMAL
+    }
+
+    override fun onStart() {
+        post { loadImage(list[index]) }
+    }
+
+    override fun onStop() {
+        setImageBitmap(null)
+        currentBitmap?.recycle()
     }
 }

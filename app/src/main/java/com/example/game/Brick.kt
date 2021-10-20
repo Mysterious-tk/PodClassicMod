@@ -5,10 +5,10 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.view.View
 import android.widget.FrameLayout
-import com.example.podclassic.base.ScreenView
 import com.example.game.core.GameView
 import com.example.game.core.Object
-import com.example.podclassic.game.util.Colors
+import com.example.game.util.Colors
+import com.example.podclassic.base.ScreenView
 import kotlin.random.Random
 
 class Brick constructor(context: Context) : FrameLayout(context), ScreenView {
@@ -24,12 +24,9 @@ class Brick constructor(context: Context) : FrameLayout(context), ScreenView {
     private var boardHeight = 0
     private var boardWidth = 0
 
-    private var vel = 5
 
 
-    val bricks by lazy { Array(MAX_Y_OBJ) { arrayOfNulls<Object?>(
-        X_OBJ
-    ) } }
+    val bricks by lazy { Array(MAX_Y_OBJ) { arrayOfNulls<Object?>(X_OBJ) } }
     private var ball : Object? = null
     private var board : Object? = null
 
@@ -57,14 +54,14 @@ class Brick constructor(context: Context) : FrameLayout(context), ScreenView {
 
             override fun onDraw(canvas: Canvas?) {
                 super.onDraw(canvas)
-                paint.shader = Colors.getShader(width / 2f, 0f, width / 2f, height.toFloat(), Colors.line, Colors.line)
+                paint.shader = null
                 canvas?.drawRoundRect(0f, 0f, width.toFloat(), height.toFloat(), PADDING, PADDING, paint)
                 paint.shader = Colors.getShader(width / 2f, 0f, width / 2f, height.toFloat(), Colors.board_1, Colors.board_2)
                 canvas?.drawRoundRect( 1f, 1f, width - 1f, height - 1f, PADDING, PADDING, paint)
             }
         }
 
-        class Brick(context: Context?) : View(context) {
+        class Brick(context: Context?, val colorIndex : Int = Random.nextInt(Colors.brick_1.size)) : View(context) {
 
             companion object {
                 const val PADDING = 5f
@@ -76,9 +73,8 @@ class Brick constructor(context: Context) : FrameLayout(context), ScreenView {
                 super.onDraw(canvas)
                 paint.shader = Colors.getShader(width / 2f, 0f, width / 2f, height.toFloat(), Colors.line, Colors.line)
                 canvas?.drawRoundRect(PADDING, PADDING, width - PADDING, height - PADDING, PADDING, PADDING, paint)
-                val index = Random.nextInt(Colors.brick_1.size)
-                val c1 = Colors.brick_1[index]
-                val c2 = Colors.brick_2[index]
+                val c1 = Colors.brick_1[colorIndex]
+                val c2 = Colors.brick_2[colorIndex]
                 paint.shader = Colors.getShader(width / 2f, 0f, width / 2f, height.toFloat(), c1, c2)
                 canvas?.drawRoundRect(PADDING + 1, PADDING + 1, width - PADDING - 1, height - PADDING - 1, PADDING, PADDING, paint)
             }
@@ -120,7 +116,7 @@ class Brick constructor(context: Context) : FrameLayout(context), ScreenView {
         for (i in 1..Y_OBJ) {
             for (j in 1..X_OBJ) {
                 val o = Object(
-                    Brick(context),
+                    Brick(context, i - 1),
                     (j - 1) * brickWidth,
                     (i - 1) * brickHeight,
                     brickWidth,
@@ -270,5 +266,9 @@ class Brick constructor(context: Context) : FrameLayout(context), ScreenView {
     override fun getLaunchMode(): Int {
         return ScreenView.LAUNCH_MODE_NORMAL
     }
+
+    override fun onStart() { }
+
+    override fun onStop() {}
 
 }

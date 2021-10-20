@@ -16,4 +16,9 @@ interface ScreenView {
     fun getTitle() : String
 
     fun getLaunchMode() : Int
+
+    fun onStart()
+
+    fun onStop()
+
 }

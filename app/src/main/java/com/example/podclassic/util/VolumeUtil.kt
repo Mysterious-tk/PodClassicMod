@@ -46,9 +46,9 @@ object VolumeUtil {
             soundPool.play(streamId, 1f, 1f, 0, 0, 1f)
         }
         if (sound and SPManager.Sound.VIBRATE_ID != 0) {
-            ThreadUtil.newThread(Runnable {
-                view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-            })
+            ThreadUtil.newThread {
+                view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS, HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING)
+            }
         }
     }
 

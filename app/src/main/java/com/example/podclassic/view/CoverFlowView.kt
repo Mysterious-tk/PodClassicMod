@@ -11,7 +11,7 @@ import com.example.podclassic.`object`.Core
 import com.example.podclassic.`object`.MusicList
 import com.example.podclassic.base.ScreenView
 import com.example.podclassic.util.Icons
-import com.example.podclassic.util.MediaUtil
+import com.example.podclassic.util.MediaStoreUtil
 import com.example.podclassic.util.ThreadUtil
 import com.example.podclassic.widget.TextView
 import java.util.concurrent.LinkedBlockingQueue
@@ -23,14 +23,14 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
     companion object {
         private const val MAX_SIZE = 11
         private const val CENTER_OFFSET = 6
-        private const val DEFAULT_DURATION = 300L
-        private const val MIN_DURATION = 30L
+        private const val DEFAULT_DURATION = 200L
+        private const val MIN_DURATION = 10L
 
-        private val threadPoolExecutor = ThreadPoolExecutor(10, 10, 0L, TimeUnit.MILLISECONDS, LinkedBlockingQueue<Runnable>())
+        private val threadPoolExecutor = ThreadPoolExecutor(10, 10, 0L, TimeUnit.MILLISECONDS, LinkedBlockingQueue())
     }
 
     private val albums by lazy {
-        MediaUtil.albums
+        MediaStoreUtil.albums
     }
 
     private val imageViews = ArrayList<ImageView>(MAX_SIZE)
@@ -79,14 +79,9 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
         album.layout(0, artist.top - textHeight, width, artist.top)
     }
 
-    override fun onDetachedFromWindow() {
-        super.onDetachedFromWindow()
-        threadPoolExecutor.queue.clear()
-    }
-
     private fun setTexts(index : Int) {
-        album.setBufferedText(albums[index].name)
-        artist.setBufferedText(albums[index].artist)
+        album.text = albums[index].name
+        artist.text = albums[index].artist
     }
 
     private fun setRotationY(imageView: ImageView) {
@@ -145,8 +140,7 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
 
     private var slides = 0
 
-    override fun slide(slideVal: Int): Boolean {
-
+    override fun slide(slideVal: Int) : Boolean {
         if (animator?.isRunning == true) {
             duration = (duration * (0.9f + 0.1f * (1f - s(duration.toFloat())))).toLong()
             duration = max(duration, MIN_DURATION)
@@ -175,11 +169,11 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
             val sgn = if (slides > 0) 1 else -1
             slides -= sgn
 
-            if (slides <= 16) {
-                duration = (duration * (1f + 0.1f * (s(abs(slides).toFloat())))).toLong()
+            if (slides <= 12) {
+                duration = (duration * (0.98f + 0.08f * (s(abs(slides).toFloat())))).toLong()
                 duration = min(duration, DEFAULT_DURATION)
             } else {
-                duration = (duration * (0.9f + 0.1f * (1f - s(duration.toFloat())))).toLong()
+                duration = (duration * (0.81f + 0.12f * (1f - s(duration.toFloat())))).toLong()
                 duration = max(duration, MIN_DURATION)
             }
             loadAnimation(sgn)
@@ -268,6 +262,15 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
         return ScreenView.LAUNCH_MODE_NORMAL
     }
 
+    override fun onStart() {
+
+    }
+
+    override fun onStop() {
+        threadPoolExecutor.queue.clear()
+        animator?.cancel()
+    }
+
     private class ImageView(context: Context) : androidx.appcompat.widget.AppCompatImageView(context) {
 
         private var album : MusicList? = null
@@ -295,7 +298,7 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
                 threadPoolExecutor.remove(runnable)
             }
             runnable = Runnable {
-                val bitmap = MediaUtil.getAlbumImage(album.id)
+                val bitmap = MediaStoreUtil.getAlbumImage(album.id)
                 if (Thread.currentThread().isInterrupted) {
                     return@Runnable
                 }

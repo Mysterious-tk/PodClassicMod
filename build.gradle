@@ -3,11 +3,11 @@ ext {
 }// Top-level build file where you can add configuration options common to all sub-projects/modules.
 
 buildscript {
-    ext.kotlin_version = '1.4.32'
+    ext.kotlin_version = '1.5.30'
     repositories {
         maven{ url 'http://maven.aliyun.com/nexus/content/groups/public/'}
         google()
-        jcenter()
+        mavenCentral()
 
     }
     dependencies {
@@ -20,8 +20,7 @@ allprojects {
     repositories {
         maven{ url 'http://maven.aliyun.com/nexus/content/groups/public/'}
         google()
-        jcenter()
-
+        mavenCentral()
     }
 }
 

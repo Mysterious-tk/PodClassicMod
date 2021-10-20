@@ -3,18 +3,19 @@ package com.example.podclassic.widget
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.Shader
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
+import android.os.Build
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.LinearLayout.VERTICAL
-import com.example.podclassic.util.Colors
-import com.example.podclassic.util.Icons
-import com.example.podclassic.util.PinyinUtil
-import com.example.podclassic.util.ThreadUtil
+import androidx.annotation.RequiresApi
+import com.example.podclassic.util.*
 import com.example.podclassic.util.Values.DEFAULT_PADDING
 import java.util.*
 import kotlin.collections.ArrayList
@@ -147,7 +148,7 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
         scrollBar.setScrollBar(position, MAX_SIZE, itemList.size)
         for (i in position until MAX_SIZE + position) {
             if (i >= itemList.size) {
-                clearAt(i - position)
+            //    clearAt(i - position)
                 break
             }
             val itemView = itemViewList[i - position]
@@ -161,6 +162,7 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
             itemView.setRightText(itemList[i].rightText)
             itemView.setEnable(itemList[i].enable)
             onItemCreated(i, itemView)
+
         }
     }
 
@@ -242,7 +244,9 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
                                         cancelTimer()
                                     } else if ((System.currentTimeMillis() - prevSlideTime) > DELAY) {
                                         cancelTimer()
-                                        ThreadUtil.runOnUiThread(Runnable { indexView.visibility = INVISIBLE })
+                                        ThreadUtil.runOnUiThread {
+                                            indexView.visibility = INVISIBLE
+                                        }
                                     }
                                 }
                             }, DELAY * 6L, DELAY * 12L)
@@ -336,6 +340,8 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
         var enable : Boolean = false
         var rightText = ""
 
+        var extra : Any? = null
+
         constructor(name: String, onItemClickListener: OnItemClickListener?, enable: Boolean) {
             this.name = name
             this.onItemClickListener = onItemClickListener
@@ -347,6 +353,13 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
             this.onItemClickListener = onItemClickListener
             this.rightText = rightText
         }
+
+        override fun equals(other: Any?): Boolean {
+            if (other !is Item) {
+                return false
+            }
+            return other.name == name && other.onItemClickListener == onItemClickListener && other.enable == enable && other.rightText == rightText
+        }
     }
 
     private class ScrollBar(context: Context) : ViewGroup(context) {
@@ -354,31 +367,33 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
         private var maxSize = 0
         var size = 0
 
-        companion object {
-            const val LINE_WIDTH = 1
-        }
-
         private val paint by lazy { Paint() }
+        private val shader by lazy { Colors.getShader(width / 1.8f, 0f, width.toFloat(), 0f, Colors.background_dark_2, Colors.background_dark_1) }
 
         fun setScrollBar(position : Int, maxSize : Int, size : Int) {
             this.position = position
             this.maxSize = maxSize
             this.size = size
-            //invalidate()
+            refresh()
+        //invalidate()
         }
 
-        override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
+        private fun refresh() {
             if (size > maxSize) {
                 var barHeight = measuredHeight * maxSize / size
                 if (barHeight == 0) {
                     barHeight = 1
                 }
                 val barTop = measuredHeight * position / size
-                bar.layout(LINE_WIDTH, barTop, measuredWidth, barTop + barHeight)
+                bar.layout(Values.LINE_WIDTH, barTop, measuredWidth, barTop + barHeight)
                 visibility = VISIBLE
             } else {
                 visibility = GONE
             }
+        }
+
+        override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
+            refresh()
         }
 
         override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
@@ -388,19 +403,31 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
 
         override fun onDraw(canvas: Canvas?) {
             super.onDraw(canvas)
-            paint.shader = Colors.getShader(0f, height / 2f, width.toFloat(), height / 2f, Colors.background_dark_1, Colors.background_dark_2)
+
+            paint.shader = shader
             canvas?.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
+
             paint.shader = null
             paint.color = Colors.line
-            canvas?.drawRect(0f, 0f, LINE_WIDTH.toFloat(), measuredHeight.toFloat(), paint)
+            canvas?.drawRect(0f, 0f, Values.LINE_WIDTH.toFloat(), measuredHeight.toFloat(), paint)
         }
 
-        private var bar = View(context)
+        private val bar = object : View(context) {
+            private val paint by lazy {
+                Paint().apply { shader = null }
+            }
+
+            override fun onDraw(canvas: Canvas?) {
+                if (paint.shader == null) {
+                    paint.shader = Colors.getShader(width / 2f, 0f, width.toFloat(), 0f, Colors.main, Colors.main_light, Shader.TileMode.MIRROR)
+                }
+                canvas?.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
+            }
+        }
 
         init {
             visibility = GONE
             setBackgroundColor(Colors.background)
-            bar.setBackgroundColor(Colors.main)
             addView(bar)
         }
     }
@@ -413,16 +440,26 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
 
         private val rightText = TextView(context)
         private val leftText = TextView(context)
+        private val rightIcon = ImageView(context)
 
         init {
 
             val layoutParams1 = LayoutParams(LayoutParams.MATCH_PARENT,LayoutParams.MATCH_PARENT)
             val layoutParams2 = LayoutParams(LayoutParams.WRAP_CONTENT,LayoutParams.MATCH_PARENT)
+            val layoutParams3 = LayoutParams(LayoutParams.MATCH_PARENT,LayoutParams.MATCH_PARENT)
 
             layoutParams2.gravity = Gravity.END
 
+            rightIcon.scaleType = ImageView.ScaleType.CENTER
+
             addView(leftText, layoutParams1)
             addView(rightText, layoutParams2)
+            addView(rightIcon, layoutParams3)
+        }
+
+        override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
+            super.onLayout(changed, left, top, right, bottom)
+            rightIcon.layout(rightIcon.right - (rightIcon.height * 0.9).toInt(), rightIcon.top, rightIcon.right, rightIcon.bottom)
         }
 
         fun setHighlight(highlight: Boolean) {
@@ -460,7 +497,7 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
 
         private var hasRightIcon = false
         private fun setRightIcon(drawable: Drawable?) {
-            rightText.setRightIcon(drawable)
+            rightIcon.setImageDrawable(drawable)
             hasRightIcon = (drawable != null)
         }
 
@@ -495,7 +532,7 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
                 shakeTimer?.schedule(object : TimerTask() {
                     override fun run() {
                         shakeCount ++
-                        ThreadUtil.runOnUiThread(Runnable { setHighlight(!highlight) })
+                        ThreadUtil.runOnUiThread { setHighlight(!highlight) }
                         if (shakeCount == 4) {
                             cancelShake()
                         }
@@ -515,6 +552,7 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
 
             leftText.clear()
             rightText.clear()
+            rightIcon.setImageDrawable(null)
 
             highlight = false
             enable = false

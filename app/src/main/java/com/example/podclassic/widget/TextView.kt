@@ -18,25 +18,15 @@ class TextView(context: Context) : androidx.appcompat.widget.AppCompatTextView(c
 
     init {
         marqueeRepeatLimit = -1
-        setSingleLine(true)
+        isSingleLine = true
         maxLines = MAX_LINES
         ellipsize = TextUtils.TruncateAt.END
         typeface = Typeface.defaultFromStyle(Typeface.BOLD)
         textSize = TEXT_SIZE
-        gravity = Gravity.CENTER_VERTICAL
+
         setTextColor(Colors.text)
         setPadding(DEFAULT_PADDING, DEFAULT_PADDING / 4, DEFAULT_PADDING, DEFAULT_PADDING / 4)
         gravity = Gravity.CENTER_VERTICAL
-    }
-
-    private var bufferedText : String? = null
-
-    fun setBufferedText(text : String?) {
-        if (text == bufferedText) {
-            return
-        }
-        super.setText(text)
-        bufferedText = text
     }
 
     fun setLeftIcon(drawable : Drawable?) {
@@ -52,9 +42,18 @@ class TextView(context: Context) : androidx.appcompat.widget.AppCompatTextView(c
     }
 
     fun clear() {
-        super.setText("")
+        super.setText(null)
         setCompoundDrawables(null, null, null, null)
         setPadding(DEFAULT_PADDING, DEFAULT_PADDING / 4, DEFAULT_PADDING, DEFAULT_PADDING / 4)
+    }
+
+    private var buffer : String? = null
+    fun setBufferedText(text : String?) {
+        if (text == buffer) {
+            return
+        }
+        buffer = text
+        setText(buffer)
     }
 
     var scrollable = false

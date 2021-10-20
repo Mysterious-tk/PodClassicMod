@@ -8,7 +8,7 @@ import com.example.podclassic.base.ScreenView
 import com.example.podclassic.storage.SaveMusicLists
 import com.example.podclassic.storage.SaveMusics
 import com.example.podclassic.util.FileUtil
-import com.example.podclassic.util.MediaUtil
+import com.example.podclassic.util.MediaStoreUtil
 import com.example.podclassic.widget.ListView
 import java.io.File
 import java.text.Collator
@@ -22,16 +22,17 @@ class FileView(context: Context, val file: File) : ListView(context), ScreenView
     private var hasAudio = false
     val list: ArrayList<File> = file.let{
         val array = file.listFiles()
-        val arrayList = ArrayList<File>(array.size)
+        val arrayList = ArrayList<File>(0)
         if (array != null) {
-            for (file in file.listFiles()) {
-                if (!file.name.startsWith(".")) {
-                    arrayList.add(file)
+            arrayList.ensureCapacity(array.size)
+            for (f in array) {
+                if (!f.name.startsWith(".")) {
+                    arrayList.add(f)
                 }
             }
+            val collator = Collator.getInstance(Locale.CHINA)
+            arrayList.sortWith { o1, o2 -> collator.compare(o1?.name, o2?.name) }
         }
-        val collator = Collator.getInstance(Locale.CHINA)
-        arrayList.sortWith(Comparator { o1, o2 -> collator.compare(o1?.name, o2?.name) })
         arrayList
     }
 
@@ -62,11 +63,11 @@ class FileView(context: Context, val file: File) : ListView(context), ScreenView
             return false
         }
         if (hasAudio && index == 0) {
-            val musics = MediaUtil.searchMusic("${MediaUtil.PATH} like ?", "${file.path}%")
+            val musics = MediaStoreUtil.searchMusic("${MediaStoreUtil.PATH} like ? ", "${file.path}%")
             if (musics.isEmpty()) {
                 musics.ensureCapacity(musicList.size)
                 for (file in musicList) {
-                    musics.add(MediaUtil.getMusicFromFile(file.path))
+                    musics.add(MediaStoreUtil.getMusicFromFile(file.path))
                 }
             }
             val lastIndex = file.path.length
@@ -93,7 +94,7 @@ class FileView(context: Context, val file: File) : ListView(context), ScreenView
                 FileUtil.TYPE_VIDEO -> Core.addView(VideoView(context, file))
                 FileUtil.TYPE_IMAGE -> Core.addView(ImageView(context, arrayListOf(file), 0))
                 FileUtil.TYPE_AUDIO -> {
-                    MediaPlayer.add(MediaUtil.getMusic(file.path))
+                    MediaPlayer.add(MediaStoreUtil.getMusic(file.path))
                     Core.addView(MusicPlayerView(context))
                 }
             }
@@ -111,7 +112,7 @@ class FileView(context: Context, val file: File) : ListView(context), ScreenView
         val id = if (hasAudio) index - 1 else index
 
         if (list[id].isDirectory) {
-            val folder = list[id].listFiles()
+            val folder = list[id].listFiles() ?: return false
             for (file in folder) {
                 if (FileUtil.isAudio(file)) {
                     SaveMusicLists.saveFolders.add(list[id].path)
@@ -120,7 +121,7 @@ class FileView(context: Context, val file: File) : ListView(context), ScreenView
                 }
             }
         } else if (FileUtil.isAudio(list[id])) {
-            SaveMusics.loveList.add(MediaUtil.getMusic(list[id].path))
+            SaveMusics.loveList.add(MediaStoreUtil.getMusic(list[id].path))
             shake()
             return true
         }
@@ -139,5 +140,10 @@ class FileView(context: Context, val file: File) : ListView(context), ScreenView
         return ScreenView.LAUNCH_MODE_NORMAL
     }
 
+    override fun onStart() {
 
+    }
+
+    override fun onStop() {
+    }
 }

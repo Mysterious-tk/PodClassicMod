@@ -1,45 +1,41 @@
 <?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout
+<LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
+    android:orientation="vertical"
     android:layout_height="match_parent"
     android:background="@color/colorPrimary"
     tools:context=".activity.MainActivity">
 
     <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_alignParentTop="true"
+        android:layout_height="300dp"
         android:layout_marginLeft="12dp"
         android:layout_marginRight="12dp"
-        android:layout_marginBottom="12dp"
-        android:layout_above="@id/slide_controller"
         android:id="@+id/frame_layout">
 
         <com.example.podclassic.widget.TitleBar
             android:layout_width="match_parent"
-            android:layout_height="24dp"
+            android:layout_height="30dp"
             android:id="@+id/title_bar" />
 
         <com.example.podclassic.widget.Screen
-            android:layout_marginTop="24dp"
+            android:layout_marginTop="30dp"
+            android:layout_width="match_parent"
+            android:layout_height="270dp"
+            android:id="@+id/screen" />
+
+        <View
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:id="@+id/screen" />
+            android:background="@color/colorPrimaryDark"
+            android:id="@+id/dark_mode"/>
     </FrameLayout>
 
     <com.example.podclassic.widget.SlideController
-        android:layout_alignParentBottom="true"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_margin="48dp"
-        android:id="@+id/slide_controller" />
-
-    <View
+        android:layout_gravity="bottom"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="@color/colorPrimaryDark"
-        android:id="@+id/dark_mode"/>
-
-</RelativeLayout>
+        android:id="@+id/slide_controller" />
+</LinearLayout>

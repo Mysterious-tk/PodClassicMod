@@ -1,12 +1,16 @@
 package com.example.podclassic.`object`
 
 import android.annotation.SuppressLint
+import android.content.Intent
 import android.view.View
 import com.example.podclassic.activity.MainActivity
 import com.example.podclassic.base.ScreenView
+import com.example.podclassic.service.MediaPlayerService
 import com.example.podclassic.storage.SPManager
-import com.example.podclassic.util.MediaUtil
+import com.example.podclassic.util.MediaStoreUtil
 import com.example.podclassic.util.ThreadUtil
+import com.example.podclassic.util.Values
+import com.example.podclassic.util.VolumeUtil
 import com.example.podclassic.view.MainView
 import com.example.podclassic.view.MusicPlayerView
 import com.example.podclassic.widget.AppWidget
@@ -14,6 +18,7 @@ import com.example.podclassic.widget.Screen
 import com.example.podclassic.widget.SlideController
 import com.example.podclassic.widget.TitleBar
 import java.util.*
+import kotlin.system.exitProcess
 
 @SuppressLint("StaticFieldLeak")
 object Core {
@@ -32,15 +37,15 @@ object Core {
         setTitle(screen.currentView)
         controller.onTouchListener = object : SlideController.OnTouchListener {
             override fun onEnterClick(): Boolean {
-                return screen.getView().enter()
+                return screen.getCurrent().enter()
             }
 
             override fun onEnterLongClick(): Boolean {
-                return screen.getView().enterLongClick()
+                return screen.getCurrent().enterLongClick()
             }
 
             override fun onSlide(slideVal: Int): Boolean {
-                return screen.getView().slide(slideVal)
+                return screen.getCurrent().slide(slideVal)
             }
         }
         wake()
@@ -48,7 +53,8 @@ object Core {
     }
 
     var active = false
-    private var lock = false
+    var lock = false
+        private set
     fun lock(lock: Boolean) {
         this.lock = lock
         controller.lock(lock)
@@ -60,7 +66,7 @@ object Core {
     }
 
     fun getView(): ScreenView {
-        return screen.getView()
+        return screen.getCurrent()
     }
 
     fun removeView(): Boolean {
@@ -90,14 +96,15 @@ object Core {
     }
 
     fun exit() {
-        MediaPlayer.stop()
-        /*
-        MediaPlayer.release()
-        activity?.stopService(Intent(activity, MediaPlayerService::class.java))
-        VolumeUtil.releaseSoundPool()
-        activity?.finish()
-        exitProcess(0)
-        */
+        if (Values.LAUNCHER) {
+            MediaPlayer.stop()
+        } else {
+            MediaPlayer.release()
+            activity?.stopService(Intent(activity, MediaPlayerService::class.java))
+            VolumeUtil.releaseSoundPool()
+            activity?.finish()
+            exitProcess(0)
+        }
     }
 
     fun setNightMode(darkMode: Boolean) {
@@ -127,11 +134,11 @@ object Core {
                     return
                 }
                 if (screen.currentView !is MusicPlayerView) {
-                    ThreadUtil.runOnUiThread(Runnable {
+                    ThreadUtil.runOnUiThread {
                         if (activity != null) {
                             addView(MusicPlayerView(activity!!))
                         }
-                    })
+                    }
                 }
             }
         }, DELAY)
@@ -139,7 +146,7 @@ object Core {
 
     fun init() {
         // 无论是否加载Activity都需要初始化
-        MediaUtil.prepare()
+        MediaStoreUtil.prepare()
         AppWidget.updateRemoteViews(null)
     }
 }

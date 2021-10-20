@@ -9,7 +9,7 @@ import com.example.podclassic.R
 import com.example.podclassic.`object`.Music
 import com.example.podclassic.base.ScreenView
 import com.example.podclassic.util.AudioFocusManager
-import com.example.podclassic.util.MediaUtil
+import com.example.podclassic.util.MediaStoreUtil
 import com.example.podclassic.util.ThreadUtil
 import com.example.podclassic.util.Values.DEFAULT_PADDING
 import com.example.podclassic.widget.ListView
@@ -28,10 +28,9 @@ class MusicQuizView(context: Context) : RelativeLayout(context), ScreenView, Med
         const val MAX_SIZE = 5
     }
 
-    private val musics = MediaUtil.musics.clone() as ArrayList<Music>
+    private val musics = MediaStoreUtil.musics.clone() as ArrayList<Music>
 
     private val audioFocusManager = AudioFocusManager(this)
-
 
     override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
         super.onWindowFocusChanged(hasWindowFocus)
@@ -40,17 +39,6 @@ class MusicQuizView(context: Context) : RelativeLayout(context), ScreenView, Med
         } else {
             pause()
         }
-    }
-
-    override fun onAttachedToWindow() {
-        super.onAttachedToWindow()
-        audioFocusManager.requestAudioFocus()
-    }
-
-    override fun onDetachedFromWindow() {
-        super.onDetachedFromWindow()
-        pause()
-        mediaPlayer.release()
     }
 
     private var timer : Timer? = null
@@ -206,6 +194,15 @@ class MusicQuizView(context: Context) : RelativeLayout(context), ScreenView, Med
 
     override fun getLaunchMode(): Int {
         return ScreenView.LAUNCH_MODE_NORMAL
+    }
+
+    override fun onStart() {
+        audioFocusManager.requestAudioFocus()
+    }
+
+    override fun onStop() {
+        pause()
+        mediaPlayer.release()
     }
 
     override fun onPrepared(mp: MediaPlayer?) {

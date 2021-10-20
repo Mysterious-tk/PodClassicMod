@@ -98,4 +98,11 @@ class AlbumListView : ListView, ScreenView {
         return ScreenView.LAUNCH_MODE_NORMAL
     }
 
+    override fun onStart() {
+
+    }
+
+    override fun onStop() {
+    }
+
 }

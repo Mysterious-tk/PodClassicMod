@@ -159,7 +159,7 @@ class SaveMusics(private val databaseName: String, val name : String) {
             return Music(name, album, singer, path, id)
         }
 
-        fun putMusic(values: ContentValues, music: Music): ContentValues? {
+        fun putMusic(values: ContentValues, music: Music): ContentValues {
             values.put(NAME, music.name)
             values.put(SINGER, music.singer)
             values.put(ALBUM, music.album)

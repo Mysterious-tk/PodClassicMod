@@ -33,19 +33,8 @@ class VideoView(context: Context, val file : File) : FrameLayout(context), Scree
             setOnErrorListener { _, _, _ -> return@setOnErrorListener true }
             start()
         }
-
     }
 
-    override fun onDetachedFromWindow() {
-        super.onDetachedFromWindow()
-        videoView.apply {
-            stopPlayback()
-            suspend()
-            setOnErrorListener(null)
-        }
-        removeAllViews()
-        audioFocusManager.abandonAudioFocus()
-    }
 
     override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
         super.onWindowFocusChanged(hasWindowFocus)
@@ -102,5 +91,18 @@ class VideoView(context: Context, val file : File) : FrameLayout(context), Scree
 
     override fun getLaunchMode(): Int {
         return ScreenView.LAUNCH_MODE_NORMAL
+    }
+
+    override fun onStart() {
+    }
+
+    override fun onStop() {
+        videoView.apply {
+            stopPlayback()
+            suspend()
+            setOnErrorListener(null)
+        }
+        removeAllViews()
+        audioFocusManager.abandonAudioFocus()
     }
 }

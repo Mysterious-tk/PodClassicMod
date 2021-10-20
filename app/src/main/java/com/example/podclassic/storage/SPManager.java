@@ -1,11 +1,27 @@
 package com.example.podclassic.storage;
 
+import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
+import android.content.res.Configuration;
+import android.os.Build;
 import android.preference.PreferenceManager;
+import android.util.Log;
 
 import com.example.podclassic.base.BaseApplication;
 
+import java.text.Collator;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Locale;
+import java.util.function.Predicate;
 
 public class SPManager {
 
@@ -23,9 +39,13 @@ public class SPManager {
 
         public static boolean nightMode(int id) {
             if (AUTO_ID == id) {
-                Calendar calendar = Calendar.getInstance();
-                int hour = calendar.get(Calendar.HOUR_OF_DAY);
-                return hour >= 23 || hour <= 5;
+                int nightModeFlags = BaseApplication.context.getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK;
+                if (nightModeFlags == Configuration.UI_MODE_NIGHT_UNDEFINED || Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                    Calendar calendar = Calendar.getInstance();
+                    int hour = calendar.get(Calendar.HOUR_OF_DAY);
+                    return hour >= 23 || hour <= 5;
+                }
+                return nightModeFlags == Configuration.UI_MODE_NIGHT_YES;
             }
             return ENABLE_ID == id;
         }
@@ -140,6 +160,131 @@ public class SPManager {
 
     }
 
+    public static class App {
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public String getPackageName() {
+            return packageName;
+        }
+
+        public void setPackageName(String packageName) {
+            this.packageName = packageName;
+        }
+
+        private String name;
+
+        @Override
+        public String toString() {
+            return "App{" +
+                    "name='" + name + '\'' +
+                    ", packageName='" + packageName + '\'' +
+                    '}';
+        }
+
+        private String packageName;
+        private Intent intent = null;
+
+        public App(String name, String packageName) {
+            this.name = name;
+            this.packageName = packageName;
+        }
+
+        public Intent getIntent() {
+            if (intent != null) {
+                return intent;
+            }
+            PackageManager packageManager = BaseApplication.context.getPackageManager();
+
+            intent = packageManager.getLaunchIntentForPackage(packageName);
+            /*
+            if (intent != null) {
+                intent.addFlags(Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED | Intent.FLAG_ACTIVITY_NEW_TASK);
+            }
+             */
+            return intent;
+        }
+
+        public void setIntent(Intent intent) {
+            this.intent = intent;
+        }
+    }
+
+    public static class AppList {
+
+        public static ArrayList<App> getAppList() {
+            Context context = BaseApplication.context;
+            PackageManager packageManager = context.getPackageManager();
+            ArrayList<App> apps = new ArrayList<>();
+
+            List<PackageInfo> packages = packageManager.getInstalledPackages(0);
+            for (PackageInfo packageInfo : packages) {
+                String packageName = packageInfo.packageName;
+                if (packageName.equals(context.getPackageName())) {
+                    continue;
+                }
+                String name = packageInfo.applicationInfo.loadLabel(packageManager).toString();
+                App app = new App(name, packageName);
+                if (app.getIntent() != null) {
+                    apps.add(app);
+                }
+            }
+            Collator collator = Collator.getInstance(Locale.CHINA);
+            Collections.sort(apps, (o1, o2) -> collator.compare(o1.name, o2.name));
+            return apps;
+        }
+
+        public static ArrayList<App> getSavedAppList() {
+            String[] list = getString(SP_APP_LIST).split("\n");
+            ArrayList<App> apps = new ArrayList<>();
+            for (int i = 0; i + 1 < list.length; i+= 2) {
+                String name = list[i];
+                String packageName = list[i + 1];
+                App app = new App(name, packageName);
+                if (app.getIntent() != null) {
+                    apps.add(app);
+                }
+            }
+            createAppString(apps);
+            return apps;
+        }
+
+        public static void addApp(App app) {
+            ArrayList<App> apps = getSavedAppList();
+            if (!apps.contains(app)) {
+                apps.add(app);
+            }
+            setString(SP_APP_LIST, createAppString(apps));
+
+        }
+
+        public static void removeApp(App app) {
+            ArrayList<App> list = getSavedAppList();
+            for (int i = 0; i < list.size(); i++) {
+                if (list.get(i).packageName.equals(app.packageName)) {
+                    list.remove(i);
+                    break;
+                }
+            }
+            setString(SP_APP_LIST, createAppString(list));
+        }
+
+        private static String createAppString(ArrayList<App> list) {
+            StringBuilder stringBuilder = new StringBuilder();
+            for (App app : list) {
+                stringBuilder.append(app.name).append('\n');
+                stringBuilder.append(app.packageName).append('\n');
+            }
+            return stringBuilder.toString();
+        }
+    }
+
+
     private SPManager() { }
 
     public static final String SP_STARTED = "started";
@@ -149,7 +294,6 @@ public class SPManager {
     public static final String SP_SHOW_TIME = "show_time";
     public static final String SP_SHOW_LYRIC = "show_lyric";
     public static final String SP_SHOW_INFO = "show_info";
-    public static final String SP_SAVE_FOLDERS = "save_folders";
     public static final String SP_SAVE_SINGERS = "save_singers";
     public static final String SP_SAVE_ALBUMS = "save_albums";
     public static final String SP_EQUALIZER = "equalizer";
@@ -157,7 +301,7 @@ public class SPManager {
     public static final String SP_PLAY_ALL = "play_all";
     public static final String SP_COVER_FLOW = "cover_flow";
     public static final String SP_REPEAT = "repeat";
-    public static final String SP_HAS_PERMISSION = "has_permission";
+    public static final String SP_APP_LIST = "app_list";
 
     private static SharedPreferences getSharedPreferences() {
         return PreferenceManager.getDefaultSharedPreferences(BaseApplication.context);
@@ -186,7 +330,6 @@ public class SPManager {
 
     public static void setString(String sp, String value) {
         getSharedPreferences().edit().putString(sp, value).apply();
-
     }
 
     public static void reset() {
@@ -195,6 +338,7 @@ public class SPManager {
         setBoolean(SP_SHOW_TIME, true);
         setBoolean(SP_SHOW_LYRIC, true);
         setBoolean(SP_THEME, true);
+        setBoolean(SP_REPEAT, true);
         setBoolean(SP_SHOW_INFO, false);
         setBoolean(SP_COVER_FLOW, false);
         setInt(NightMode.SP_NAME, NightMode.DISABLE_ID);
@@ -202,6 +346,7 @@ public class SPManager {
         setInt(AutoStop.SP_NAME, AutoStop.DISABLE_ID);
         setInt(SP_PLAY_MODE, 0);
         setInt(SP_EQUALIZER, 0);
+        setString(SP_APP_LIST, "");
         SaveMusicLists.Companion.getSaveAlbums().clear();
         SaveMusicLists.Companion.getSaveFolders().clear();
         SaveMusicLists.Companion.getSaveSingers().clear();

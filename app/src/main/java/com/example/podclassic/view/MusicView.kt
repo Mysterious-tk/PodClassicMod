@@ -7,7 +7,7 @@ import com.example.podclassic.`object`.MusicList
 import com.example.podclassic.base.ScreenView
 import com.example.podclassic.storage.SPManager
 import com.example.podclassic.storage.SaveMusicLists
-import com.example.podclassic.util.MediaUtil
+import com.example.podclassic.util.MediaStoreUtil
 import com.example.podclassic.widget.ListView
 
 class MusicView(context: Context) : ListView(context), ScreenView {
@@ -30,7 +30,7 @@ class MusicView(context: Context) : ListView(context), ScreenView {
 
     private val coverFlow = Item("CoverFlow", object : OnItemClickListener {
         override fun onItemClick(index: Int, listView: ListView): Boolean {
-            if (MediaUtil.albums.isEmpty()) {
+            if (MediaStoreUtil.albums.isEmpty()) {
                 return false
             }
             Core.addView(CoverFlowView(context))
@@ -38,21 +38,10 @@ class MusicView(context: Context) : ListView(context), ScreenView {
         }
     }, true)
 
-    override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
-        super.onWindowFocusChanged(hasWindowFocus)
-        if (hasWindowFocus) {
-            if (MediaPlayer.getCurrent() == null) {
-                remove(currentList)
-            } else {
-                addIfNotExist(currentList)
-            }
-        }
-    }
-
     init {
         itemList = arrayListOf(
             Item("歌曲", object : OnItemClickListener {
-                val musicList = MediaUtil.musics
+                val musicList = MediaStoreUtil.musics
                 override fun onItemClick(index : Int, listView : ListView) : Boolean {
                     Core.addView(MusicListView(context, musicList, "歌曲"))
                     return true
@@ -60,20 +49,20 @@ class MusicView(context: Context) : ListView(context), ScreenView {
             }, true),
             Item("专辑", object : OnItemClickListener {
                 override fun onItemClick(index : Int, listView : ListView) : Boolean {
-                    Core.addView(AlbumListView(context, MediaUtil.albums, "专辑"))
+                    Core.addView(AlbumListView(context, MediaStoreUtil.albums, "专辑"))
                     return true
                 }
             }, true),
             Item("艺术家", object : OnItemClickListener {
                 override fun onItemClick(index : Int, listView : ListView) : Boolean {
-                    val singerList = MediaUtil.singers
-                    val itemList1 = ArrayList<Item>()
+                    val singerList = MediaStoreUtil.singers
+                    val itemList1 = ArrayList<Item>(singerList.size)
                     for (musicList in singerList) {
                         itemList1.add(Item(musicList.name, null, true))
                     }
                     val itemListView = ItemListView(context, itemList1,  "艺术家", object : OnItemClickListener {
                         override fun onItemClick(index : Int, listView : ListView) : Boolean {
-                            val albumList = MediaUtil.searchAlbum(MediaUtil.SINGER, singerList[index].name)
+                            val albumList = MediaStoreUtil.searchAlbum(singerList[index].name)
                             val musicList = MusicList()
                             musicList.name = singerList[index].name
                             musicList.type = MusicList.TYPE_SINGER
@@ -94,6 +83,7 @@ class MusicView(context: Context) : ListView(context), ScreenView {
                 }
 
             }, true),
+
             Item("收藏的文件夹", object : OnItemClickListener {
                 override fun onItemClick(index: Int, listView : ListView) : Boolean {
                     val itemList = ArrayList<Item>()
@@ -115,6 +105,8 @@ class MusicView(context: Context) : ListView(context), ScreenView {
                     return true
                 }
             }, true),
+
+
             Item("收藏的歌曲", object : OnItemClickListener {
                 override fun onItemClick(index : Int, listView : ListView) : Boolean {
                     Core.addView(MusicListView(context, MusicListView.LONG_CLICK_REMOVE_LOVE))
@@ -145,6 +137,18 @@ class MusicView(context: Context) : ListView(context), ScreenView {
 
     override fun getLaunchMode(): Int {
         return ScreenView.LAUNCH_MODE_NORMAL
+    }
+
+    override fun onStart() {
+        if (MediaPlayer.getCurrent() == null) {
+            remove(currentList)
+        } else {
+            addIfNotExist(currentList)
+        }
+    }
+
+    override fun onStop() {
+
     }
 
 }

@@ -3,6 +3,7 @@ package com.example.podclassic.base
 import android.annotation.SuppressLint
 import android.app.Application
 import android.content.Context
+import android.util.Log
 import com.example.podclassic.`object`.Core
 
 class BaseApplication : Application() {

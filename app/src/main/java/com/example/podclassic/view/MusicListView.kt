@@ -32,6 +32,7 @@ class MusicListView : ListView, ScreenView, MediaPlayer.OnMediaChangeListener {
         init()
         sorted = musicList.type != MusicList.TYPE_ALBUM
     }
+
     constructor(context: Context, onLongClick : Int) : super(context) {
         val musicList = when (onLongClick) {
             LONG_CLICK_REMOVE_LOVE -> SaveMusics.loveList.getMusicList()
@@ -67,17 +68,13 @@ class MusicListView : ListView, ScreenView, MediaPlayer.OnMediaChangeListener {
         }
     }
 
-    override fun onDetachedFromWindow() {
-        super.onDetachedFromWindow()
-        onStop()
-    }
-
-    private fun onStart() {
+    override fun onStart() {
         MediaPlayer.addOnMediaChangeListener(this)
         onMediaChange()
     }
 
-    private fun onStop() {
+
+    override fun onStop() {
         MediaPlayer.removeOnMediaChangeListener(this)
     }
 
@@ -139,6 +136,7 @@ class MusicListView : ListView, ScreenView, MediaPlayer.OnMediaChangeListener {
     override fun onMediaChangeFinished() {}
 
     override fun onPlayStateChange() {}
+    override fun onSeek(progress: Int) {}
 
     override fun getLaunchMode(): Int {
         return ScreenView.LAUNCH_MODE_NORMAL

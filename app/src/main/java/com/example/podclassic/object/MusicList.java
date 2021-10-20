@@ -1,6 +1,6 @@
 package com.example.podclassic.object;
 
-import com.example.podclassic.util.MediaUtil;
+import com.example.podclassic.util.MediaStoreUtil;
 
 import org.jetbrains.annotations.NotNull;
 
@@ -23,9 +23,9 @@ public class MusicList {
     public ArrayList<Music> getList() {
         if (list == null) {
             if (type == TYPE_SINGER) {
-                list = MediaUtil.INSTANCE.getArtistMusic(name);
+                list = MediaStoreUtil.INSTANCE.getArtistMusic(name);
             } else if (type == TYPE_ALBUM) {
-                list = MediaUtil.INSTANCE.getAlbumMusic(name);
+                list = MediaStoreUtil.INSTANCE.getAlbumMusic(name);
             }
         }
         return list;

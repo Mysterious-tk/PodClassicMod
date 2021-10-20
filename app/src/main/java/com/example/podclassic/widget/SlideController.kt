@@ -15,9 +15,12 @@ import com.example.podclassic.util.Icons.NEXT
 import com.example.podclassic.util.Icons.PAUSE
 import com.example.podclassic.util.Icons.PREV
 import com.example.podclassic.util.ThreadUtil
+import com.example.podclassic.util.Values
 import com.example.podclassic.util.VolumeUtil
 import java.util.*
 import kotlin.math.abs
+import kotlin.math.atan2
+import kotlin.math.min
 import kotlin.math.sqrt
 
 
@@ -50,16 +53,34 @@ class SlideController : View {
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec)
         val x = MeasureSpec.getSize(widthMeasureSpec)
-        //var y = MeasureSpec.getSize(heightMeasureSpec)
+        val y = MeasureSpec.getSize(heightMeasureSpec)
         centerX = x / 2f
-        centerY =
-            centerX
+        centerY = y / 2f
 
-        minR = centerX / 16 * 5
-        maxR =
-            centerX
+        val center = min(centerX, centerY)
 
-        setMeasuredDimension(x, x)
+        maxR = center * (center / (center + abs(centerX - centerY) + Values.screenWidth / 12))
+
+        //maxR = min(maxR, center - Values.screenWidth / 12)
+
+        /*
+        when {
+            MainActivity.screenRatio <= 17f / 9f && MainActivity.screenRatio >= 16f / 9f -> {
+                maxR = maxR / 8 * 7
+            }
+            MainActivity.screenRatio > 1f / 2f -> {
+                maxR = maxR / 4 * 3
+            }
+            MainActivity.screenRatio <= 1f / 2f && MainActivity.screenRatio > 17f / 9f -> {
+                maxR = maxR / 6 * 5
+            }
+        }
+
+         */
+
+        minR = maxR / 16 * 5
+
+        setMeasuredDimension(x, y)
     }
 
     override fun onDraw(canvas: Canvas?) {
@@ -67,19 +88,16 @@ class SlideController : View {
 
         paint.isAntiAlias = true
         paint.color = Colors.controller
-        canvas?.drawCircle(
-            centerX,
-            centerY,
-            centerX, paint)
+        canvas?.drawCircle(centerX, centerY, maxR, paint)
         paint.color = Colors.color_primary
-        canvas?.drawCircle(
-            centerX,
-            centerY, centerX / 16 * 5, paint)
+        canvas?.drawCircle(centerX, centerY, minR, paint)
 
-        canvas?.drawBitmap(MENU.bitmap, centerX - MENU.width / 2, (centerY / 3) - MENU.height , paint)
-        canvas?.drawBitmap(PREV.bitmap, (centerX / 4) - PREV.width, centerY - PREV.height / 2, paint)
-        canvas?.drawBitmap(NEXT.bitmap, ( -centerX / 4 + 2 * centerX), centerY - NEXT.height / 2, paint)
-        canvas?.drawBitmap(PAUSE.bitmap, centerX - PAUSE.width / 2, ( -centerY / 4 + 2 * centerY), paint)
+        val r = (minR + maxR) / 2
+
+        canvas?.drawBitmap(MENU.bitmap, centerX - MENU.width / 2, centerY - r - PAUSE.height - MENU.height / 2 , paint)
+        canvas?.drawBitmap(PREV.bitmap, (centerX - r) - PREV.width / 2 * 3, centerY - PREV.height / 2, paint)
+        canvas?.drawBitmap(NEXT.bitmap, (centerX + r) + NEXT.width / 2, centerY - NEXT.height / 2, paint)
+        canvas?.drawBitmap(PAUSE.bitmap, centerX - PAUSE.width / 2, centerY + r + PAUSE.height / 2, paint)
 
     }
 
@@ -106,15 +124,15 @@ class SlideController : View {
                         return@Runnable
                     }
                     if (startPoint.inCenter && curPoint.inCenter && (prevPoint.isEmpty() || prevPoint.inCenter)) {
-                        onEnterLongClicked()
+                        onEnterLongClick()
                         cancelTimer()
                     } else if (startPoint.inCircle && curPoint.inCircle && (prevPoint.isEmpty() || prevPoint.inCircle)) {
                         when (startPoint.deg) {
-                            in 45..135 -> onMenuLongClicked()
-                            in 135..225 -> onPrevLongClicked()
-                            in 225..315 -> onPauseLongClicked()
-                            in 315..360 -> onNextLongClicked()
-                            in 0..45 -> onNextLongClicked()
+                            in 45..135 -> onMenuLongClick()
+                            in 135..225 -> onPrevLongClick()
+                            in 225..315 -> onPauseLongClick()
+                            in 315..360 -> onNextLongClick()
+                            in 0..45 -> onNextLongClick()
                         }
                     }
                 })
@@ -174,14 +192,14 @@ class SlideController : View {
                 }
                 if ((curPoint.t - startPoint.t) <= 400) {
                     if (startPoint.inCenter && curPoint.inCenter) {
-                        onEnterClicked()
+                        onEnterClick()
                     } else if (startPoint.inCircle && curPoint.inCircle) {
                         when (startPoint.deg) {
-                            in 45..135 -> { onMenuClicked() }
-                            in 135..225 -> { onPrevClicked() }
-                            in 225..315 -> { onPauseClicked() }
-                            in 315..360 -> { onNextClicked() }
-                            in 0..45 -> { onNextClicked() }
+                            in 45..135 -> { onMenuClick() }
+                            in 135..225 -> { onPrevClick() }
+                            in 225..315 -> { onPauseClick() }
+                            in 315..360 -> { onNextClick() }
+                            in 0..45 -> { onNextClick() }
                         }
                     }
                 }
@@ -279,7 +297,7 @@ class SlideController : View {
         }
 
         private fun getDeg(x : Float, y : Float) : Int {
-            var deg : Int = Math.toDegrees(Math.atan2(y.toDouble(), x.toDouble())).toInt()
+            var deg : Int = Math.toDegrees(atan2(y.toDouble(), x.toDouble())).toInt()
             if (deg < 0) {
                 deg += 360
             }
@@ -294,7 +312,7 @@ class SlideController : View {
 
     }
 
-    private fun onEnterClicked() {
+    private fun onEnterClick() {
         if (lock) {
             return
         }
@@ -303,7 +321,7 @@ class SlideController : View {
         }
     }
 
-    private fun onMenuClicked() {
+    private fun onMenuClick() {
         if (lock) {
             return
         }
@@ -312,7 +330,7 @@ class SlideController : View {
         }
     }
 
-    private fun onPrevClicked() {
+    private fun onPrevClick() {
         if (lock) {
             return
         }
@@ -320,7 +338,7 @@ class SlideController : View {
         VolumeUtil.vibrate(this)
     }
 
-    private fun onNextClicked() {
+    private fun onNextClick() {
         if (lock) {
             return
         }
@@ -339,7 +357,7 @@ class SlideController : View {
     }
 
 
-    private fun onPauseClicked() {
+    private fun onPauseClick() {
         if (lock) {
             return
         }
@@ -347,7 +365,7 @@ class SlideController : View {
         VolumeUtil.vibrate(this)
     }
 
-    private fun onEnterLongClicked() {
+    private fun onEnterLongClick() {
         if (lock) {
             return
         }
@@ -356,7 +374,7 @@ class SlideController : View {
         }
     }
 
-    private fun onNextLongClicked() {
+    private fun onNextLongClick() {
         if (lock) {
             return
         }
@@ -364,9 +382,9 @@ class SlideController : View {
         VolumeUtil.vibrate(this)
     }
 
-    private fun onPauseLongClicked() {}
+    private fun onPauseLongClick() {}
 
-    private fun onPrevLongClicked() {
+    private fun onPrevLongClick() {
         if (lock) {
             return
         }
@@ -374,7 +392,7 @@ class SlideController : View {
         VolumeUtil.vibrate(this)
     }
 
-    private fun onMenuLongClicked() {
+    private fun onMenuLongClick() {
         if (lock) {
             return
         }

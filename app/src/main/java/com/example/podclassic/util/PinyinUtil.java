@@ -14,6 +14,7 @@ public class PinyinUtil {
             pinyin = readPinyin();
         }
     }
+
     private static HashMap<Character, Character> readPinyin() {
         try (ObjectInputStream in = new ObjectInputStream(BaseApplication.context.getResources().openRawResource(R.raw.pinyin))) {
             Object obj = in.readObject();

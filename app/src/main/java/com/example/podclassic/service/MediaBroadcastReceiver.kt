@@ -6,6 +6,8 @@ import android.content.Intent
 import android.view.KeyEvent
 import com.example.podclassic.`object`.Core
 import com.example.podclassic.`object`.MediaPlayer
+import com.example.podclassic.base.BaseApplication
+import com.example.podclassic.view.MusicPlayerView
 
 class MediaBroadcastReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context?, intent: Intent?) {
@@ -23,6 +25,7 @@ class MediaBroadcastReceiver : BroadcastReceiver() {
                 KeyEvent.KEYCODE_MEDIA_NEXT -> {
                     if (MediaPlayer.getPlayListSize() == 0) {
                         MediaPlayer.shufflePlay()
+                        Core.addView(MusicPlayerView(BaseApplication.context))
                     } else {
                         MediaPlayer.next()
                     }
@@ -30,6 +33,7 @@ class MediaBroadcastReceiver : BroadcastReceiver() {
                 KeyEvent.KEYCODE_MEDIA_PREVIOUS -> {
                     if (MediaPlayer.getPlayListSize() == 0) {
                         MediaPlayer.shufflePlay()
+                        Core.addView(MusicPlayerView(BaseApplication.context))
                     } else {
                         MediaPlayer.prev()
                     }
