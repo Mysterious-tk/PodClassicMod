@@ -234,8 +234,13 @@ public class SPManager {
                     apps.add(app);
                 }
             }
-            Collator collator = Collator.getInstance(Locale.CHINA);
-            Collections.sort(apps, (o1, o2) -> collator.compare(o1.name, o2.name));
+            final Collator collator = Collator.getInstance(Locale.CHINA);
+            Collections.sort(apps, new Comparator<App>() {
+                @Override
+                public int compare(App o1, App o2) {
+                    return collator.compare(o1.name, o2.name);
+                }
+            });
             return apps;
         }
 
