@@ -21,4 +21,6 @@ interface ScreenView {
 
     fun onStop()
 
+    fun onStartFinished() {}
+
 }

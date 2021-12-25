@@ -32,6 +32,34 @@ import kotlin.math.min
 
 object MediaPlayer : MediaPlayer.OnCompletionListener, MediaPlayer.OnErrorListener, AudioFocusManager.OnAudioFocusChangeListener, MediaPlayer.OnPreparedListener {
 
+    //audioFocus
+    private val audioFocusManager = AudioFocusManager(this)
+    private var wasPlaying = false
+
+    override fun onAudioFocusGain() {
+        if (wasPlaying && !isPlaying) {
+            pause()
+        }
+    }
+
+    override fun onAudioFocusLoss() {
+        if (isPlaying) {
+            wasPlaying = true
+            pause()
+        } else {
+            wasPlaying = false
+        }
+    }
+    //audioFocus
+
+    private val mediaPlayer = MediaPlayer().apply {
+        setOnCompletionListener(this@MediaPlayer)
+        setOnErrorListener(this@MediaPlayer)
+        setOnPreparedListener(this@MediaPlayer)
+        setAudioAttributes(audioFocusManager.attribute)
+    }
+
+    //playmode
     private const val PLAY_MODE_ORDER = 0
     const val PLAY_MODE_SINGLE = 1
     const val PLAY_MODE_SHUFFLE = 2
@@ -41,72 +69,6 @@ object MediaPlayer : MediaPlayer.OnCompletionListener, MediaPlayer.OnErrorListen
     private const val PLAY_MODE_SHUFFLE_STRING = "随机播放"
 
     private var currentPlayMode = SPManager.getInt(SPManager.SP_PLAY_MODE)
-
-    private val audioFocusManager = AudioFocusManager(this)
-
-    var isPrepared = false
-    var isPlaying = false
-
-    val equalizerList = ArrayList<String>(10)
-
-
-    private val mediaPlayer = MediaPlayer().apply {
-        setOnCompletionListener(this@MediaPlayer)
-        setOnErrorListener(this@MediaPlayer)
-        setOnPreparedListener(this@MediaPlayer)
-        setAudioAttributes(audioFocusManager.attribute)
-    }
-    private val equalizer = Equalizer(0, mediaPlayer.audioSessionId)
-
-    init {
-        MediaStoreUtil.prepare()
-        equalizer.apply {
-            if (hasControl()) {
-                enabled = true
-                for (i in 0 until numberOfPresets) {
-                    equalizerList.add(getPresetName(i.toShort()))
-                }
-                setEqualizer(SPManager.getInt(SPManager.SP_EQUALIZER))
-            }
-        }
-    }
-
-    fun setEqualizer(index: Int): Boolean {
-        return if (index in 0 until equalizerList.size) {
-            SPManager.setInt(SPManager.SP_EQUALIZER, index)
-            equalizer.usePreset(index.toShort())
-            true
-        } else {
-            false
-        }
-    }
-
-    fun release() {
-        stop()
-        mediaPlayer.release()
-        onMediaChangeListeners.clear()
-        onProgressListeners.clear()
-
-        equalizer.release()
-    }
-
-    fun stop() {
-        cancelTimer()
-        if (mediaPlayer.isPlaying) {
-            mediaPlayer.pause()
-        }
-        scheduleToStop(0)
-        ThreadManager.clearTask()
-        mediaPlayer.reset()
-        audioFocusManager.abandonAudioFocus()
-        playList.clear()
-        orderedPlayList.clear()
-        isPlaying = false
-        isPrepared = false
-        currentIndex = -1
-        onPlayStateChange()
-        onMediaChange()
-    }
 
     fun setPlayMode() {
         currentPlayMode++
@@ -134,7 +96,24 @@ object MediaPlayer : MediaPlayer.OnCompletionListener, MediaPlayer.OnErrorListen
             else -> ""
         }
     }
+    //playmode
 
+    //equalizer
+    val equalizerList = ArrayList<String>(10)
+    private val equalizer = Equalizer(0, mediaPlayer.audioSessionId)
+
+    fun setEqualizer(index: Int): Boolean {
+        return if (index in 0 until equalizerList.size) {
+            SPManager.setInt(SPManager.SP_EQUALIZER, index)
+            equalizer.usePreset(index.toShort())
+            true
+        } else {
+            false
+        }
+    }
+    //equalizer
+
+    //onMediaChangeListener
     interface OnMediaChangeListener {
         //确定下一首歌的music对象
         fun onMediaChange()
@@ -155,7 +134,9 @@ object MediaPlayer : MediaPlayer.OnCompletionListener, MediaPlayer.OnErrorListen
     @Synchronized fun removeOnMediaChangeListener(onMediaChangeListener: OnMediaChangeListener) {
         onMediaChangeListeners.remove(onMediaChangeListener)
     }
+    //onMediaChangeListener
 
+    //onProgressListener
     interface OnProgressListener {
         fun onProgress(progress: Int)
     }
@@ -175,32 +156,9 @@ object MediaPlayer : MediaPlayer.OnCompletionListener, MediaPlayer.OnErrorListen
             cancelTimer()
         }
     }
+    //onProgressListener
 
-    private var timer: Timer? = null
-    private var timerCount : Int = 0
-    private var duration : Int = 1
-    private fun setTimer() {
-        if (onProgressListeners.isEmpty()) {
-            cancelTimer()
-        } else if (timer == null) {
-            timer = Timer()
-            if (isPrepared) {
-                timerCount = mediaPlayer.currentPosition
-            }
-            timer!!.schedule(object : TimerTask() {
-                override fun run() {
-                    timerCount += 500
-                    onProgress(timerCount)
-                }
-            }, 500, 500)
-        }
-    }
-
-    private fun cancelTimer() {
-        timer?.cancel()
-        timer = null
-    }
-
+    //playlist
     private var playList = ArrayList<Music>()
 
     private var orderedPlayList = ArrayList<Music>()
@@ -328,7 +286,44 @@ object MediaPlayer : MediaPlayer.OnCompletionListener, MediaPlayer.OnErrorListen
         }
         return null
     }
+    //playlist
 
+    //timer
+    private var timer: Timer? = null
+    private var timerCount : Int = 0
+    private var duration : Int = 1
+    private fun setTimer() {
+        if (onProgressListeners.isEmpty()) {
+            cancelTimer()
+        } else if (timer == null) {
+            timer = Timer()
+            if (isPrepared) {
+                timerCount = mediaPlayer.currentPosition
+            }
+            timer!!.schedule(object : TimerTask() {
+                override fun run() {
+                    timerCount += 500
+                    onProgress(timerCount)
+                }
+            }, 500, 500)
+        }
+    }
+
+    private fun updateTimer() {
+        timerCount = if (isPrepared) {
+            mediaPlayer.currentPosition
+        } else {
+            0
+        }
+    }
+
+    private fun cancelTimer() {
+        timer?.cancel()
+        timer = null
+    }
+    //timer
+
+    //stopTime
     var stopTime = 0L
     private var pendingIntent: PendingIntent? = null
 
@@ -359,8 +354,50 @@ object MediaPlayer : MediaPlayer.OnCompletionListener, MediaPlayer.OnErrorListen
             }
         }
     }
+    //stopTime
 
+    var isPrepared = false
+    var isPlaying = false
 
+    init {
+        MediaStoreUtil.prepare()
+        equalizer.apply {
+            if (hasControl()) {
+                enabled = true
+                for (i in 0 until numberOfPresets) {
+                    equalizerList.add(getPresetName(i.toShort()))
+                }
+                setEqualizer(SPManager.getInt(SPManager.SP_EQUALIZER))
+            }
+        }
+    }
+
+    fun release() {
+        stop()
+        mediaPlayer.release()
+        onMediaChangeListeners.clear()
+        onProgressListeners.clear()
+
+        equalizer.release()
+    }
+
+    fun stop() {
+        cancelTimer()
+        if (mediaPlayer.isPlaying) {
+            mediaPlayer.pause()
+        }
+        scheduleToStop(0)
+        ThreadManager.clearTask()
+        mediaPlayer.reset()
+        audioFocusManager.abandonAudioFocus()
+        playList.clear()
+        orderedPlayList.clear()
+        isPlaying = false
+        isPrepared = false
+        currentIndex = -1
+        onPlayStateChange()
+        onMediaChange()
+    }
 
     private object ThreadManager {
         private val handler = Handler(Looper.getMainLooper())
@@ -494,11 +531,11 @@ object MediaPlayer : MediaPlayer.OnCompletionListener, MediaPlayer.OnErrorListen
 
         onMediaChange()
 
-        timerCount = 0
+        cancelTimer()
 
         isPrepared = false
-        mediaPlayer.reset()
         isPlaying = false
+        mediaPlayer.reset()
 
         val music = playList[currentIndex]
 
@@ -560,7 +597,7 @@ object MediaPlayer : MediaPlayer.OnCompletionListener, MediaPlayer.OnErrorListen
 
     fun seekTo(position: Int) {
         mediaPlayer.seekTo(position)
-        timerCount = mediaPlayer.currentPosition
+        updateTimer()
         onProgress(timerCount)
         onSeek(timerCount)
     }
@@ -649,23 +686,6 @@ object MediaPlayer : MediaPlayer.OnCompletionListener, MediaPlayer.OnErrorListen
     private fun onProgress(progress: Int) {
         for (item in onProgressListeners) {
             ThreadUtil.runOnUiThread { item.onProgress(progress) }
-        }
-    }
-
-    private var wasPlaying = false
-
-    override fun onAudioFocusGain() {
-        if (wasPlaying && !isPlaying) {
-            pause()
-        }
-    }
-
-    override fun onAudioFocusLoss() {
-        if (isPlaying) {
-            wasPlaying = true
-            pause()
-        } else {
-            wasPlaying = false
         }
     }
 }

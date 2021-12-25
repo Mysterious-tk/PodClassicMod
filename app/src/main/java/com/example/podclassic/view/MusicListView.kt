@@ -66,6 +66,10 @@ class MusicListView : ListView, ScreenView, MediaPlayer.OnMediaChangeListener {
                 itemList.add(Item(music.name, null, false))
             }
         }
+        val index = musicList.indexOf(MediaPlayer.getCurrent())
+        if (index != -1) {
+            setCurrent(index)
+        }
     }
 
     override fun onStart() {

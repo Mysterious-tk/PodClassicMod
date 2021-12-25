@@ -1,4 +1,5 @@
 <resources>
     <string name="app_name">Pod Classic</string>
     <string name="shuffle_play">随机播放</string>
+
 </resources>

@@ -9,7 +9,7 @@
         android:shortcutShortLabel="@string/shuffle_play">
 
         <intent
-            android:action="ACTION_SHUFFLE"
+            android:action="action_shuffle"
             android:targetClass="com.example.podclassic.activity.MainActivity"
             android:targetPackage="com.example.podclassic" />
         <categories android:name="android.shortcut.conversation" />

@@ -13,7 +13,6 @@ import com.example.podclassic.util.Values
 import com.example.podclassic.util.VolumeUtil
 import com.example.podclassic.view.MainView
 import com.example.podclassic.view.MusicPlayerView
-import com.example.podclassic.widget.AppWidget
 import com.example.podclassic.widget.Screen
 import com.example.podclassic.widget.SlideController
 import com.example.podclassic.widget.TitleBar
@@ -147,6 +146,6 @@ object Core {
     fun init() {
         // 无论是否加载Activity都需要初始化
         MediaStoreUtil.prepare()
-        AppWidget.updateRemoteViews(null)
+        //AppWidget.updateRemoteViews(null)
     }
 }

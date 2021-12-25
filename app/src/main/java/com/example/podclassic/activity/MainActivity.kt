@@ -1,9 +1,11 @@
 package com.example.podclassic.activity
 
 import android.Manifest
+import android.app.Activity
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Outline
-import android.graphics.Point
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
@@ -11,56 +13,68 @@ import android.view.View
 import android.view.ViewOutlineProvider
 import android.widget.FrameLayout
 import android.widget.LinearLayout
+import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.documentfile.provider.DocumentFile
 import com.example.podclassic.R
 import com.example.podclassic.`object`.Core
 import com.example.podclassic.`object`.MediaPlayer
+import com.example.podclassic.base.BaseApplication
 import com.example.podclassic.fragment.SplashFragment
+import com.example.podclassic.service.MediaPlayerService
 import com.example.podclassic.storage.SPManager
 import com.example.podclassic.util.*
-import com.example.podclassic.view.MainView
 import com.example.podclassic.view.MusicPlayerView
+import java.lang.Exception
 
 class MainActivity : AppCompatActivity() {
 
     companion object {
         const val TOP_MARGIN = 24
     }
+
     private var statusBarHeight = 0
+
+    private var mini = false
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         initScreen()
-        setContentView(R.layout.activity_main)
-        initView()
-
-        if (!SPManager.getBoolean(SPManager.SP_STARTED)) {
-            SPManager.setBoolean(SPManager.SP_STARTED, true)
-            SPManager.reset()
+        if ((Values.screenHeight.toFloat() / Values.screenWidth.toFloat()) < (6f / 5f)) {
+            mini = true
         }
-        Core.bindActivity(findViewById(R.id.slide_controller), findViewById(R.id.screen), findViewById(R.id.title_bar), findViewById(R.id.dark_mode), this)
+        if (mini) {
+            setContentView(R.layout.activity_main_mini)
+            MediaStoreUtil.prepare()
+        } else {
+            setContentView(R.layout.activity_main)
+            initView()
+            if (!SPManager.getBoolean(SPManager.SP_STARTED)) {
+                SPManager.setBoolean(SPManager.SP_STARTED, true)
+                SPManager.reset()
+            }
+            Core.bindActivity(findViewById(R.id.slide_controller), findViewById(R.id.screen), findViewById(R.id.title_bar), findViewById(R.id.dark_mode), this)
+        }
 
         checkPermission()
     }
 
     private fun prepare() {
+        if (mini) {
+            return
+        }
         supportFragmentManager
             .beginTransaction()
             .replace(R.id.frame_layout, SplashFragment {
                 Core.lock(true)
                 //UI相关
-                /*
-                if (Values.LAUNCHER) {
-                    MainView.loadAppList()
-                }
-
-                 */
                 PinyinUtil.load()
 
-                //MediaStoreUtil.prepare()
+                MediaStoreUtil.prepare()
+
                 if (initMediaPlayer()) {
                     ThreadUtil.runOnUiThread {
                         Core.addView(MusicPlayerView(this))
@@ -73,6 +87,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onBackPressed() {
+        if (mini) {
+            if (!Values.LAUNCHER) {
+                Core.exit()
+            }
+            return
+        }
         if (Values.LAUNCHER) {
             if (Core.lock) {
                 return
@@ -87,6 +107,9 @@ class MainActivity : AppCompatActivity() {
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
+        if (mini) {
+            return
+        }
         if (hasFocus) {
             Core.setNightMode(SPManager.NightMode.nightMode(SPManager.getInt(SPManager.NightMode.SP_NAME)))
         }
@@ -97,7 +120,7 @@ class MainActivity : AppCompatActivity() {
         val action = intent?.action
         val autoStop = SPManager.getInt(SPManager.AutoStop.SP_NAME)
         return when {
-            action == "ACTION_SHUFFLE" || (!Core.active && autoStop != 0) -> {
+            action == MediaPlayerService.ACTION_SHUFFLE || (!Core.active && autoStop != 0) -> {
                 MediaPlayer.shufflePlay()
                 if (autoStop != SPManager.AutoStop.FOREVER_ID) {
                     MediaPlayer.scheduleToStop(SPManager.AutoStop.getMinute(autoStop))
@@ -118,20 +141,10 @@ class MainActivity : AppCompatActivity() {
             statusBarHeight = resources.getDimensionPixelSize(resourceId)
         }
 
-        val point = Point()
+        val displayMetrics = resources.displayMetrics
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            display?.getRealSize(point)
-        } else {
-            windowManager.defaultDisplay.getSize(point)
-        }
-
-        val height = point.y
-        val width = point.x
-
-        Values.screenWidth = width
-        Values.screenHeight = height
-
+        Values.screenWidth = displayMetrics.widthPixels
+        Values.screenHeight = displayMetrics.heightPixels
     }
 
     private fun initView() {
@@ -183,12 +196,6 @@ class MainActivity : AppCompatActivity() {
         layoutParams.topMargin = topMargin
 
 
-
-        frameLayout.outlineProvider = object : ViewOutlineProvider() {
-            override fun getOutline(view: View, outline: Outline) {
-                outline.setRoundRect(0, 0, view.width, view.height, 16f)
-            }
-        }
         frameLayout.clipToOutline = true
 
         //隐藏虚拟按键

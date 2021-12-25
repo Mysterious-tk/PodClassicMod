@@ -124,6 +124,7 @@ class MainView(context: Context) : ListView(context), ScreenView {
                 override fun onItemClick(index: Int, listView: ListView): Boolean {
                     val itemList = getItemList()
                     if (itemList == null) {
+
                         Core.addView(FileView(context, Environment.getExternalStorageDirectory()))
                     } else {
                         Core.addView(ItemListView(context, itemList, "文件", null))

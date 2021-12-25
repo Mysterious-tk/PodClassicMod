@@ -47,20 +47,22 @@ class MusicView(context: Context) : ListView(context), ScreenView {
                     return true
                 }
             }, true),
+
             Item("专辑", object : OnItemClickListener {
                 override fun onItemClick(index : Int, listView : ListView) : Boolean {
                     Core.addView(AlbumListView(context, MediaStoreUtil.albums, "专辑"))
                     return true
                 }
             }, true),
-            Item("艺术家", object : OnItemClickListener {
+
+            Item("表演者", object : OnItemClickListener {
                 override fun onItemClick(index : Int, listView : ListView) : Boolean {
                     val singerList = MediaStoreUtil.singers
                     val itemList1 = ArrayList<Item>(singerList.size)
                     for (musicList in singerList) {
                         itemList1.add(Item(musicList.name, null, true))
                     }
-                    val itemListView = ItemListView(context, itemList1,  "艺术家", object : OnItemClickListener {
+                    val itemListView = ItemListView(context, itemList1,  "表演者", object : OnItemClickListener {
                         override fun onItemClick(index : Int, listView : ListView) : Boolean {
                             val albumList = MediaStoreUtil.searchAlbum(singerList[index].name)
                             val musicList = MusicList()
@@ -131,7 +133,7 @@ class MusicView(context: Context) : ListView(context), ScreenView {
         }
 
         if (MediaPlayer.getCurrent() != null) {
-            addIfNotExist(currentList)
+            addIfNotExist(currentList, 0)
         }
     }
 

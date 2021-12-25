@@ -19,11 +19,15 @@ class Screen(context: Context, attributeSet: AttributeSet?) : FrameLayout(contex
         setBackgroundColor(Colors.background)
         addView(screenLayout, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
         screenLayout.onViewChangeListener = object : ScreenLayout.OnViewChangeListener {
-            override fun onViewRemoved(view: View) {
+            override fun onViewRemove(view: View) {
                 (view as ScreenView).onStop()
             }
-            override fun onViewAdded(view: View) {
+            override fun onViewAdd(view: View) {
                 (view as ScreenView).onStart()
+            }
+
+            override fun onViewAdded(view: View) {
+                (view as ScreenView).onStartFinished()
             }
         }
         screenLayout.addView(mainView as View)

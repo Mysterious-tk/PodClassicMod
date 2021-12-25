@@ -17,6 +17,8 @@ import android.widget.LinearLayout.VERTICAL
 import androidx.annotation.RequiresApi
 import com.example.podclassic.util.*
 import com.example.podclassic.util.Values.DEFAULT_PADDING
+import java.lang.Integer.max
+import java.lang.Math.min
 import java.util.*
 import kotlin.collections.ArrayList
 import kotlin.math.abs
@@ -92,14 +94,22 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
     }
 
     fun addIfNotExist(item : Item) {
+        addIfNotExist(item, size())
+    }
+
+    fun addIfNotExist(item: Item, index: Int) {
         if (!itemList.contains(item)) {
-            add(item)
+            add(item, index)
         }
     }
 
-    fun add(item : Item) {
-        itemList.add(item)
+    fun add(item: Item, index: Int) {
+        itemList.add(index, item)
         refreshList()
+    }
+
+    fun add(item : Item) {
+        add(item, size())
     }
 
     fun remove(item : Item) {
@@ -120,7 +130,13 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
     }
 
     fun getCurrentItem() : Item {
-        return itemList[index]
+        return getItem(index)
+    }
+
+    fun setCurrent(index: Int) {
+        this.index = index
+        this.position = (index - MAX_SIZE / 2).coerceAtMost(itemList.size - MAX_SIZE).coerceAtLeast(0)
+        refreshList()
     }
 
     fun shake() {
@@ -148,7 +164,7 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
         scrollBar.setScrollBar(position, MAX_SIZE, itemList.size)
         for (i in position until MAX_SIZE + position) {
             if (i >= itemList.size) {
-            //    clearAt(i - position)
+                clearAt(i - position)
                 break
             }
             val itemView = itemViewList[i - position]
@@ -359,6 +375,10 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
                 return false
             }
             return other.name == name && other.onItemClickListener == onItemClickListener && other.enable == enable && other.rightText == rightText
+        }
+
+        override fun hashCode(): Int {
+            return name.hashCode()
         }
     }
 

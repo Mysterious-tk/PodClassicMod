@@ -96,8 +96,6 @@ class SettingsView(context: Context) : ListView(context), ScreenView {
                 }
             }, MediaPlayer.getPlayModeString()),
 
-            SwitchBar("循环播放", SPManager.SP_REPEAT),
-
             Item("随机播放", object : OnItemClickListener {
                 override fun onItemClick(index : Int, listView : ListView) : Boolean {
                     SPManager.getBoolean(SPManager.SP_PLAY_ALL).let {
@@ -107,6 +105,8 @@ class SettingsView(context: Context) : ListView(context), ScreenView {
                     return true
                 }
             }, if (SPManager.getBoolean(SPManager.SP_PLAY_ALL))  "全部歌曲" else "收藏歌曲" ),
+
+            SwitchBar("重复播放", SPManager.SP_REPEAT),
 
             Item("夜间模式", object : OnItemClickListener {
                 override fun onItemClick(index : Int, listView : ListView) : Boolean {

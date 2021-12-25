@@ -1,9 +1,11 @@
 package com.example.podclassic.view
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.media.MediaPlayer
 import android.text.TextUtils
 import android.view.View
+import android.view.ViewGroup
 import android.widget.RelativeLayout
 import com.example.podclassic.R
 import com.example.podclassic.`object`.Music
@@ -14,6 +16,7 @@ import com.example.podclassic.util.ThreadUtil
 import com.example.podclassic.util.Values.DEFAULT_PADDING
 import com.example.podclassic.widget.ListView
 import com.example.podclassic.widget.SeekBar
+import com.example.podclassic.widget.TextView
 import java.util.*
 import kotlin.collections.ArrayList
 import kotlin.math.min
@@ -22,6 +25,7 @@ import kotlin.random.Random
 class MusicQuizView(context: Context) : RelativeLayout(context), ScreenView, MediaPlayer.OnPreparedListener, AudioFocusManager.OnAudioFocusChangeListener {
     private val itemList = ItemListView(context, ArrayList(), "", null, MAX_SIZE)
     private val timerView = SeekBar(context)
+    private val textView = TextView(context)
 
     companion object {
         const val MAX_TIME = 10
@@ -56,15 +60,17 @@ class MusicQuizView(context: Context) : RelativeLayout(context), ScreenView, Med
             setMax(MAX_TIME)
             id = R.id.timer_view
         }
-        addView(itemList, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT).apply { addRule(ABOVE, timerView.id) })
         addView(timerView, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
             .apply {
                 setMargins(DEFAULT_PADDING,DEFAULT_PADDING,DEFAULT_PADDING,DEFAULT_PADDING)
                 addRule(ALIGN_PARENT_BOTTOM)
             })
+        addView(itemList, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT).apply { addRule(ABOVE, timerView.id) })
+        addView(textView, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply { addRule(ALIGN_PARENT_BOTTOM);setMargins(0, 0, 0, DEFAULT_PADDING) })
         mediaPlayer.setOnPreparedListener(this)
     }
 
+    @SuppressLint("SetTextI18n")
     fun startGame() {
         if (musics.isEmpty()) {
             return
@@ -93,7 +99,8 @@ class MusicQuizView(context: Context) : RelativeLayout(context), ScreenView, Med
 
         pack = Package(selectedMusic[Random.nextInt(selectedMusic.size)])
         if (TextUtils.isEmpty(timerView.getLeftText())) {
-            timerView.setLeftText("分数 : " + count * 1000 + " (" + count + "/" + total + ")")
+            textView.text = "分数 : ${count * 1000} ($count/$total)"
+            //timerView.setLeftText("分数 : " + count * 1000 + " (" + count + "/" + total + ")")
         }
 
         try {
@@ -113,24 +120,26 @@ class MusicQuizView(context: Context) : RelativeLayout(context), ScreenView, Med
         timer?.schedule(object : TimerTask() {
             override fun run() {
                 timerCount ++
-                ThreadUtil.runOnUiThread(Runnable {
+                ThreadUtil.runOnUiThread {
                     timerView.setCurrent(timerCount)
-                })
+                }
                 if (timerCount == MAX_TIME) {
                     timer?.cancel()
                     total ++
                     mediaPlayer.stop()
-                    ThreadUtil.runOnUiThread(Runnable {
-                        timerView.setLeftText("不正确")
-                    })
+                    ThreadUtil.runOnUiThread {
+                        textView.text = "不正确"
+                        //timerView.setLeftText("不正确")
+                    }
                     Thread.sleep(1000)
-                    ThreadUtil.runOnUiThread(Runnable {
+                    ThreadUtil.runOnUiThread {
                         startGame()
-                    })
+                    }
                 } else if (timerCount == 1) {
-                    ThreadUtil.runOnUiThread(Runnable {
-                        timerView.setLeftText("分数 : " + count * 1000 + " (" + count + "/" + total + ")")
-                    })
+                    ThreadUtil.runOnUiThread {
+                        textView.text = "分数 : ${count * 1000} ($count/$total)"
+                        //timerView.setLeftText("分数 : " + count * 1000 + " (" + count + "/" + total + ")")
+                    }
                 }
             }
 
@@ -143,10 +152,16 @@ class MusicQuizView(context: Context) : RelativeLayout(context), ScreenView, Med
         fun onSelect(music : Music) {
             total ++
             if (music == selectedMusic) {
-                this@MusicQuizView.timerView.setLeftText("正确！")
+                ThreadUtil.runOnUiThread {
+                    textView.text = "正确！"
+                }
+                //this@MusicQuizView.timerView.setLeftText("正确！")
                 count ++
             } else {
-                this@MusicQuizView.timerView.setLeftText("不正确")
+                ThreadUtil.runOnUiThread {
+                    textView.text = "不正确"
+                }
+                //this@MusicQuizView.timerView.setLeftText("不正确")
             }
             timer?.cancel()
             mediaPlayer.stop()
@@ -198,6 +213,10 @@ class MusicQuizView(context: Context) : RelativeLayout(context), ScreenView, Med
 
     override fun onStart() {
         audioFocusManager.requestAudioFocus()
+    }
+
+    override fun onStartFinished() {
+
     }
 
     override fun onStop() {

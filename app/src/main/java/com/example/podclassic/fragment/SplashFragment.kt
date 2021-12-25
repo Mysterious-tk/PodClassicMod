@@ -11,13 +11,12 @@ import com.example.podclassic.util.ThreadUtil
 
 class SplashFragment(private val runnable : Runnable) : Fragment() {
 
-    @SuppressLint("StaticFieldLeak")
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
         ThreadUtil.newThread(runnable, {
-            fragmentManager
-                ?.beginTransaction()
-                ?.remove(this@SplashFragment)
-                ?.commitAllowingStateLoss()
+            parentFragmentManager
+                .beginTransaction()
+                .remove(this@SplashFragment)
+                .commitAllowingStateLoss()
         })
 
         return inflater.inflate(R.layout.fragment_splash, container, false)

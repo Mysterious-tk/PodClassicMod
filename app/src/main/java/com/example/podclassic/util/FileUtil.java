@@ -1,18 +1,27 @@
 package com.example.podclassic.util;
 
+import android.app.Activity;
 import android.content.Context;
+import android.content.Intent;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
 import android.os.storage.StorageManager;
 import android.provider.DocumentsContract;
+import android.provider.MediaStore;
+import android.provider.Settings;
+import android.util.Log;
+
+import androidx.annotation.RequiresApi;
+import androidx.documentfile.provider.DocumentFile;
 
 import com.example.podclassic.base.BaseApplication;
 
 import java.io.File;
 import java.lang.reflect.Array;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 
 public class FileUtil {
     private FileUtil() {}
@@ -29,6 +38,9 @@ public class FileUtil {
             Method getVolumeList = mStorageManager.getClass().getMethod("getVolumeList");
             Method getPath = storageVolumeClazz.getMethod("getPath");
             Object result = getVolumeList.invoke(mStorageManager);
+            if (result == null) {
+                return null;
+            }
             final int length = Array.getLength(result);
             for (int i = 1; i < length; i++) {
                 Object storageVolumeElement = Array.get(result, i);

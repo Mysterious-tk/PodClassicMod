@@ -6,9 +6,12 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.*
+import android.util.Log
 import android.view.Gravity
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.RelativeLayout
+import android.widget.Toast
 import com.example.podclassic.R
 import com.example.podclassic.`object`.Core
 import com.example.podclassic.`object`.MediaPlayer
@@ -53,7 +56,6 @@ class MusicPlayerView(context: Context) : RelativeLayout(context), ScreenView, M
     private var stopTimer : Timer? = null
 
     init {
-
         val padding = DEFAULT_PADDING * 2
 
         setPadding(padding, padding, padding, padding)
@@ -63,7 +65,6 @@ class MusicPlayerView(context: Context) : RelativeLayout(context), ScreenView, M
 
         index.setPadding(0, 0, DEFAULT_PADDING * 3 , DEFAULT_PADDING)
 
-
         addView(index)//, LayoutParams(LayoutParams.MATCH_PARENT,LayoutParams.WRAP_CONTENT))
         screenLayout.apply {
             addView(progressBar)
@@ -72,6 +73,7 @@ class MusicPlayerView(context: Context) : RelativeLayout(context), ScreenView, M
         addView(screenLayout)
 
         image.layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply { addRule(BELOW, index.id) }
+        image.scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
         addView(image)
 
         infoSet.apply {
@@ -120,7 +122,9 @@ class MusicPlayerView(context: Context) : RelativeLayout(context), ScreenView, M
         setVolumeBar()
         setPlayMode()
 
-        updateTextInfo()
+        //updateTextInfo()
+        //onMediaChange()
+        //onMediaChangeFinished()
     }
 
     override fun enter() : Boolean {
@@ -175,6 +179,7 @@ class MusicPlayerView(context: Context) : RelativeLayout(context), ScreenView, M
         if (stopTime != null && stopTimer == null) {
             stopTimer = Timer().apply {
                 schedule(object : TimerTask() {
+                    @SuppressLint("SetTextI18n")
                     override fun run() {
                         val time = MediaPlayer.stopTime - System.currentTimeMillis()
                         if (time > 0) {
@@ -221,12 +226,9 @@ class MusicPlayerView(context: Context) : RelativeLayout(context), ScreenView, M
             context.registerReceiver(volumeBroadcastReceiver, intentFilter)
             broadcastReceiverRegistered = true
         }
-
         setStopTimer()
         onMediaChange()
-        onMediaChangeFinished()
     }
-
 
     override fun onStop() {
         MediaPlayer.apply {
@@ -241,10 +243,18 @@ class MusicPlayerView(context: Context) : RelativeLayout(context), ScreenView, M
         cancelStopTimer()
     }
 
+    private var startFinished = false
+
+    override fun onStartFinished() {
+        startFinished = true
+        onMediaChangeFinished()
+    }
+
     override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
         super.onWindowFocusChanged(hasWindowFocus)
         if (hasWindowFocus) {
             onStart()
+            onStartFinished()
         } else {
             onStop()
         }
@@ -301,7 +311,7 @@ class MusicPlayerView(context: Context) : RelativeLayout(context), ScreenView, M
 
     @SuppressLint( "RtlHardcoded")
     override fun onMediaChangeFinished() {
-        if (!hasWindowFocus()) {
+        if (!hasWindowFocus() || !startFinished) {
             return
         }
 
@@ -316,26 +326,7 @@ class MusicPlayerView(context: Context) : RelativeLayout(context), ScreenView, M
         progressBar.set(progress, MediaPlayer.getDuration())
         lyric?.setBufferedText(MediaPlayer.getLyric(progress))
 
-
-        val bitmap = MediaPlayer.getImage()
-        if (bitmap == null) {
-            name.gravity = Gravity.CENTER
-            singer.gravity = Gravity.CENTER
-            album.gravity = Gravity.CENTER
-            lyric?.gravity = Gravity.CENTER
-            image.setImageBitmap(null)
-        } else {
-            name.gravity = Gravity.LEFT
-            singer.gravity = Gravity.LEFT
-            album.gravity = Gravity.LEFT
-            lyric?.gravity = Gravity.LEFT
-
-            if (imageHeight == 0f) {
-                post { loadImage(bitmap) }
-            } else {
-                loadImage(bitmap)
-            }
-        }
+        loadImage()
     }
 
     @SuppressLint("SetTextI18n")
@@ -376,20 +367,53 @@ class MusicPlayerView(context: Context) : RelativeLayout(context), ScreenView, M
         if (name.gravity == Gravity.CENTER) {
             image.setImageBitmap(null)
         } else {
-            loadImage(Icons.EMPTY)
+            loadDefaultImage()
         }
     }
 
-    private fun loadImage(bitmap: Bitmap) {
-        if (imageHeight == 0f) {
+    private val defaultImage by lazy {
+        val bitmap = Icons.EMPTY
+        val scaleWidth : Float = imageHeight / bitmap.width.toFloat()
+        val scaleHeight : Float= imageHeight / bitmap.height.toFloat()
+        val matrix = Matrix()
+        matrix.postScale(scaleWidth, scaleHeight)
+        Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, false)
+    }
+
+    private fun loadDefaultImage() {
+        if (!hasWindowFocus()) {
             return
         }
-        //val imageHeight = min(measuredHeight / 2f, measuredWidth / 2f - DEFAULT_PADDING * 4)
+        image.setImageBitmap(defaultImage)
+    }
+
+    private fun loadImage() {
+        if (!hasWindowFocus()) {
+            return
+        }
+
+        val bitmap = MediaPlayer.getImage()
+
+        if (bitmap == null) {
+            name.gravity = Gravity.CENTER
+            singer.gravity = Gravity.CENTER
+            album.gravity = Gravity.CENTER
+            lyric?.gravity = Gravity.CENTER
+            image.setImageBitmap(null)
+            return
+        } else {
+            name.gravity = Gravity.LEFT
+            singer.gravity = Gravity.LEFT
+            album.gravity = Gravity.LEFT
+            lyric?.gravity = Gravity.LEFT
+        }
+
         val scaleWidth : Float = imageHeight / bitmap.width.toFloat()
         val scaleHeight : Float= imageHeight / bitmap.height.toFloat()
         val matrix = Matrix()
         matrix.postScale(scaleWidth, scaleHeight)
         val result = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, false)
+
         image.setImageBitmap(result)
     }
 
@@ -407,17 +431,10 @@ class MusicPlayerView(context: Context) : RelativeLayout(context), ScreenView, M
     }
 
     override fun onSeek(progress: Int) {
-
+        onProgress(progress)
     }
 
-    private var imageHeight = 0f
-
-    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        super.onMeasure(widthMeasureSpec, heightMeasureSpec)
-        if (imageHeight == 0f && measuredHeight != 0) {
-            imageHeight = min(measuredHeight / 2f, measuredWidth / 2f - DEFAULT_PADDING * 4)
-        }
-    }
+    private var imageHeight = Values.screenWidth / 2.5f
 
     override fun getLaunchMode(): Int {
         return ScreenView.LAUNCH_MODE_SINGLE

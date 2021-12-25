@@ -9,8 +9,11 @@ import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
 import android.media.ThumbnailUtils
 import android.net.Uri
+import android.os.Environment
 import android.provider.MediaStore
 import android.text.TextUtils
+import android.util.Log
+import android.widget.Toast
 import androidx.core.content.ContextCompat
 import com.example.podclassic.`object`.Music
 import com.example.podclassic.`object`.MusicList
@@ -22,15 +25,14 @@ import kotlin.collections.ArrayList
 import kotlin.collections.HashSet
 
 object MediaStoreUtil {
-    private const val MIN_DURATION = 10 * 1000
-    private const val MIN_SIZE = 512 * 1024
+    private const val MIN_DURATION = 60 * 1000
+    private const val MIN_SIZE = 1024 * 1024
     private const val MAX_DURATION = 60 * 60 * 1000
 
     const val SINGER = MediaStore.Audio.Media.ARTIST
     const val ALBUM = MediaStore.Audio.Media.ALBUM
     const val NAME = MediaStore.Audio.Media.TITLE
     const val PATH = MediaStore.Audio.Media.DATA
-
 
     private val contentResolver = BaseApplication.context.contentResolver
     private val collator = Collator.getInstance(Locale.CHINA)
@@ -39,18 +41,34 @@ object MediaStoreUtil {
     val singers = ArrayList<MusicList>()
     val albums = ArrayList<MusicList>()
 
-    private fun buildMusicFromCursor(cursor: Cursor): Music? {
-        val duration = cursor.getLong(cursor.getColumnIndex(MediaStore.Audio.Media.DURATION))
-        val size = cursor.getLong(cursor.getColumnIndex(MediaStore.Audio.Media.SIZE))
-        val path = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Media.DATA))
 
-        if (path.contains("通话录音") || /*path.substring(0, path.lastIndexOf('/')).lowercase(Locale.ROOT).contains("record") ||*/ duration < MIN_DURATION || size < MIN_SIZE || duration > MAX_DURATION) {
+    private fun buildMusicFromCursor(cursor: Cursor): Music? {
+        val durationIndex = cursor.getColumnIndex(MediaStore.Audio.Media.DURATION)
+        val sizeIndex = cursor.getColumnIndex(MediaStore.Audio.Media.SIZE)
+        val pathIndex = cursor.getColumnIndex(MediaStore.Audio.Media.DATA)
+
+        val albumIndex = cursor.getColumnIndex(MediaStore.Audio.Media.ALBUM)
+        val singerIndex = cursor.getColumnIndex(MediaStore.Audio.Media.ARTIST)
+        val nameIndex = cursor.getColumnIndex(MediaStore.Audio.Media.TITLE)
+        val idIndex = cursor.getColumnIndex(MediaStore.Audio.Media.ALBUM_ID)
+
+        val duration = cursor.getLong(durationIndex)
+        val size = cursor.getLong(sizeIndex)
+        val path = cursor.getString(pathIndex)
+        val lowerPath = path.lowercase()
+
+        // 屏蔽通话录音
+        if (lowerPath.contains("通话录音") || lowerPath.contains("Recorder") || lowerPath.contains("Recordings") || (lowerPath.contains("call") && lowerPath.contains("record"))) {
             return null
         }
-        val album = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Media.ALBUM))
-        val singer = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Media.ARTIST))
-        val name = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Media.TITLE))
-        val id = cursor.getLong(cursor.getColumnIndex(MediaStore.Audio.Media.ALBUM_ID))
+
+        if (/* path.substring(0, path.lastIndexOf('/')).lowercase(Locale.ROOT).contains("record") ||*/ duration < MIN_DURATION || size < MIN_SIZE || duration > MAX_DURATION) {
+            return null
+        }
+        val album = cursor.getString(albumIndex)
+        val singer = cursor.getString(singerIndex)
+        val name = cursor.getString(nameIndex)
+        val id = cursor.getLong(idIndex)
         return Music(name, album, singer, path, id)
     }
 
@@ -126,7 +144,8 @@ object MediaStoreUtil {
         )
         hashSet = HashSet(cursor!!.count)
         while (cursor.moveToNext()) {
-            val name = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Artists.ARTIST))
+            val artistId = cursor.getColumnIndex(MediaStore.Audio.Artists.ARTIST)
+            val name = cursor.getString(artistId)
             if (TextUtils.isEmpty(name)) {
                 continue
             }
@@ -263,7 +282,8 @@ object MediaStoreUtil {
         val cursor = contentResolver.query(uri, null, null, null, null)
         val list = ArrayList<File>(cursor!!.count)
         while (cursor.moveToNext()) {
-            list.add(File(cursor.getString(cursor.getColumnIndex(MediaStore.Images.Media.DATA))))
+            val dataIndex = cursor.getColumnIndex(MediaStore.Images.Media.DATA)
+            list.add(File(cursor.getString(dataIndex)))
         }
         cursor.close()
         photoSize = list.size
@@ -276,7 +296,8 @@ object MediaStoreUtil {
         val cursor = contentResolver.query(uri, null, null, null, null)
         val list = ArrayList<File>(cursor!!.count)
         while (cursor.moveToNext()) {
-            list.add(File(cursor.getString(cursor.getColumnIndex(MediaStore.Video.Media.DATA))))
+            val dataIndex = cursor.getColumnIndex(MediaStore.Images.Media.DATA)
+            list.add(File(cursor.getString(dataIndex)))
         }
         cursor.close()
         videoSize = list.size
@@ -323,8 +344,10 @@ object MediaStoreUtil {
         val uri = ContentUris.withAppendedId(artworkUri, id)
         try {
             contentResolver.openInputStream(uri).use { inputStream ->
+                val bitmap = BitmapFactory.decodeStream(inputStream)
+                inputStream?.close()
                 return ThumbnailUtils.extractThumbnail(
-                    BitmapFactory.decodeStream(inputStream),
+                    bitmap,
                     Values.IMAGE_WIDTH,
                     Values.IMAGE_WIDTH,
                     ThumbnailUtils.OPTIONS_RECYCLE_INPUT

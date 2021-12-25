@@ -27,7 +27,7 @@ import com.example.podclassic.storage.SaveMusics
 import com.example.podclassic.util.AudioFocusManager
 import com.example.podclassic.util.Colors
 import com.example.podclassic.util.Icons
-import com.example.podclassic.widget.AppWidget
+import com.example.podclassic.util.VolumeUtil
 
 
 class MediaPlayerService : Service(), MediaPlayer.OnMediaChangeListener, AudioFocusManager.OnAudioFocusChangeListener {
@@ -41,8 +41,18 @@ class MediaPlayerService : Service(), MediaPlayer.OnMediaChangeListener, AudioFo
 
     private lateinit var mediaSession: MediaSession
 
-    private val playbackStateActions =
-        PlaybackState.ACTION_FAST_FORWARD or PlaybackState.ACTION_REWIND or PlaybackState.ACTION_PLAY_PAUSE or PlaybackState.ACTION_SKIP_TO_NEXT or PlaybackState.ACTION_SKIP_TO_PREVIOUS or PlaybackState.ACTION_STOP or PlaybackState.ACTION_SEEK_TO
+    private val playbackStateBuilder = PlaybackState.Builder().apply {
+        setActions(PlaybackState.ACTION_FAST_FORWARD
+                or PlaybackState.ACTION_REWIND
+                or PlaybackState.ACTION_PLAY_PAUSE
+                or PlaybackState.ACTION_SKIP_TO_NEXT
+                or PlaybackState.ACTION_SKIP_TO_PREVIOUS
+                or PlaybackState.ACTION_STOP
+                or PlaybackState.ACTION_SEEK_TO
+                or PlaybackState.ACTION_PAUSE
+                or PlaybackState.ACTION_PLAY
+        )
+    }
 
     private val mediaSessionCallBack = object : MediaSession.Callback() {
         override fun onMediaButtonEvent(mediaButtonIntent: Intent): Boolean {
@@ -65,7 +75,7 @@ class MediaPlayerService : Service(), MediaPlayer.OnMediaChangeListener, AudioFo
         mediaPlayer.removeOnMediaChangeListener(this)
         audioFocusManager.onAudioFocusChangeListener = null
         stopForeground(true)
-        AppWidget.updateRemoteViews(null)
+        //AppWidget.updateRemoteViews(null)
 
         mediaSession.apply {
             setCallback(null)
@@ -83,13 +93,13 @@ class MediaPlayerService : Service(), MediaPlayer.OnMediaChangeListener, AudioFo
         packageManager.setComponentEnabledSetting(componentName, PackageManager.COMPONENT_ENABLED_STATE_ENABLED, PackageManager.DONT_KILL_APP)
         val mediaButtonIntent = Intent(Intent.ACTION_MEDIA_BUTTON)
         mediaButtonIntent.component = componentName
-        val pendingIntent = PendingIntent.getBroadcast(this, 0, mediaButtonIntent, PendingIntent.FLAG_CANCEL_CURRENT)
+        //val pendingIntent = PendingIntent.getBroadcast(this, 0, mediaButtonIntent, PendingIntent.FLAG_CANCEL_CURRENT)
 
         mediaSession = MediaSession(applicationContext, packageName).apply {
             isActive = true
             setCallback(mediaSessionCallBack)
-            setFlags(MediaSession.FLAG_HANDLES_TRANSPORT_CONTROLS or MediaSession.FLAG_HANDLES_MEDIA_BUTTONS)
-            setMediaButtonReceiver(pendingIntent)
+            //setFlags(MediaSession.FLAG_HANDLES_TRANSPORT_CONTROLS or MediaSession.FLAG_HANDLES_MEDIA_BUTTONS)
+            //setMediaButtonReceiver(pendingIntent)
             setSessionActivity(pendingIntentActivity)
         }
 
@@ -119,6 +129,8 @@ class MediaPlayerService : Service(), MediaPlayer.OnMediaChangeListener, AudioFo
         const val ACTION_PREV = "action_prev"
         const val ACTION_SHUFFLE = "action_shuffle"
         const val ACTION_FAVORITE = "action_favorite"
+        const val ACTION_VOLUME_UP = "action_volume_up"
+        const val ACTION_VOLUME_DOWN = "action_volume_donw"
     }
 
     private val contentIntent by lazy {
@@ -180,6 +192,8 @@ class MediaPlayerService : Service(), MediaPlayer.OnMediaChangeListener, AudioFo
                     }
                     sendNotification()
                 }
+                ACTION_VOLUME_UP -> VolumeUtil.volumeUp()
+                ACTION_VOLUME_DOWN -> VolumeUtil.volumeDown()
                 else -> sendNotification()
             }
         }
@@ -193,32 +207,30 @@ class MediaPlayerService : Service(), MediaPlayer.OnMediaChangeListener, AudioFo
         }
     }
 
-    @Suppress("DEPRECATION")
     private fun sendNotification() {
         val music = MediaPlayer.getCurrent()
-        AppWidget.updateRemoteViews(music)
+        //AppWidget.updateRemoteViews(music)
         if (music == null) {
             stopForeground(true)
             return
         }
         val image = MediaPlayer.getImage() ?: Icons.EMPTY
 
-        val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) Notification.Builder(this, packageName) else Notification.Builder(this)
-
         val actionPause = Notification.Action.Builder(if (mediaPlayer.isPlaying) R.drawable.ic_pause_grey_800_36dp else R.drawable.ic_play_arrow_grey_800_36dp, "pause", pendingIntentPause).build()
 
         val actionFavorite = Notification.Action.Builder(if (SaveMusics.loveList.contains(music)) R.drawable.ic_favorite_grey_800_24dp else R.drawable.ic_favorite_border_grey_800_24dp, "favorite", pendingIntentFavorite).build()
 
-        builder.apply {
-            setVisibility(Notification.VISIBILITY_PUBLIC)
+        val builder = (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) Notification.Builder(this, packageName) else Notification.Builder(this)).apply {
             setPriority(Notification.PRIORITY_MAX)
+            setVisibility(Notification.VISIBILITY_PUBLIC)
             setSmallIcon(R.drawable.ic_play_arrow_grey_800_36dp)
             setShowWhen(false)
             setOnlyAlertOnce(true)
             setDeleteIntent(actionStop.actionIntent)
             setContentIntent(contentIntent)
+            setColor(Colors.color_primary)
+            style = mediaStyle
             setLargeIcon(image)
-            setOngoing(mediaPlayer.isPlaying)
             addAction(actionPrev)
             addAction(actionPause)
             addAction(actionNext)
@@ -226,17 +238,18 @@ class MediaPlayerService : Service(), MediaPlayer.OnMediaChangeListener, AudioFo
             addAction(actionStop)
             setContentTitle(music.name)
             setContentText(music.singer)
-            setColor(Colors.color_primary)
-            style = mediaStyle
+            setOngoing(mediaPlayer.isPlaying)
+
         }
 
         val notification = builder.build()
         notification.flags = Notification.FLAG_ONGOING_EVENT
+
+        updateMediaMetadata(music, image)
+
         startForeground(1, notification)
 
         updatePlaybackState()
-        updateMediaMetadata(music, image)
-
     }
 
     private val mediaBroadcastReceiver = MediaBroadcastReceiver()
@@ -276,10 +289,7 @@ class MediaPlayerService : Service(), MediaPlayer.OnMediaChangeListener, AudioFo
     private fun updatePlaybackState() {
         val state = if (mediaPlayer.isPlaying) PlaybackState.STATE_PLAYING else PlaybackState.STATE_PAUSED
         mediaSession.setPlaybackState(
-            PlaybackState.Builder().apply {
-                setActions(playbackStateActions)
-                setState(state, mediaPlayer.getProgress().toLong(), 1f)
-            }.build()
+            playbackStateBuilder.setState(state, mediaPlayer.getProgress().toLong(), 1f).build()
         )
     }
 

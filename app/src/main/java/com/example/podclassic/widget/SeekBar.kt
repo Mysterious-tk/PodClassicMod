@@ -7,9 +7,12 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Shader
 import android.graphics.drawable.Drawable
+import android.text.TextUtils
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.widget.FrameLayout
+import android.widget.LinearLayout
 import com.example.podclassic.util.Colors
 import com.example.podclassic.util.Values
 import kotlin.math.sqrt
@@ -54,21 +57,33 @@ class SeekBar(context: Context) : ViewGroup(context) {
         }
     }
 
+    private val frameLayout = FrameLayout(context)
+
     private val leftView = TextView(context)
     private val rightView = TextView(context)
 
     init {
         addView(background)
         addView(bar)
+        leftView.setPadding(0, Values.DEFAULT_PADDING, Values.DEFAULT_PADDING, 0)
+        rightView.setPadding(Values.DEFAULT_PADDING, Values.DEFAULT_PADDING, 0, 0)
+        //rightView.gravity = Gravity.END
+        //rightView.ellipsize = TextUtils.TruncateAt.MARQUEE
 
-        //val layoutParamsLeft = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT)
-        leftView.setPadding(0, BAR_HEIGHT / 2,0,0)
-        addView(leftView)
+        frameLayout.apply {
+            addView(leftView, FrameLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT))
+            //leftView.setPadding(0, BAR_HEIGHT / 2,0,0)
+            //addView(leftView)
 
-        //val layoutParamsRight = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT)
-        rightView.gravity = Gravity.END
-        rightView.setPadding(0, BAR_HEIGHT / 2,0,0)
-        addView(rightView)
+            //val layoutParamsRight = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT)
+            //rightView.gravity = Gravity.END
+            //rightView.setPadding(0, BAR_HEIGHT / 2,0,0)
+            addView(rightView, FrameLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply {
+                gravity = Gravity.END
+            })
+        }
+
+        addView(frameLayout)
     }
 
     private var max = 1
@@ -93,7 +108,9 @@ class SeekBar(context: Context) : ViewGroup(context) {
     }
 
     fun setLeftText(text : String) {
-        leftView.text = text
+        if (textVisibility == VISIBLE) {
+            leftView.text = text
+        }
     }
 
     fun getLeftText() : String {
@@ -166,23 +183,26 @@ class SeekBar(context: Context) : ViewGroup(context) {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec)
         val width = MeasureSpec.getSize(widthMeasureSpec)
         setMeasuredDimension(width, BAR_HEIGHT * 3)
-        //background.measure(width, BAR_HEIGHT)
-        //bar.measure(width, BAR_HEIGHT)
-
-        leftView.measure((width / 2), (BAR_HEIGHT * 2))
-        rightView.measure((width / 2), (BAR_HEIGHT * 2))
+        background.measure(width, BAR_HEIGHT)
+        bar.measure(width, BAR_HEIGHT)
+        frameLayout.measure(width, BAR_HEIGHT * 2)
+        //leftView.measure((width / 2), (BAR_HEIGHT * 2))
+        //rightView.measure((width / 2), (BAR_HEIGHT * 2))
 
     }
 
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
-        if (!changed) {
-            return
-        }
-        background.layout(0, 0, width, BAR_HEIGHT)
-        leftView.layout(0, BAR_HEIGHT, width / 2, height)
-        rightView.layout(width / 2, BAR_HEIGHT, width, height)
-        bar.layout(0, 0, width * current / max, BAR_HEIGHT)
+        //if (!changed) {
+        //    return
+        //}
+        background.layout(0, 0, right, BAR_HEIGHT)
+        frameLayout.layout(0, BAR_HEIGHT, right, bottom)
+        //leftView.layout(0, BAR_HEIGHT, right / 2, bottom)
+        //rightView.layout(right / 2, BAR_HEIGHT, right, bottom)
+        bar.layout(0, 0, right * current / max, BAR_HEIGHT)
     }
+
+
 
     private fun toMinute(temp : Int): String {
         val stringBuilder = StringBuilder()

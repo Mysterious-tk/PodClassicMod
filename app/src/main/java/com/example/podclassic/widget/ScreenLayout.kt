@@ -16,7 +16,8 @@ open class ScreenLayout : ViewGroup {
     var onViewChangeListener : OnViewChangeListener? = null
 
     interface OnViewChangeListener {
-        fun onViewRemoved(view : View)
+        fun onViewRemove(view : View)
+        fun onViewAdd(view : View)
         fun onViewAdded(view : View)
     }
 
@@ -72,8 +73,10 @@ open class ScreenLayout : ViewGroup {
         if (indexOfChild(child) != -1) {
             return currView()
         }
-        onViewChangeListener?.onViewAdded(child)
         super.addView(child)
+        // requestLayout()
+        // invalidate(true)
+        onViewChangeListener?.onViewAdd(child)
 
 
         currAnimator = ValueAnimator.ofInt(0, width).apply {
@@ -87,15 +90,17 @@ open class ScreenLayout : ViewGroup {
                 override fun onAnimationStart(animation: Animator?) {}
                 override fun onAnimationEnd(animation: Animator?) {
                     if (childCount > 1) {
-                        onViewChangeListener?.onViewRemoved(currChild)
+                        onViewChangeListener?.onViewRemove(currChild)
                         super@ScreenLayout.removeView(currChild)
                     }
+                    onViewChangeListener?.onViewAdded(child)
                 }
                 override fun onAnimationCancel(animation: Animator?) {
                     child.layout(0, 0, width, height)
                 }
                 override fun onAnimationRepeat(animation: Animator?) {}
             })
+            setTarget(child)
             start()
         }
         return child
@@ -112,9 +117,8 @@ open class ScreenLayout : ViewGroup {
         if (indexOfChild(view) != -1) {
             return
         }
-
-        onViewChangeListener?.onViewAdded(view)
         super.addView(view)//, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
+        onViewChangeListener?.onViewAdd(view)
 
 
         if (childCount == 1) {
@@ -137,7 +141,8 @@ open class ScreenLayout : ViewGroup {
                 override fun onAnimationEnd(animation: Animator?) {
                     super@ScreenLayout.removeView(currChild)
                     viewStack.push(currChild)
-                    onViewChangeListener?.onViewRemoved(currChild)
+                    onViewChangeListener?.onViewRemove(currChild)
+                    onViewChangeListener?.onViewAdded(view)
                 }
                 override fun onAnimationCancel(animation: Animator?) {
                     view.layout(0, 0, width, height)
@@ -154,11 +159,11 @@ open class ScreenLayout : ViewGroup {
         }
         if (onViewChangeListener != null) {
             for (view in viewStack) {
-                onViewChangeListener?.onViewRemoved(view as View)
+                onViewChangeListener?.onViewRemove(view as View)
             }
         }
         viewStack.clear()
-        onViewChangeListener?.onViewRemoved(getChildAt(0))
+        onViewChangeListener?.onViewRemove(getChildAt(0))
         super.removeAllViews()
     }
 }

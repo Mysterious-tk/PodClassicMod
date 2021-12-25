@@ -5,23 +5,18 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
-import android.content.pm.ResolveInfo;
 import android.content.res.Configuration;
 import android.os.Build;
 import android.preference.PreferenceManager;
-import android.util.Log;
 
 import com.example.podclassic.base.BaseApplication;
 
 import java.text.Collator;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
-import java.util.function.Predicate;
 
 public class SPManager {
 
@@ -179,6 +174,7 @@ public class SPManager {
 
         private String name;
 
+        /*
         @Override
         public String toString() {
             return "App{" +
@@ -186,6 +182,8 @@ public class SPManager {
                     ", packageName='" + packageName + '\'' +
                     '}';
         }
+
+         */
 
         private String packageName;
         private Intent intent = null;
@@ -235,12 +233,7 @@ public class SPManager {
                 }
             }
             final Collator collator = Collator.getInstance(Locale.CHINA);
-            Collections.sort(apps, new Comparator<App>() {
-                @Override
-                public int compare(App o1, App o2) {
-                    return collator.compare(o1.name, o2.name);
-                }
-            });
+            Collections.sort(apps, (o1, o2) -> collator.compare(o1.name, o2.name));
             return apps;
         }
 
@@ -355,7 +348,7 @@ public class SPManager {
         SaveMusicLists.Companion.getSaveAlbums().clear();
         SaveMusicLists.Companion.getSaveFolders().clear();
         SaveMusicLists.Companion.getSaveSingers().clear();
-        SaveMusics.Companion.getLoveList().clear();
+        //SaveMusics.Companion.getLoveList().clear();
 
         setString(SP_SAVE_SINGERS, "");
         setString(SP_SAVE_ALBUMS, "");
@@ -363,5 +356,7 @@ public class SPManager {
         int reset_count = getInt(SP_RESET_COUNT);
         reset_count++;
         setInt(SP_RESET_COUNT, reset_count);
+
+        getSharedPreferences().edit().commit();
     }
 }

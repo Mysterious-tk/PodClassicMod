@@ -8,7 +8,7 @@ import com.example.podclassic.util.Values
 import com.example.podclassic.widget.ListView
 
 class AppsView(context: Context) : ItemListView(context,
-    //这是构造方法的一个参数...
+    //这是构造方法的一个参数...轻喷
     arrayListOf(
         Item("游戏", object : OnItemClickListener {
             val itemList = arrayListOf(

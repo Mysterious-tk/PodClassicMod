@@ -27,8 +27,8 @@ object Colors {
 
     val controller : Int get () { return if (SPManager.getBoolean(SPManager.SP_THEME)) red else gray }
 
-    private val red by lazy { ContextCompat.getColor(BaseApplication.context, R.color.red) }
-    private val gray by lazy { ContextCompat.getColor(BaseApplication.context, R.color.gray) }
+    val red by lazy { ContextCompat.getColor(BaseApplication.context, R.color.red) }
+    val gray by lazy { ContextCompat.getColor(BaseApplication.context, R.color.gray) }
     val white by lazy { ContextCompat.getColor(BaseApplication.context, R.color.white) }
 
     fun getShader(x0 : Float, y0 : Float, x1 : Float, y1 : Float, c1 : Int, c2 : Int, tileMode: Shader.TileMode = Shader.TileMode.CLAMP) : Shader {
