@@ -156,19 +156,19 @@ class MediaPlayerService : Service(), MediaPlayer.OnMediaChangeListener, AudioFo
     private val actionPrev by lazy {
         val intent = Intent(applicationContext, MediaPlayerService::class.java).apply { action = ACTION_PREV }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) Notification.Action.Builder(Icon.createWithResource(this, R.drawable.ic_skip_previous_grey_800_36dp), "prev", PendingIntent.getForegroundService(applicationContext, 1, intent, PendingIntent.FLAG_UPDATE_CURRENT)).build()
-        else Notification.Action.Builder(R.drawable.ic_skip_previous_grey_800_36dp, "prev", PendingIntent.getService(this, 1, intent, PendingIntent.FLAG_UPDATE_CURRENT)).build()
+        else Notification.Action.Builder(R.drawable.ic_skip_previous_grey_800_36dp, "prev", PendingIntent.getService(this, 1, intent, PendingIntent.FLAG_UPDATE_CURRENT  or PendingIntent.FLAG_IMMUTABLE)).build()
     }
 
     private val actionNext by lazy {
         val intent = Intent(applicationContext, MediaPlayerService::class.java).apply { action = ACTION_NEXT }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) Notification.Action.Builder(Icon.createWithResource(this, R.drawable.ic_skip_next_grey_800_36dp), "next", PendingIntent.getForegroundService(applicationContext, 3, intent, PendingIntent.FLAG_UPDATE_CURRENT)).build()
-        else Notification.Action.Builder(R.drawable.ic_skip_next_grey_800_36dp, "next", PendingIntent.getService(this, 3, intent, PendingIntent.FLAG_UPDATE_CURRENT)).build()
+        else Notification.Action.Builder(R.drawable.ic_skip_next_grey_800_36dp, "next", PendingIntent.getService(this, 3, intent, PendingIntent.FLAG_UPDATE_CURRENT  or PendingIntent.FLAG_IMMUTABLE)).build()
     }
 
     private val actionStop by lazy {
         val intent = Intent(applicationContext, MediaPlayerService::class.java).apply { action = ACTION_STOP }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) Notification.Action.Builder(Icon.createWithResource(this, R.drawable.ic_close_grey_800_24dp), "stop", PendingIntent.getForegroundService(applicationContext, 5, intent, PendingIntent.FLAG_UPDATE_CURRENT)).build()
-        else Notification.Action.Builder(R.drawable.ic_close_grey_800_24dp, "stop", PendingIntent.getService(this, 5, intent, PendingIntent.FLAG_UPDATE_CURRENT)).build()
+        else Notification.Action.Builder(R.drawable.ic_close_grey_800_24dp, "stop", PendingIntent.getService(this, 5, intent, PendingIntent.FLAG_UPDATE_CURRENT  or PendingIntent.FLAG_IMMUTABLE)).build()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {

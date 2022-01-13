@@ -434,7 +434,7 @@ class MusicPlayerView(context: Context) : RelativeLayout(context), ScreenView, M
         onProgress(progress)
     }
 
-    private var imageHeight = Values.screenWidth / 2.5f
+    private var imageHeight = Values.screenWidth / 2.7f
 
     override fun getLaunchMode(): Int {
         return ScreenView.LAUNCH_MODE_SINGLE

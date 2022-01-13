@@ -11,6 +11,7 @@ import android.media.audiofx.Equalizer
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import com.example.podclassic.base.BaseApplication
 import com.example.podclassic.service.MediaPlayerService
 import com.example.podclassic.storage.SPManager
@@ -540,9 +541,11 @@ object MediaPlayer : MediaPlayer.OnCompletionListener, MediaPlayer.OnErrorListen
         val music = playList[currentIndex]
 
         ThreadManager.addTask(music)
-
         mediaPlayer.setDataSource(music.path)
-        mediaPlayer.prepareAsync()
+
+        ThreadUtil.newThread {
+            mediaPlayer.prepareAsync()
+        }
 
         BaseApplication.context.apply {
             startService(Intent(this, MediaPlayerService::class.java))

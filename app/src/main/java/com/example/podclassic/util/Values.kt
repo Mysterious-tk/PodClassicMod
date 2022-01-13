@@ -32,8 +32,6 @@ object Values {
     var screenWidth = 0
     var screenHeight = 0
 
-
-
     fun getVersionName(): String {
         val context = BaseApplication.context
         return context.packageManager.getPackageInfo(context.packageName, 0).versionName

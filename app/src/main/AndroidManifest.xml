@@ -49,7 +49,7 @@
             android:icon="@mipmap/ic_launcher"
             android:roundIcon="@mipmap/ic_launcher"
             android:launchMode="singleTask"
-            android:screenOrientation="fullSensor"
+            android:screenOrientation="unspecified"
             android:resizeableActivity="true"
             android:excludeFromRecents="true"
             tools:targetApi="n"

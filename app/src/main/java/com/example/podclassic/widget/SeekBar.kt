@@ -65,8 +65,10 @@ class SeekBar(context: Context) : ViewGroup(context) {
     init {
         addView(background)
         addView(bar)
-        leftView.setPadding(0, Values.DEFAULT_PADDING, Values.DEFAULT_PADDING, 0)
-        rightView.setPadding(Values.DEFAULT_PADDING, Values.DEFAULT_PADDING, 0, 0)
+        leftView.setPadding(0, Values.DEFAULT_PADDING, Values.DEFAULT_PADDING * 2, 0)
+        leftView.ellipsize = TextUtils.TruncateAt.END
+        rightView.setPadding(Values.DEFAULT_PADDING * 2, Values.DEFAULT_PADDING, 0, 0)
+        leftView.ellipsize = TextUtils.TruncateAt.START
         //rightView.gravity = Gravity.END
         //rightView.ellipsize = TextUtils.TruncateAt.MARQUEE
 
