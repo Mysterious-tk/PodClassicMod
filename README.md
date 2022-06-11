@@ -43,7 +43,7 @@
     另有可作为桌面的launcher版本
 </p>
 <p>
-    <a href="https://github.com/0x1317bf7/PodClassic/releases/download/1.5/1.5_launcher.apk">launcher.apk</a>
+    <a href=https://github.com/0x1317bf7/PodClassic/releases/download/1.5/PodClassic_1.5_launcher.apk>launcher.apk</a>
 </p>
 <p>
     <br/>
