@@ -1,7 +1,6 @@
 package com.example.podclassic.util
 
 import android.content.Context
-import android.media.AudioAttributes
 import android.media.AudioManager
 import android.media.SoundPool
 import android.view.HapticFeedbackConstants
@@ -9,7 +8,6 @@ import android.view.View
 import com.example.podclassic.R
 import com.example.podclassic.base.BaseApplication
 import com.example.podclassic.storage.SPManager
-import kotlin.math.max
 
 object VolumeUtil {
     private val audioManager by lazy {
@@ -56,14 +54,19 @@ object VolumeUtil {
         setCurrentVolume(getCurrentVolume() - 1)
     }
 
-    fun vibrate(view : View) {
-        val sound = SPManager.getInt(SPManager.Sound.SP_NAME)
-        if ((sound and SPManager.Sound.SOUND_ID) != 0) {
+    fun vibrate(view: View) {
+        val sound = SPManager.getInt(
+            SPManager.Sound.SP_NAME
+        )
+        if ((sound and SPManager.Sound.SOUND.id) != 0) {
             soundPool.play(streamId, 1f, 1f, 0, 0, 1f)
         }
-        if (sound and SPManager.Sound.VIBRATE_ID != 0) {
+        if (sound and SPManager.Sound.VIBRATE.id != 0) {
             ThreadUtil.newThread {
-                view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS, HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING)
+                view.performHapticFeedback(
+                    HapticFeedbackConstants.LONG_PRESS,
+                    HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING
+                )
             }
         }
     }

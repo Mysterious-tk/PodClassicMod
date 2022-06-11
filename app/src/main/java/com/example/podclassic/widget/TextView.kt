@@ -4,12 +4,15 @@ import android.content.Context
 import android.graphics.Typeface
 import android.graphics.drawable.Drawable
 import android.text.TextUtils
+import android.util.AttributeSet
 import android.view.Gravity
-import com.example.podclassic.util.Colors
-import com.example.podclassic.util.Values.DEFAULT_PADDING
+import com.example.podclassic.values.Colors
+import com.example.podclassic.values.Values.DEFAULT_PADDING
 
 
-class TextView(context: Context) : androidx.appcompat.widget.AppCompatTextView(context) {
+class TextView : androidx.appcompat.widget.AppCompatTextView {
+    constructor(context: Context) : super(context)
+    constructor(context: Context, attr: AttributeSet?) : super(context, attr)
 
     companion object {
         const val MAX_LINES = 1
@@ -17,19 +20,19 @@ class TextView(context: Context) : androidx.appcompat.widget.AppCompatTextView(c
     }
 
     init {
-        marqueeRepeatLimit = -1
-        isSingleLine = true
-        maxLines = MAX_LINES
-        ellipsize = TextUtils.TruncateAt.END
         typeface = Typeface.defaultFromStyle(Typeface.BOLD)
         textSize = TEXT_SIZE
-
         setTextColor(Colors.text)
+        maxLines = MAX_LINES
+        marqueeRepeatLimit = -1
+
+        ellipsize = TextUtils.TruncateAt.END
+
         setPadding(DEFAULT_PADDING, DEFAULT_PADDING / 4, DEFAULT_PADDING, DEFAULT_PADDING / 4)
         gravity = Gravity.CENTER_VERTICAL
     }
 
-    fun setLeftIcon(drawable : Drawable?) {
+    fun setLeftIcon(drawable: Drawable?) {
         setCompoundDrawablesWithIntrinsicBounds(drawable, null, null, null)
     }
 
@@ -37,7 +40,7 @@ class TextView(context: Context) : androidx.appcompat.widget.AppCompatTextView(c
         setCompoundDrawables(null, null, drawable, null)
     }
 
-    fun setPaddingRight(padding : Int) {
+    fun setPaddingRight(padding: Int) {
         setPadding(DEFAULT_PADDING, DEFAULT_PADDING / 4, padding, DEFAULT_PADDING / 4)
     }
 
@@ -47,8 +50,8 @@ class TextView(context: Context) : androidx.appcompat.widget.AppCompatTextView(c
         setPadding(DEFAULT_PADDING, DEFAULT_PADDING / 4, DEFAULT_PADDING, DEFAULT_PADDING / 4)
     }
 
-    private var buffer : String? = null
-    fun setBufferedText(text : String?) {
+    private var buffer: String? = null
+    fun setBufferedText(text: String?) {
         if (text == buffer) {
             return
         }
@@ -57,17 +60,17 @@ class TextView(context: Context) : androidx.appcompat.widget.AppCompatTextView(c
     }
 
     var scrollable = false
-    set(value) {
-        if (value == field) {
-            return
+        set(value) {
+            if (value == field) {
+                return
+            }
+            ellipsize = if (value) {
+                TextUtils.TruncateAt.MARQUEE
+            } else {
+                TextUtils.TruncateAt.END
+            }
+            field = value
         }
-        ellipsize = if (value) {
-            TextUtils.TruncateAt.MARQUEE
-        } else {
-            TextUtils.TruncateAt.END
-        }
-        field = value
-    }
 
     override fun isFocused(): Boolean {
         return scrollable

@@ -4,48 +4,39 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.view.KeyEvent
-import com.example.podclassic.`object`.Core
-import com.example.podclassic.`object`.MediaPlayer
-import com.example.podclassic.base.BaseApplication
-import com.example.podclassic.view.MusicPlayerView
 
 class MediaBroadcastReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context?, intent: Intent?) {
-        if (intent == null) {
-            return
-        }
+        intent ?: return
+        context ?: return
+
         if (Intent.ACTION_MEDIA_BUTTON == intent.action) {
             val keyEvent = intent.getParcelableExtra<KeyEvent>(Intent.EXTRA_KEY_EVENT) ?: return
             if (keyEvent.action != KeyEvent.ACTION_UP) {
                 return
             }
-
             when (keyEvent.keyCode) {
-                KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.KEYCODE_HEADSETHOOK -> MediaPlayer.pause()
+                KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.KEYCODE_HEADSETHOOK -> {
+                    MediaPresenter.playPause()
+                }
                 KeyEvent.KEYCODE_MEDIA_NEXT -> {
-                    if (MediaPlayer.getPlayListSize() == 0) {
-                        MediaPlayer.shufflePlay()
-                        Core.addView(MusicPlayerView(BaseApplication.context))
-                    } else {
-                        MediaPlayer.next()
-                    }
+                    MediaPresenter.next()
                 }
                 KeyEvent.KEYCODE_MEDIA_PREVIOUS -> {
-                    if (MediaPlayer.getPlayListSize() == 0) {
-                        MediaPlayer.shufflePlay()
-                        Core.addView(MusicPlayerView(BaseApplication.context))
-                    } else {
-                        MediaPlayer.prev()
-                    }
+                    MediaPresenter.prev()
                 }
-                KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> MediaPlayer.forward()
-                KeyEvent.KEYCODE_MEDIA_REWIND -> MediaPlayer.backward()
-                KeyEvent.KEYCODE_MEDIA_CLOSE -> Core.exit()
+                KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
+                    MediaPresenter.forward()
+                }
+                KeyEvent.KEYCODE_MEDIA_REWIND -> {
+                    MediaPresenter.backward()
+                }
+                KeyEvent.KEYCODE_MEDIA_CLOSE -> {
+                    MediaPresenter.stop()
+                }
             }
         } else {
-            if (MediaPlayer.isPlaying) {
-                MediaPlayer.pause()
-            }
+            MediaPresenter.pause()
         }
     }
 }

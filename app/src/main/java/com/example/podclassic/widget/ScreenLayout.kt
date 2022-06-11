@@ -1,6 +1,7 @@
 package com.example.podclassic.widget
 
-import android.animation.*
+import android.animation.Animator
+import android.animation.ValueAnimator
 import android.content.Context
 import android.util.AttributeSet
 import android.view.View
@@ -9,19 +10,52 @@ import java.util.*
 
 open class ScreenLayout : ViewGroup {
     constructor(context: Context?) : super(context)
-    constructor(context: Context?, attrs: AttributeSet?, defStyleAttr: Int) : super(context, attrs, defStyleAttr)
+    constructor(context: Context?, attrs: AttributeSet?, defStyleAttr: Int) : super(
+        context,
+        attrs,
+        defStyleAttr
+    )
+
     constructor(context: Context?, attrs: AttributeSet?) : super(context, attrs)
 
 
-    var onViewChangeListener : OnViewChangeListener? = null
+    var onViewChangeListener: OnViewChangeListener? = null
 
     interface OnViewChangeListener {
-        fun onViewRemove(view : View)
-        fun onViewAdd(view : View)
-        fun onViewAdded(view : View)
+        fun onViewDelete(view: View)
+        fun onViewCreate(view: View)
+        fun onViewAdd(view: View)
+        fun onViewRemove(view: View)
     }
 
-    private var currAnimator : Animator? = null
+    override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
+        super.onWindowFocusChanged(hasWindowFocus)
+        val curr = curr() ?: return
+        if (hasWindowFocus) {
+            onViewAdd(curr)
+        } else {
+            onViewRemove(curr)
+        }
+    }
+
+    private fun onViewCreate(view: View) {
+        onViewChangeListener?.onViewCreate(view)
+
+    }
+
+    private fun onViewRemove(view: View) {
+        onViewChangeListener?.onViewRemove(view)
+    }
+
+    private fun onViewDelete(view: View) {
+        onViewChangeListener?.onViewDelete(view)
+    }
+
+    private fun onViewAdd(view: View) {
+        onViewChangeListener?.onViewAdd(view)
+    }
+
+    private var currAnimator: Animator? = null
 
     override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
         if (currAnimator?.isRunning == true) {
@@ -33,11 +67,26 @@ open class ScreenLayout : ViewGroup {
         getChildAt(childCount - 1).layout(0, 0, width, height)
     }
 
-    fun stackSize() : Int {
+    fun stackSize(): Int {
         return viewStack.size
     }
 
+    fun removeInstanceOf(clazz : Class<Any>) {
+        for (view in viewStack) {
+            if (view.javaClass == clazz) {
+                onViewDelete(view)
+                viewStack.remove(view)
+            }
+        }
+        val current = curr()
+        if (current?.javaClass == clazz) {
+            removeView(current)
+        }
+    }
+
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+        /*
         var maxHeight = 0
         for (i in 0 until childCount) {
             val child = getChildAt(i)
@@ -46,38 +95,44 @@ open class ScreenLayout : ViewGroup {
             maxHeight = maxHeight.coerceAtLeast(height)
         }
         setMeasuredDimension(widthMeasureSpec, maxHeight)
+
+         */
+        for (i in 0 until childCount) {
+            val child = getChildAt(i)
+            child.measure(widthMeasureSpec, heightMeasureSpec)
+
+        }
     }
 
 
     private val viewStack = Stack<View>()
 
-    open fun currView() : View? {
+    open fun curr(): View? {
         if (childCount == 0) {
             return null
         }
         return getChildAt(childCount - 1)
     }
 
-    open fun removeView() : View? {
+    open fun remove(): View? {
         if (currAnimator != null && currAnimator?.isRunning == true) {
             currAnimator?.cancel()
         }
 
         if (childCount <= 0 || viewStack.isEmpty()) {
-            return currView()
+            return curr()
         }
 
         val currChild = getChildAt(childCount - 1)
         val child = viewStack.pop()
 
         if (indexOfChild(child) != -1) {
-            return currView()
+            return curr()
         }
         super.addView(child)
         // requestLayout()
         // invalidate(true)
-        onViewChangeListener?.onViewAdd(child)
-
+        onViewAdd(child)
 
         currAnimator = ValueAnimator.ofInt(0, width).apply {
             addUpdateListener {
@@ -90,14 +145,17 @@ open class ScreenLayout : ViewGroup {
                 override fun onAnimationStart(animation: Animator?) {}
                 override fun onAnimationEnd(animation: Animator?) {
                     if (childCount > 1) {
-                        onViewChangeListener?.onViewRemove(currChild)
+                        onViewRemove(currChild)
+                        onViewDelete(currChild)
                         super@ScreenLayout.removeView(currChild)
                     }
-                    onViewChangeListener?.onViewAdded(child)
+                    //onViewAdd(child)
                 }
+
                 override fun onAnimationCancel(animation: Animator?) {
                     child.layout(0, 0, width, height)
                 }
+
                 override fun onAnimationRepeat(animation: Animator?) {}
             })
             setTarget(child)
@@ -106,7 +164,12 @@ open class ScreenLayout : ViewGroup {
         return child
     }
 
-    override fun addView(view: View?) {
+
+    fun removeChild(child: View) {
+        viewStack.remove(child)
+    }
+
+    fun add(view: View?) {
         if (currAnimator != null && currAnimator?.isRunning == true) {
             currAnimator?.cancel()
         }
@@ -117,23 +180,30 @@ open class ScreenLayout : ViewGroup {
         if (indexOfChild(view) != -1) {
             return
         }
-        super.addView(view)//, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
-        onViewChangeListener?.onViewAdd(view)
 
+        addView(view)//, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
+        onViewCreate(view)
+        //onViewAdd(view)
 
         if (childCount == 1) {
+            onViewAdd(view)
             //onViewChangeListener?.onViewAdded(view)
             return
         }
 
         val currChild = getChildAt(0)
-
+        var viewAdded = false
         currAnimator = ValueAnimator.ofInt(width, 0).apply {
             duration = 300
             addUpdateListener {
                 val currValue = animatedValue as Int
                 view.layout(currValue, 0, currValue + width, height)
                 currChild.layout(currValue - width, 0, currValue, height)
+                if (!viewAdded && currValue != width) {
+                    onViewAdd(view)
+                    viewAdded = true
+                }
+
             }
 
             addListener(object : Animator.AnimatorListener {
@@ -141,29 +211,33 @@ open class ScreenLayout : ViewGroup {
                 override fun onAnimationEnd(animation: Animator?) {
                     super@ScreenLayout.removeView(currChild)
                     viewStack.push(currChild)
-                    onViewChangeListener?.onViewRemove(currChild)
-                    onViewChangeListener?.onViewAdded(view)
+                    onViewRemove(currChild)
+
                 }
+
                 override fun onAnimationCancel(animation: Animator?) {
                     view.layout(0, 0, width, height)
                 }
+
                 override fun onAnimationRepeat(animation: Animator?) {}
             })
             start()
         }
     }
 
-    override fun removeAllViews() {
+    fun removeAll() {
         if (currAnimator != null && currAnimator?.isRunning == true) {
             currAnimator?.cancel()
         }
         if (onViewChangeListener != null) {
             for (view in viewStack) {
-                onViewChangeListener?.onViewRemove(view as View)
+                onViewRemove(view)
+                onViewDelete(view)
             }
         }
         viewStack.clear()
-        onViewChangeListener?.onViewRemove(getChildAt(0))
+        onViewRemove(getChildAt(0))
+        onViewDelete(getChildAt(0))
         super.removeAllViews()
     }
 }

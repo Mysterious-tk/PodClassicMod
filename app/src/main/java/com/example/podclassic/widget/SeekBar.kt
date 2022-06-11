@@ -7,32 +7,38 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Shader
 import android.graphics.drawable.Drawable
-import android.text.TextUtils
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
-import android.widget.FrameLayout
 import android.widget.LinearLayout
-import com.example.podclassic.util.Colors
-import com.example.podclassic.util.Values
+import com.example.podclassic.values.Colors
+import com.example.podclassic.values.Values
 import kotlin.math.sqrt
 
 
-class SeekBar(context: Context) : ViewGroup(context) {
+class SeekBar(context: Context) : LinearLayout(context) {
 
     companion object {
-        private val BAR_HEIGHT = Values.DEFAULT_PADDING * 2
+        private val BAR_HEIGHT = (Values.DEFAULT_PADDING * 2)
     }
 
 
-    private val bar = object : View(context) {
+    private val front = object : View(context) {
         private val paint by lazy { Paint().apply { shader = null } }
         private val rect by lazy { RectF() }
         var seekMode = false
 
         override fun onDraw(canvas: Canvas?) {
             if (paint.shader == null) {
-                paint.shader = Colors.getShader(0f, 0f, 0f, height / 2f, Colors.main_light, Colors.main, Shader.TileMode.MIRROR)
+                paint.shader = Colors.getShader(
+                    0f,
+                    0f,
+                    0f,
+                    height / 2f,
+                    Colors.main_light,
+                    Colors.main,
+                    Shader.TileMode.MIRROR
+                )
             }
             if (seekMode) {
                 val sqrt2 = sqrt(2f)
@@ -46,46 +52,60 @@ class SeekBar(context: Context) : ViewGroup(context) {
         }
     }
 
-    private val background = object : View(context) {
+    private val back = object : View(context) {
         private val paint by lazy { Paint().apply { shader = null } }
 
         override fun onDraw(canvas: Canvas?) {
             if (paint.shader == null) {
-                paint.shader = Colors.getShader(0f, height / 2f, 0f, height.toFloat(), Colors.background_dark_1, Colors.background_dark_2)
+                paint.shader = Colors.getShader(
+                    0f,
+                    height / 2f,
+                    0f,
+                    height.toFloat(),
+                    Colors.background_dark_1,
+                    Colors.background_dark_2
+                )
             }
             canvas?.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
         }
     }
 
-    private val frameLayout = FrameLayout(context)
+    private inner class Layout(context: Context?) : ViewGroup(context) {
+        override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
+            if (!changed) {
+                return
+            }
+            back.layout(l, t, r, b)
+            front.layout(l, t, width * current / max, b)
+        }
+    }
+
+    private val layout = Layout(context)
+    private val linearLayout = LinearLayout(context)
 
     private val leftView = TextView(context)
     private val rightView = TextView(context)
 
     init {
-        addView(background)
-        addView(bar)
-        leftView.setPadding(0, Values.DEFAULT_PADDING, Values.DEFAULT_PADDING * 2, 0)
-        leftView.ellipsize = TextUtils.TruncateAt.END
-        rightView.setPadding(Values.DEFAULT_PADDING * 2, Values.DEFAULT_PADDING, 0, 0)
-        leftView.ellipsize = TextUtils.TruncateAt.START
-        //rightView.gravity = Gravity.END
-        //rightView.ellipsize = TextUtils.TruncateAt.MARQUEE
-
-        frameLayout.apply {
-            addView(leftView, FrameLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT))
-            //leftView.setPadding(0, BAR_HEIGHT / 2,0,0)
-            //addView(leftView)
-
-            //val layoutParamsRight = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT)
-            //rightView.gravity = Gravity.END
-            //rightView.setPadding(0, BAR_HEIGHT / 2,0,0)
-            addView(rightView, FrameLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply {
-                gravity = Gravity.END
-            })
+        orientation = VERTICAL
+        layout.apply {
+            addView(back)
+            addView(front)
+        }
+        linearLayout.apply {
+            addView(
+                leftView.apply { gravity = Gravity.START; setPadding(0, 0, 0, 0) },
+                LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT, 1f)
+            )
+            addView(
+                rightView.apply { gravity = Gravity.END; setPadding(0, 0, 0, 0) },
+                LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT, 1f)
+            )
+            setPadding(0, Values.DEFAULT_PADDING, 0, 0)
         }
 
-        addView(frameLayout)
+        addView(layout, LayoutParams(LayoutParams.MATCH_PARENT, BAR_HEIGHT))
+        addView(linearLayout)
     }
 
     private var max = 1
@@ -93,47 +113,48 @@ class SeekBar(context: Context) : ViewGroup(context) {
     private var current = 0
 
     var textVisibility = View.VISIBLE
-    set(value) {
-        if (value != VISIBLE) {
-            leftView.text = null
-            rightView.text = null
+        set(value) {
+            if (value != VISIBLE) {
+                leftView.text = null
+                rightView.text = null
+            }
+            field = value
         }
-        field = value
-    }
 
-    fun getProgress() : Int {
+    fun getProgress(): Int {
         return current
     }
 
-    fun getMax() : Int {
+    fun getMax(): Int {
         return max
     }
 
-    fun setLeftText(text : String) {
+    fun setLeftText(text: String) {
         if (textVisibility == VISIBLE) {
             leftView.text = text
         }
     }
 
-    fun getLeftText() : String {
+    fun getLeftText(): String {
         return leftView.text.toString()
     }
 
     fun setLeftIcon(drawable: Drawable) {
-        leftView.setLeftIcon(drawable)
+        leftView.setCompoundDrawables(drawable, null, null, null)
     }
 
     fun setRightIcon(drawable: Drawable) {
-        rightView.setRightIcon(drawable)
+        rightView.setCompoundDrawables(null, null, drawable, null)
     }
 
-    fun set(cur : Int, duration: Int) {
-        if (duration in 1..1000 * 60 * 720) {
+    fun set(cur: Int, duration: Int) {
+
+        if (duration in 1 until 1000 * 60 * 720) {
             this.max = duration
         } else {
             this.max = 1
         }
-        if (cur in 0..1000 * 60 * 720) {
+        if (cur in 0 until 1000 * 60 * 720) {
             this.current = cur
         } else {
             this.current = 0
@@ -143,8 +164,9 @@ class SeekBar(context: Context) : ViewGroup(context) {
 
 
     @SuppressLint("SetTextI18n")
-    fun setMax(duration : Int) {
-        if (duration in 1..1000 * 60 * 720) {
+    fun setMax(duration: Int) {
+
+        if (duration in 1 until 1000 * 60 * 720) {
             this.max = duration
         } else {
             this.max = 1
@@ -152,8 +174,8 @@ class SeekBar(context: Context) : ViewGroup(context) {
         onCurrentPositionChange()
     }
 
-    fun setCurrent(cur : Int) {
-        if (cur in 0..1000 * 60 * 720) {
+    fun setCurrent(cur: Int) {
+        if (cur in 0 until 1000 * 60 * 720) {
             this.current = cur
         } else {
             this.current = 0
@@ -161,13 +183,13 @@ class SeekBar(context: Context) : ViewGroup(context) {
         onCurrentPositionChange()
     }
 
-    fun getCurrent() : Int {
+    fun getCurrent(): Int {
         return current
     }
 
-    fun setSeekMode(seekMode : Boolean) {
-        bar.seekMode = seekMode
-        bar.invalidate()
+    fun setSeekMode(seekMode: Boolean) {
+        front.seekMode = seekMode
+        front.invalidate()
     }
 
     private fun onCurrentPositionChange() {
@@ -176,37 +198,11 @@ class SeekBar(context: Context) : ViewGroup(context) {
             leftView.text = toMinute(ms)
             rightView.text = toMinute(ms - max)
         }
-        if (width != 0) {
-            bar.layout(0, 0, width * current / max, BAR_HEIGHT)
-        }
-    }
-
-    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        super.onMeasure(widthMeasureSpec, heightMeasureSpec)
-        val width = MeasureSpec.getSize(widthMeasureSpec)
-        setMeasuredDimension(width, BAR_HEIGHT * 3)
-        background.measure(width, BAR_HEIGHT)
-        bar.measure(width, BAR_HEIGHT)
-        frameLayout.measure(width, BAR_HEIGHT * 2)
-        //leftView.measure((width / 2), (BAR_HEIGHT * 2))
-        //rightView.measure((width / 2), (BAR_HEIGHT * 2))
-
-    }
-
-    override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
-        //if (!changed) {
-        //    return
-        //}
-        background.layout(0, 0, right, BAR_HEIGHT)
-        frameLayout.layout(0, BAR_HEIGHT, right, bottom)
-        //leftView.layout(0, BAR_HEIGHT, right / 2, bottom)
-        //rightView.layout(right / 2, BAR_HEIGHT, right, bottom)
-        bar.layout(0, 0, right * current / max, BAR_HEIGHT)
+        front.layout(0, 0, width * current / max, BAR_HEIGHT)
     }
 
 
-
-    private fun toMinute(temp : Int): String {
+    private fun toMinute(temp: Int): String {
         val stringBuilder = StringBuilder()
         val ms = if (temp < 0) {
             stringBuilder.append('-')

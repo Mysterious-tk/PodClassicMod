@@ -3,74 +3,80 @@ package com.example.podclassic.widget
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.os.Build
-import android.view.View
 import android.widget.RemoteViews
 import com.example.podclassic.R
 import com.example.podclassic.activity.MainActivity
 import com.example.podclassic.base.BaseApplication
-import com.example.podclassic.service.MediaPlayerService
-import com.example.podclassic.storage.SPManager
-import com.example.podclassic.util.Colors
+import com.example.podclassic.service.MediaService
 
 class PodShuffleWidget : AppWidgetProvider() {
 
     companion object {
-        private val pendingIntentPrev by lazy {
-            val context = BaseApplication.context
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) PendingIntent.getForegroundService(context, 1, Intent(context, MediaPlayerService::class.java).apply { action = MediaPlayerService.ACTION_PREV
-            }, PendingIntent.FLAG_UPDATE_CURRENT)
-            else PendingIntent.getService(context, 1, Intent(context, MediaPlayerService::class.java).apply { action = MediaPlayerService.ACTION_PREV }, PendingIntent.FLAG_UPDATE_CURRENT)
-        }
-
-        private val pendingIntentPause by lazy {
-            val context = BaseApplication.context
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) PendingIntent.getForegroundService(context, 2, Intent(context, MediaPlayerService::class.java).apply { action = MediaPlayerService.ACTION_PAUSE
-            }, PendingIntent.FLAG_UPDATE_CURRENT)
-            else PendingIntent.getService(context, 2, Intent(context, MediaPlayerService::class.java).apply { action = MediaPlayerService.ACTION_PAUSE }, PendingIntent.FLAG_UPDATE_CURRENT)
-        }
-
-
-        private val pendingIntentNext by lazy {
-            val context = BaseApplication.context
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) PendingIntent.getForegroundService(context, 3, Intent(context, MediaPlayerService::class.java).apply { action = MediaPlayerService.ACTION_NEXT
-            }, PendingIntent.FLAG_UPDATE_CURRENT)
-            else PendingIntent.getService(context, 3, Intent(context, MediaPlayerService::class.java).apply { action = MediaPlayerService.ACTION_NEXT }, PendingIntent.FLAG_UPDATE_CURRENT)
-        }
-
-        private val pendingIntentVolumeUp by lazy {
-            val context = BaseApplication.context
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) PendingIntent.getForegroundService(context, 4, Intent(context, MediaPlayerService::class.java).apply { action = MediaPlayerService.ACTION_VOLUME_UP }, PendingIntent.FLAG_UPDATE_CURRENT)
-            else PendingIntent.getService(context, 4, Intent(context, MediaPlayerService::class.java).apply { action = MediaPlayerService.ACTION_FAVORITE }, PendingIntent.FLAG_UPDATE_CURRENT)
-        }
-
-        private val pendingIntentVolumeDown by lazy {
-            val context = BaseApplication.context
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) PendingIntent.getForegroundService(context, 5, Intent(context, MediaPlayerService::class.java).apply { action = MediaPlayerService.ACTION_VOLUME_DOWN }, PendingIntent.FLAG_UPDATE_CURRENT)
-            else PendingIntent.getService(context, 4, Intent(context, MediaPlayerService::class.java).apply { action = MediaPlayerService.ACTION_FAVORITE }, PendingIntent.FLAG_UPDATE_CURRENT)
-        }
-
-        private val pendingIntentActivity by lazy {
-            val context = BaseApplication.context
-            PendingIntent.getActivity(context, 6, Intent(context, MainActivity::class.java).apply {  action = MediaPlayerService.ACTION_MAIN }, PendingIntent.FLAG_UPDATE_CURRENT)
-        }
+        private val pendingIntentPrev = PendingIntent.getService(
+            BaseApplication.context,
+            1,
+            Intent(BaseApplication.context, MediaService::class.java).apply {
+                action = MediaService.ACTION_PREV
+            },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        private val pendingIntentNext = PendingIntent.getService(
+            BaseApplication.context,
+            2,
+            Intent(BaseApplication.context, MediaService::class.java).apply {
+                action = MediaService.ACTION_NEXT
+            },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        private val pendingIntentPause = PendingIntent.getService(
+            BaseApplication.context,
+            3,
+            Intent(BaseApplication.context, MediaService::class.java).apply {
+                action = MediaService.ACTION_PLAY_PAUSE
+            },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        private val pendingIntentVolumeUp = PendingIntent.getService(
+            BaseApplication.context,
+            4,
+            Intent(BaseApplication.context, MediaService::class.java).apply {
+                action = MediaService.ACTION_VOLUME_UP
+            },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        private val pendingIntentVolumeDown = PendingIntent.getService(
+            BaseApplication.context,
+            5,
+            Intent(BaseApplication.context, MediaService::class.java).apply {
+                action = MediaService.ACTION_VOLUME_DOWN
+            },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        private val pendingIntentActivity = PendingIntent.getService(
+            BaseApplication.context,
+            6,
+            Intent(BaseApplication.context, MainActivity::class.java).apply {
+                action = MediaService.ACTION_MAIN
+            },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
     }
 
-    override fun onUpdate(context: Context?, appWidgetManager: AppWidgetManager?, appWidgetIds: IntArray?) {
+    override fun onUpdate(
+        context: Context?,
+        appWidgetManager: AppWidgetManager?,
+        appWidgetIds: IntArray?
+    ) {
         super.onUpdate(context, appWidgetManager, appWidgetIds)
         //updateRemoteViews()
         //return
-        if (appWidgetIds == null) {
-            return
-        }
-        if (context == null) {
+        if (appWidgetIds == null || context == null) {
             return
         }
         for (appWidgetId in appWidgetIds) {
-            val remoteViews = RemoteViews(context.packageName, R.layout.view_ipod_shuffle)
+            val remoteViews = RemoteViews(context.packageName, R.layout.pod_shuffle)
 
             remoteViews.setOnClickPendingIntent(R.id.btn_pause, pendingIntentPause)
             remoteViews.setOnClickPendingIntent(R.id.btn_prev, pendingIntentPrev)

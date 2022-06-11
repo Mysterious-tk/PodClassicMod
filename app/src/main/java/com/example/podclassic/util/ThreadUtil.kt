@@ -14,13 +14,14 @@ object ThreadUtil {
         handler.post(runnable)
     }
 
-    private val threadPoolExecutor = ThreadPoolExecutor(0, Integer.MAX_VALUE, 60L, TimeUnit.SECONDS, SynchronousQueue<Runnable>())
+    private val threadPoolExecutor =
+        ThreadPoolExecutor(0, Integer.MAX_VALUE, 60L, TimeUnit.SECONDS, SynchronousQueue())
 
     fun newThread(runnable: Runnable) {
         threadPoolExecutor.execute(runnable)
     }
 
-    fun newThread(doInBackground: Runnable, onFinished : Runnable) {
+    fun asyncTask(doInBackground: Runnable, onFinished: Runnable) {
         threadPoolExecutor.execute {
             doInBackground.run()
             runOnUiThread(onFinished)

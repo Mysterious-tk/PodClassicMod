@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+
+    android:padding="@dimen/padding_1">
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_margin="@dimen/padding_0"
+        android:layout_weight="1">
+
+        <com.example.podclassic.widget.TextView
+            android:id="@+id/tv_index"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <com.example.podclassic.widget.TextView
+            android:id="@+id/tv_stop_time"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_gravity="center"
+            android:drawableLeft="@drawable/ic_access_time_grey_600_18dp" />
+
+        <androidx.appcompat.widget.AppCompatImageView
+            android:id="@+id/ic_repeat_mode"
+            android:layout_width="@dimen/icon_size"
+            android:layout_height="match_parent"
+            android:layout_gravity="end"
+            android:layout_marginStart="@dimen/icon_size"
+            android:layout_marginEnd="@dimen/icon_size" />
+
+        <androidx.appcompat.widget.AppCompatImageView
+            android:id="@+id/ic_play_mode"
+            android:layout_width="@dimen/icon_size"
+            android:layout_height="match_parent"
+            android:layout_gravity="end" />
+
+    </FrameLayout>
+
+    <LinearLayout
+        android:id="@+id/container"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_margin="@dimen/padding_0"
+        android:layout_weight="5">
+
+        <com.example.podclassic.widget.ImageView
+            android:id="@+id/image"
+            android:layout_width="125dp"
+            android:layout_height="125dp"
+            android:scaleType="fitXY" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="125dp"
+            android:orientation="vertical">
+
+            <com.example.podclassic.widget.TextView
+                android:id="@+id/tv_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content" />
+
+            <com.example.podclassic.widget.TextView
+                android:id="@+id/tv_artist"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content" />
+
+            <com.example.podclassic.widget.TextView
+                android:id="@+id/tv_album"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content" />
+
+            <com.example.podclassic.widget.TextView
+                android:id="@+id/tv_lyric"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:singleLine="true" />
+        </LinearLayout>
+
+
+    </LinearLayout>
+
+
+    <com.example.podclassic.widget.ScreenLayout
+        android:id="@+id/seek_bar"
+
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_margin="@dimen/padding_0"
+        android:layout_weight="2" />
+
+</LinearLayout>

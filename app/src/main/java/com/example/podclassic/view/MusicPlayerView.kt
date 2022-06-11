@@ -1,167 +1,168 @@
 package com.example.podclassic.view
 
-import android.annotation.SuppressLint
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.graphics.*
-import android.util.Log
+import android.graphics.Bitmap
+import android.graphics.Matrix
+import android.graphics.Typeface
 import android.view.Gravity
-import android.widget.ImageView
-import android.widget.LinearLayout
-import android.widget.RelativeLayout
-import android.widget.Toast
+import android.view.LayoutInflater
+import android.view.ViewGroup
+import android.widget.FrameLayout
 import com.example.podclassic.R
-import com.example.podclassic.`object`.Core
-import com.example.podclassic.`object`.MediaPlayer
+import com.example.podclassic.base.Core
+import com.example.podclassic.base.Observer
 import com.example.podclassic.base.ScreenView
+import com.example.podclassic.bean.Music
+import com.example.podclassic.media.PlayMode
+import com.example.podclassic.media.RepeatMode
+import com.example.podclassic.service.MediaPresenter
 import com.example.podclassic.storage.SPManager
-import com.example.podclassic.util.*
-import com.example.podclassic.util.Values.DEFAULT_PADDING
+import com.example.podclassic.util.LiveData
+import com.example.podclassic.util.ThreadUtil
+import com.example.podclassic.util.VolumeUtil
+import com.example.podclassic.values.Icons
+import com.example.podclassic.values.Strings
 import com.example.podclassic.widget.ScreenLayout
 import com.example.podclassic.widget.SeekBar
 import com.example.podclassic.widget.TextView
 import java.util.*
-import kotlin.math.min
 
 
-@SuppressLint("RtlHardcoded")
-class MusicPlayerView(context: Context) : RelativeLayout(context), ScreenView, MediaPlayer.OnMediaChangeListener, MediaPlayer.OnProgressListener {
+class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
 
-    companion object { const val TITLE = "正在播放" }
+    private val observer = Observer()
 
-    private var timer : Timer? = null
+    override fun getObserver(): Observer {
+        return observer
+    }
+
+
+    private var timer: Timer? = null
     private var prevTimerSetTime = 0L
 
-    override fun getTitle(): String { return TITLE }
+    override fun getTitle(): String {
+        return Strings.NOW_PLAYING
+    }
 
     private var seekMode = false
 
-    private val progressBar = SeekBar(context)
+    private val progressBar: SeekBar = SeekBar(context)
+    private val volumeBar: SeekBar = SeekBar(context)
 
-    private val screenLayout = ScreenLayout(context)
-    private val volumeBar = SeekBar(context)
-    private val index = TextView(context)
-    private val stopTime = if (MediaPlayer.stopTime < System.currentTimeMillis()) null else TextView(context)
-    private val image = ImageView(context)
-    private val name = TextView(context)
-    private val singer = TextView(context)
-    private val album = TextView(context)
-    private val lyric = if (SPManager.getBoolean(SPManager.SP_SHOW_LYRIC)) TextView(context) else null
-    private val infoSet = LinearLayout(context)
-    private val icon1 = android.widget.ImageView(context)
-    private val icon2 = android.widget.ImageView(context)
+    private val screenLayout: ScreenLayout
+    private val index: TextView
+    private val image: com.example.podclassic.widget.ImageView
+    private val title: TextView
+    private val artist: TextView
+    private val album: TextView
+    private val stopTime: TextView?
+    private val lyric: TextView?
+    private val icon1: androidx.appcompat.widget.AppCompatImageView
+    private val icon2: androidx.appcompat.widget.AppCompatImageView
 
-    private var stopTimer : Timer? = null
+    private val progressTimer =
+        com.example.podclassic.util.Timer(500L) { a -> ThreadUtil.runOnUiThread { onProgress(a.toInt()) } }
+
+    private val container : ViewGroup
 
     init {
-        val padding = DEFAULT_PADDING * 2
-
-        setPadding(padding, padding, padding, padding)
-
-        index.id = R.id.index
-        image.id = R.id.image
-
-        index.setPadding(0, 0, DEFAULT_PADDING * 3 , DEFAULT_PADDING)
-
-        addView(index)//, LayoutParams(LayoutParams.MATCH_PARENT,LayoutParams.WRAP_CONTENT))
-        screenLayout.apply {
-            addView(progressBar)
-            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT,LayoutParams.WRAP_CONTENT).apply { addRule(ALIGN_PARENT_BOTTOM) }
-        }
-        addView(screenLayout)
-
-        image.layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply { addRule(BELOW, index.id) }
-        image.scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
-        addView(image)
-
-        infoSet.apply {
-            setPadding(DEFAULT_PADDING, DEFAULT_PADDING, DEFAULT_PADDING , 0)
-            orientation = LinearLayout.VERTICAL
-            addView(name)
-            addView(singer)
-            addView(album)
-        }
-
-        if (lyric != null) {
-            lyric.apply {
+        val view = LayoutInflater.from(context).inflate(R.layout.view_player, this, false)
+            .apply { addView(this) }
+        album = view.findViewById(R.id.tv_album)
+        artist = view.findViewById(R.id.tv_artist)
+        title = view.findViewById(R.id.tv_title)
+        image = view.findViewById(R.id.image)
+        //image.visibility = GONE
+        index = view.findViewById<TextView?>(R.id.tv_index).apply { setPadding(0, 0, 0, 0) }
+        screenLayout = (view.findViewById(R.id.seek_bar) as ScreenLayout).apply { add(progressBar) }
+        icon1 = view.findViewById(R.id.ic_play_mode)
+        icon2 = view.findViewById(R.id.ic_repeat_mode)
+        stopTime = view.findViewById(R.id.tv_stop_time)
+        container = view.findViewById(R.id.container)
+        lyric = if (SPManager.getBoolean(SPManager.SP_SHOW_LYRIC)) {
+            (view.findViewById(R.id.tv_lyric) as TextView).apply {
                 scrollable = true
                 typeface = Typeface.defaultFromStyle(Typeface.NORMAL)
                 textSize = 12f
             }
-            lyric.layoutParams = LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply { setMargins(0, DEFAULT_PADDING / 2, 0, 0) }
-            infoSet.addView(lyric)
+        } else {
+            null
         }
 
-        if (stopTime != null) {
-            stopTime.setPadding(0,0,0, DEFAULT_PADDING)
-            stopTime.layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT,LayoutParams.WRAP_CONTENT).apply { addRule(CENTER_HORIZONTAL) }
-            addView(stopTime)
+        observer.addLiveData(MediaPresenter.music, object : LiveData.OnDataChangeListener {
+            override fun onStart() { onMusicChange() }
+            override fun onDataChange() = ThreadUtil.runOnUiThread { onMusicChange() }
+        })
 
-            stopTime.setLeftIcon(Icons.STOP_TIME.drawable)
-        }
+        observer.addLiveData(MediaPresenter.stopTime, object : LiveData.OnDataChangeListener {
+            override fun onStart() { setStopTime() }
+            override fun onDataChange() = ThreadUtil.runOnUiThread { setStopTime() }
+        })
 
-        infoSet.layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply {
-            addRule(BELOW, index.id)
-            addRule(RIGHT_OF, image.id)
-        }
+        observer.addLiveData(MediaPresenter.playState, object : LiveData.OnDataChangeListener {
+            override fun onStart() { onPlayStateChange() }
+            override fun onDataChange() = ThreadUtil.runOnUiThread { onPlayStateChange() }
+            override fun onStop() { progressTimer.pause() }
+        })
+        observer.addLiveData(MediaPresenter.playMode, object : LiveData.OnDataChangeListener {
+            override fun onStart() { setPlayMode(); }
+            override fun onDataChange() = ThreadUtil.runOnUiThread { setPlayMode(); }
+        })
 
-        addView(infoSet)
 
-        icon1.id = R.id.icon_1
-
-        icon1.layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply { addRule(ALIGN_PARENT_RIGHT) }
-        icon2.layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply { addRule(LEFT_OF, icon1.id) }
-
-        icon1.setPadding(DEFAULT_PADDING / 2, 5,0, 0)
-        icon2.setPadding(0, 5,0, 0)
-
-        addView(icon1)
-        addView(icon2)
+        //setPlayMode()
+        //setStopTime()
+        //onPlayStateChange()
+        //onMusicChange()
         setVolumeBar()
-        setPlayMode()
-
-        //updateTextInfo()
-        //onMediaChange()
-        //onMediaChangeFinished()
     }
 
-    override fun enter() : Boolean {
+    override fun enter(): Boolean {
         seekMode = !seekMode
         progressBar.setSeekMode(seekMode)
         if (seekMode) {
             setSeekBar(progressBar)
         } else {
-            MediaPlayer.seekTo(progressBar.getProgress())
+            MediaPresenter.seekTo(progressBar.getProgress())
         }
         return true
     }
 
-    override fun enterLongClick() : Boolean {
-        MediaPlayer.setPlayMode()
-        setPlayMode()
+    override fun enterLongClick(): Boolean {
+        MediaPresenter.nextPlayMode()
         return true
     }
 
-    @SuppressLint("ObjectAnimatorBinding")
-    fun setSeekBar(seekBar : SeekBar) {
-        if (screenLayout.currView() != seekBar) {
+    fun setSeekBar(seekBar: SeekBar) {
+        if (screenLayout.curr() != seekBar) {
             if (screenLayout.stackSize() == 0) {
-                screenLayout.addView(seekBar)
+                screenLayout.add(seekBar)
             } else {
-                screenLayout.removeView()
+                screenLayout.remove()
             }
         }
     }
 
+    private fun setStopTime() {
+        val time = MediaPresenter.getStopTime()
+        if (time == 0) {
+            stopTime?.visibility = GONE
+        } else {
+            stopTime?.visibility = VISIBLE
+            stopTime?.text = time.toString()
+        }
+    }
+
     private fun setPlayMode() {
-        val playMode = when (MediaPlayer.getPlayMode()) {
-            MediaPlayer.PLAY_MODE_SHUFFLE -> Icons.PLAY_MODE_SHUFFLE.drawable
-            MediaPlayer.PLAY_MODE_SINGLE -> Icons.PLAY_MODE_SINGLE.drawable
+        val playMode = when (MediaPresenter.getPlayMode()) {
+            PlayMode.SHUFFLE -> Icons.PLAY_MODE_SHUFFLE.drawable
+            PlayMode.SINGLE -> Icons.PLAY_MODE_SINGLE.drawable
             else -> null
         }
-        if (SPManager.getBoolean(SPManager.SP_REPEAT)) {
+        if (SPManager.getInt(SPManager.SP_REPEAT_MODE) == RepeatMode.ALL.id) {
             if (playMode == null) {
                 icon1.setImageDrawable(Icons.PLAY_MODE_REPEAT.drawable)
                 icon2.setImageDrawable(null)
@@ -173,30 +174,6 @@ class MusicPlayerView(context: Context) : RelativeLayout(context), ScreenView, M
             icon1.setImageDrawable(playMode)
             icon2.setImageDrawable(null)
         }
-    }
-
-    private fun setStopTimer() {
-        if (stopTime != null && stopTimer == null) {
-            stopTimer = Timer().apply {
-                schedule(object : TimerTask() {
-                    @SuppressLint("SetTextI18n")
-                    override fun run() {
-                        val time = MediaPlayer.stopTime - System.currentTimeMillis()
-                        if (time > 0) {
-                            ThreadUtil.runOnUiThread {
-                                stopTime.text = (time / 1000 / 60 + 1).toString()
-                            }
-                        }
-                    }
-                }, 100, 60000)
-            }
-        }
-    }
-
-
-    private fun cancelStopTimer() {
-        stopTimer?.cancel()
-        stopTimer = null
     }
 
     private fun setVolumeBar() {
@@ -216,51 +193,25 @@ class MusicPlayerView(context: Context) : RelativeLayout(context), ScreenView, M
 
     private var broadcastReceiverRegistered = false
     private val intentFilter = IntentFilter("android.media.VOLUME_CHANGED_ACTION")
-    override fun onStart() {
-        MediaPlayer.apply {
-            addOnMediaChangeListener(this@MusicPlayerView)
-            addOnProgressListener(this@MusicPlayerView)
-        }
 
+    override fun onViewAdd() {
         if (!broadcastReceiverRegistered) {
             context.registerReceiver(volumeBroadcastReceiver, intentFilter)
             broadcastReceiverRegistered = true
         }
-        setStopTimer()
-        onMediaChange()
+        //onMusicChange()
+        //onPlayStateChange()
+
     }
 
-    override fun onStop() {
-        MediaPlayer.apply {
-            removeOnProgressListener(this@MusicPlayerView)
-            removeOnMediaChangeListener(this@MusicPlayerView)
-        }
-
+    override fun onViewRemove() {
         if (broadcastReceiverRegistered) {
             context.unregisterReceiver(volumeBroadcastReceiver)
             broadcastReceiverRegistered = false
         }
-        cancelStopTimer()
     }
 
-    private var startFinished = false
-
-    override fun onStartFinished() {
-        startFinished = true
-        onMediaChangeFinished()
-    }
-
-    override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
-        super.onWindowFocusChanged(hasWindowFocus)
-        if (hasWindowFocus) {
-            onStart()
-            onStartFinished()
-        } else {
-            onStop()
-        }
-    }
-
-    override fun slide(slideVal: Int) : Boolean {
+    override fun slide(slideVal: Int): Boolean {
         if (seekMode) {
             var progress = progressBar.getProgress()
             val duration = progressBar.getMax()
@@ -289,7 +240,7 @@ class MusicPlayerView(context: Context) : RelativeLayout(context), ScreenView, M
                 }, 2000)
             }
 
-            if (screenLayout.currView() == volumeBar) {
+            if (screenLayout.curr() == volumeBar) {
                 var curVolume = VolumeUtil.getCurrentVolume()
                 val maxVolume = VolumeUtil.maxVolume
 
@@ -309,152 +260,112 @@ class MusicPlayerView(context: Context) : RelativeLayout(context), ScreenView, M
         }
     }
 
-    @SuppressLint( "RtlHardcoded")
-    override fun onMediaChangeFinished() {
-        if (!hasWindowFocus() || !startFinished) {
-            return
-        }
-
-        val music = MediaPlayer.getCurrent()
-        if (music == null) {
-            Core.removeView()
-            return
-        }
-
-        val progress = MediaPlayer.getProgress()
-
-        progressBar.set(progress, MediaPlayer.getDuration())
-        lyric?.setBufferedText(MediaPlayer.getLyric(progress))
-
-        loadImage()
-    }
-
-    @SuppressLint("SetTextI18n")
-    private fun updateTextInfo() {
-        progressBar.setMax(MediaPlayer.getDuration())
-        progressBar.setCurrent(MediaPlayer.getProgress())
-
-        val music = MediaPlayer.getCurrent()
-
-        name.text = music?.name
-        singer.text = music?.singer
-        album.text = music?.album
-
-        index.text = "${(MediaPlayer.getCurrentIndex() + 1)}/${MediaPlayer.getPlayListSize()}"
-
-    }
-
-    override fun onMediaChange() {
-        if (!hasWindowFocus()) {
-            return
-        }
-
+    private fun onMusicChange() {
         if (seekMode) {
             seekMode = false
             progressBar.setSeekMode(false)
         }
-        val music = MediaPlayer.getCurrent()
-
+        val music = MediaPresenter.getCurrent()
         if (music == null) {
-            Core.removeView()
+            postDelayed({
+                if (observer.enable && MediaPresenter.getCurrent() == null) {
+                    Core.removeView()
+                    return@postDelayed
+                }
+            }, 1000)
             return
         }
+        loadImage(music)
+        val duration = if (music.duration > 1) {
+            music.duration.toInt()
+        } else {
+            MediaPresenter.getDuration()
+        }
+        progressBar.set(MediaPresenter.getProgress(), duration)
 
-        updateTextInfo()
+        title.text = music.title
+        artist.text = music.artist
+        album.text = music.album
+
+        index.text = "${(MediaPresenter.getIndex() + 1)}/${MediaPresenter.getPlaylist().size}"
 
         lyric?.setBufferedText(null)
+    }
 
-        if (name.gravity == Gravity.CENTER) {
-            image.setImageBitmap(null)
+    private val empty : Bitmap?
+    get() = if (image.height == 0) null else {
+        Icons.EMPTY.let {
+
+            val scaleWidth: Float = image.height / it.width.toFloat()
+            val scaleHeight: Float = image.height / it.height.toFloat()
+            val matrix = Matrix()
+            matrix.postScale(scaleWidth, scaleHeight)
+            val result = Bitmap.createBitmap(it, 0, 0, it.width, it.height, matrix, false)
+            result
+        }
+    }
+
+    private fun loadImage(music : Music) {
+        var bitmap: Bitmap? = null
+
+        image.setImageBitmap(empty)
+
+        ThreadUtil.asyncTask({
+            bitmap = music.image
+        }, {
+            if (bitmap == null) {
+                image.visibility = GONE
+                title.gravity = Gravity.CENTER
+                artist.gravity = Gravity.CENTER
+                album.gravity = Gravity.CENTER
+                lyric?.gravity = Gravity.CENTER
+                //image.setImageBitmap(null)
+                container.requestLayout()
+            } else {
+                image.setImageBitmap(bitmap)
+                image.visibility = VISIBLE
+
+                title.gravity = Gravity.START
+                artist.gravity = Gravity.START
+                album.gravity = Gravity.START
+                lyric?.gravity = Gravity.START
+                /*
+                bitmap?.apply {
+                    val scaleWidth: Float = image.height / this.width.toFloat()
+                    val scaleHeight: Float = image.height / this.height.toFloat()
+                    val matrix = Matrix()
+                    matrix.postScale(scaleWidth, scaleHeight)
+                    val result = Bitmap.createBitmap(this, 0, 0, this.width, this.height, matrix, false)
+                    image.setImageBitmap(result)
+                }
+
+                 */
+
+
+            }
+
+        })
+    }
+
+    private fun onPlayStateChange() {
+        val progress = MediaPresenter.getProgress()
+        progressBar.set(progress, MediaPresenter.getDuration())
+        if (MediaPresenter.isPlaying()) {
+            progressTimer.start(progress.toLong())
         } else {
-            loadDefaultImage()
+            progressTimer.pause()
         }
     }
 
-    private val defaultImage by lazy {
-        val bitmap = Icons.EMPTY
-        val scaleWidth : Float = imageHeight / bitmap.width.toFloat()
-        val scaleHeight : Float= imageHeight / bitmap.height.toFloat()
-        val matrix = Matrix()
-        matrix.postScale(scaleWidth, scaleHeight)
-        Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, false)
-    }
-
-    private fun loadDefaultImage() {
-        if (!hasWindowFocus()) {
-            return
-        }
-        image.setImageBitmap(defaultImage)
-    }
-
-    private fun loadImage() {
-        if (!hasWindowFocus()) {
-            return
-        }
-
-        val bitmap = MediaPlayer.getImage()
-
-        if (bitmap == null) {
-            name.gravity = Gravity.CENTER
-            singer.gravity = Gravity.CENTER
-            album.gravity = Gravity.CENTER
-            lyric?.gravity = Gravity.CENTER
-            image.setImageBitmap(null)
-            return
-        } else {
-            name.gravity = Gravity.LEFT
-            singer.gravity = Gravity.LEFT
-            album.gravity = Gravity.LEFT
-            lyric?.gravity = Gravity.LEFT
-        }
-
-        val scaleWidth : Float = imageHeight / bitmap.width.toFloat()
-        val scaleHeight : Float= imageHeight / bitmap.height.toFloat()
-        val matrix = Matrix()
-        matrix.postScale(scaleWidth, scaleHeight)
-        val result = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, false)
-
-        image.setImageBitmap(result)
-    }
-
-    @SuppressLint("SetTextI18n")
-    override fun onPlayStateChange() {
-        progressBar.setMax(MediaPlayer.getDuration())
-        index.text = "${(MediaPlayer.getCurrentIndex() + 1)}/${MediaPlayer.getPlayListSize()}"
-    }
-
-    override fun onProgress(progress: Int) {
+    private fun onProgress(progress: Int) {
         if (!seekMode) {
             progressBar.setCurrent(progress)
         }
-        lyric?.setBufferedText(MediaPlayer.getLyric(progress))
+        lyric?.setBufferedText(MediaPresenter.getCurrent()?.lyric?.getLyric(progress))
     }
 
-    override fun onSeek(progress: Int) {
-        onProgress(progress)
-    }
-
-    private var imageHeight = Values.screenWidth / 2.7f
 
     override fun getLaunchMode(): Int {
         return ScreenView.LAUNCH_MODE_SINGLE
-    }
-
-    private class ImageView(context: Context) : androidx.appcompat.widget.AppCompatImageView(context) {
-
-        @SuppressLint("DrawAllocation")
-        override fun onDraw(canvas: Canvas) {
-            super.onDraw(canvas)
-            val rect = canvas.clipBounds
-            rect.bottom--
-            rect.right--
-            rect.top++
-            rect.left++
-            val paint = Paint()
-            paint.color = Colors.text
-            paint.style = Paint.Style.STROKE
-            paint.strokeWidth = 1f
-            canvas.drawRect(rect, paint)
-        }
     }
 }

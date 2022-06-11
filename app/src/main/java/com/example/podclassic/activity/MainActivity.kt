@@ -1,33 +1,25 @@
 package com.example.podclassic.activity
 
 import android.Manifest
-import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.graphics.Outline
-import android.net.Uri
-import android.os.Build
 import android.os.Bundle
-import android.util.Log
 import android.view.View
-import android.view.ViewOutlineProvider
-import android.widget.FrameLayout
+import android.view.ViewGroup
 import android.widget.LinearLayout
-import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import androidx.documentfile.provider.DocumentFile
 import com.example.podclassic.R
-import com.example.podclassic.`object`.Core
-import com.example.podclassic.`object`.MediaPlayer
-import com.example.podclassic.base.BaseApplication
+import com.example.podclassic.base.Core
 import com.example.podclassic.fragment.SplashFragment
-import com.example.podclassic.service.MediaPlayerService
+import com.example.podclassic.service.MediaPresenter
+import com.example.podclassic.service.MediaService
 import com.example.podclassic.storage.SPManager
-import com.example.podclassic.util.*
+import com.example.podclassic.util.MediaStoreUtil
+import com.example.podclassic.util.ThreadUtil
+import com.example.podclassic.values.Values
 import com.example.podclassic.view.MusicPlayerView
-import java.lang.Exception
 
 class MainActivity : AppCompatActivity() {
 
@@ -37,62 +29,111 @@ class MainActivity : AppCompatActivity() {
 
     private var statusBarHeight = 0
 
-    private var mini = false
 
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        val uri = intent?.data
+        if (uri != null) {
+            val music = MediaStoreUtil.getMusicFromUri(uri)
+            MediaPresenter.set(music)
+            ThreadUtil.runOnUiThread {
+                Core.addView(MusicPlayerView(this))
+            }
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         initScreen()
-        if ((Values.screenHeight.toFloat() / Values.screenWidth.toFloat()) < (6f / 5f)) {
-            mini = true
+        setContentView(R.layout.activity_main)
+        initView()
+        if (!SPManager.getBoolean(SPManager.SP_STARTED)) {
+            SPManager.setBoolean(SPManager.SP_STARTED, true)
+            SPManager.reset()
         }
-        if (mini) {
-            setContentView(R.layout.activity_main_mini)
-            MediaStoreUtil.prepare()
-        } else {
-            setContentView(R.layout.activity_main)
-            initView()
-            if (!SPManager.getBoolean(SPManager.SP_STARTED)) {
-                SPManager.setBoolean(SPManager.SP_STARTED, true)
-                SPManager.reset()
-            }
-            Core.bindActivity(findViewById(R.id.slide_controller), findViewById(R.id.screen), findViewById(R.id.title_bar), findViewById(R.id.dark_mode), this)
-        }
-
+        Core.bindActivity(
+            findViewById(R.id.slide_controller),
+            findViewById(R.id.screen),
+            findViewById(R.id.dark_mode),
+            this
+        )
         checkPermission()
     }
 
     private fun prepare() {
-        if (mini) {
-            return
-        }
         supportFragmentManager
             .beginTransaction()
-            .replace(R.id.frame_layout, SplashFragment {
+            .replace(R.id.screen, SplashFragment {
                 Core.lock(true)
-                //UI相关
-                PinyinUtil.load()
-
-                MediaStoreUtil.prepare()
-
-                if (initMediaPlayer()) {
-                    ThreadUtil.runOnUiThread {
-                        Core.addView(MusicPlayerView(this))
-                    }
-                }
+                Core.initUI()
+                initMediaPlayer()
                 Core.lock(false)
-                Core.active = true
             })
             .commit()
     }
 
-    override fun onBackPressed() {
-        if (mini) {
-            if (!Values.LAUNCHER) {
-                Core.exit()
+    /*
+    override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
+        when (keyCode) {
+            KeyEvent.KEYCODE_DPAD_DOWN -> {
+                Core.down()
             }
-            return
+            KeyEvent.KEYCODE_DPAD_UP -> {
+                Core.up()
+            }
+            KeyEvent.KEYCODE_DPAD_LEFT -> {
+                MediaPresenter.prev()
+            }
+            KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                MediaPresenter.next()
+            }
+            KeyEvent.KEYCODE_DEL -> {
+                Core.removeView()
+            }
+            KeyEvent.KEYCODE_ENTER -> {
+                Core.enter()
+            }
+            KeyEvent.KEYCODE_BACK -> {
+                //Core.home()
+            }
+            else -> {
+            }
         }
+        return super.onKeyUp(keyCode, event)
+    }
+
+    override fun onKeyLongPress(keyCode: Int, event: KeyEvent?): Boolean {
+        when (keyCode) {
+            KeyEvent.KEYCODE_DPAD_DOWN -> {
+                //Core.down()
+            }
+            KeyEvent.KEYCODE_DPAD_UP -> {
+                //Core.up()
+            }
+            KeyEvent.KEYCODE_DPAD_LEFT -> {
+                MediaPresenter.backward()
+            }
+            KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                MediaPresenter.forward()
+            }
+            KeyEvent.KEYCODE_DEL -> {
+                Core.home()
+            }
+            KeyEvent.KEYCODE_ENTER -> {
+                Core.enter()
+            }
+            KeyEvent.KEYCODE_BACK -> {
+                Core.home()
+            }
+            else -> {
+            }
+        }
+        return super.onKeyUp(keyCode, event)
+    }
+
+     */
+
+    override fun onBackPressed() {
         if (Values.LAUNCHER) {
             if (Core.lock) {
                 return
@@ -107,31 +148,39 @@ class MainActivity : AppCompatActivity() {
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
-        if (mini) {
-            return
-        }
         if (hasFocus) {
-            Core.setNightMode(SPManager.NightMode.nightMode(SPManager.getInt(SPManager.NightMode.SP_NAME)))
+            Core.setNightMode()
         }
     }
 
-    private fun initMediaPlayer() : Boolean {
-        val uri = intent?.data
-        val action = intent?.action
-        val autoStop = SPManager.getInt(SPManager.AutoStop.SP_NAME)
-        return when {
-            action == MediaPlayerService.ACTION_SHUFFLE || (!Core.active && autoStop != 0) -> {
-                MediaPlayer.shufflePlay()
-                if (autoStop != SPManager.AutoStop.FOREVER_ID) {
-                    MediaPlayer.scheduleToStop(SPManager.AutoStop.getMinute(autoStop))
+    private fun initMediaPlayer() {
+        when (intent?.action) {
+            MediaService.ACTION_MAIN -> {
+                return
+            }
+            MediaService.ACTION_SHUFFLE -> {
+                MediaPresenter.shufflePlay()
+                ThreadUtil.runOnUiThread {
+                    Core.addView(MusicPlayerView(this))
                 }
-                true
+                return
             }
-            uri != null -> {
-                MediaPlayer.add(MediaStoreUtil.getMusic(FileUtil.uriToPath(uri)))
-                true
+        }
+        val uri = intent?.data
+        if (uri != null) {
+            onNewIntent(intent)
+            return
+        }
+
+        val autoStop = SPManager.getInt(SPManager.AutoStop.SP_NAME)
+        if (!MediaPresenter.isPlaying() && autoStop != 0) {
+            MediaPresenter.shufflePlay()
+            if (autoStop != SPManager.AutoStop.FOREVER_ID) {
+                MediaPresenter.setStopTime(SPManager.AutoStop.getMinute(autoStop))
             }
-            else -> false
+            ThreadUtil.runOnUiThread {
+                Core.addView(MusicPlayerView(this))
+            }
         }
     }
 
@@ -175,8 +224,10 @@ class MainActivity : AppCompatActivity() {
 
         (frame_layout.layoutParams as RelativeLayout.LayoutParams).topMargin = statusBarHeight + TOP_MARGIN
          */
-        val frameLayout = findViewById<FrameLayout>(R.id.frame_layout)
-        val layoutParams = (frameLayout.layoutParams as LinearLayout.LayoutParams)
+
+
+        val linearLayout = findViewById<ViewGroup>(R.id.layout_rectangle)
+        val layoutParams = (linearLayout.layoutParams as LinearLayout.LayoutParams)
         val screenRatio = Values.screenHeight / Values.screenWidth
         val topMargin = statusBarHeight + when {
             screenRatio <= 16f / 9f -> {
@@ -195,22 +246,43 @@ class MainActivity : AppCompatActivity() {
 
         layoutParams.topMargin = topMargin
 
+        //linearLayout.clipToOutline = true
 
-        frameLayout.clipToOutline = true
 
         //隐藏虚拟按键
         //window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or View.SYSTEM_UI_FLAG_FULLSCREEN;
     }
 
+    fun setColor(color: Int) {
+        window.statusBarColor = color
+        window.navigationBarColor = color
+        findViewById<View>(R.id.main_layout)?.setBackgroundColor(color)
+    }
+
     private fun checkPermission() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.READ_EXTERNAL_STORAGE), 1)
+        if (ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.WRITE_EXTERNAL_STORAGE
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(
+                    Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                    Manifest.permission.READ_EXTERNAL_STORAGE
+                ),
+                1
+            )
         } else {
             prepare()
         }
     }
 
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (grantResults.isNotEmpty() && grantResults[0] != PackageManager.PERMISSION_GRANTED) {
             Core.exit()

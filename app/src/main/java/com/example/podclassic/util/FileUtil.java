@@ -1,30 +1,27 @@
 package com.example.podclassic.util;
 
-import android.app.Activity;
 import android.content.Context;
-import android.content.Intent;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
 import android.os.storage.StorageManager;
 import android.provider.DocumentsContract;
-import android.provider.MediaStore;
-import android.provider.Settings;
-import android.util.Log;
-
-import androidx.annotation.RequiresApi;
-import androidx.documentfile.provider.DocumentFile;
 
 import com.example.podclassic.base.BaseApplication;
 
 import java.io.File;
 import java.lang.reflect.Array;
 import java.lang.reflect.Method;
-import java.util.ArrayList;
 
 public class FileUtil {
-    private FileUtil() {}
+    public static final int TYPE_AUDIO = 1;
+    public static final int TYPE_VIDEO = 2;
+    public static final int TYPE_IMAGE = 3;
+    public static final int TYPE_TEXT = 4;
+
+    private FileUtil() {
+    }
 
     public static String getSDCardPath() {
         if (Build.VERSION.SDK_INT > Build.VERSION_CODES.P) {
@@ -42,8 +39,8 @@ public class FileUtil {
                 return null;
             }
             final int length = Array.getLength(result);
-            for (int i = 1; i < length; i++) {
-                Object storageVolumeElement = Array.get(result, i);
+            if (length > 1) {
+                Object storageVolumeElement = Array.get(result, 1);
                 return (String) getPath.invoke(storageVolumeElement);
             }
         } catch (Exception e) {
@@ -66,8 +63,7 @@ public class FileUtil {
                 final String id = DocumentsContract.getDocumentId(uri);
                 final Uri contentUri = android.content.ContentUris.withAppendedId(Uri.parse("content://downloads/public_downloads"), Long.parseLong(id));
                 return getDataColumn(context, contentUri, null, null);
-            }
-            else if ("com.android.providers.media.documents".equals(uri.getAuthority())) {
+            } else if ("com.android.providers.media.documents".equals(uri.getAuthority())) {
                 final String docId = DocumentsContract.getDocumentId(uri);
                 final String[] split = docId.split(":");
                 final String type = split[0];
@@ -80,7 +76,7 @@ public class FileUtil {
                     contentUri = android.provider.MediaStore.Audio.Media.EXTERNAL_CONTENT_URI;
                 }
                 final String selection = "_id=?";
-                final String[] selectionArgs = new String[] {split[1]};
+                final String[] selectionArgs = new String[]{split[1]};
                 return getDataColumn(context, contentUri, selection, selectionArgs);
             }
         } else if ("content".equalsIgnoreCase(uri.getScheme())) {
@@ -91,7 +87,7 @@ public class FileUtil {
         return null;
     }
 
-    private static String getDataColumn(Context context, Uri uri, String selection,  String[] selectionArgs) {
+    private static String getDataColumn(Context context, Uri uri, String selection, String[] selectionArgs) {
         Cursor cursor = null;
         String column = "_data";
         String[] projection = {column};
@@ -110,11 +106,6 @@ public class FileUtil {
         return null;
     }
 
-    public static final int TYPE_AUDIO = 1;
-    public static final int TYPE_VIDEO = 2;
-    public static final int TYPE_IMAGE = 3;
-
-
     public static int getFileType(File file) {
         String name = file.getName().toLowerCase();
         if (name.endsWith(".m4a") || name.endsWith(".aac") || name.endsWith(".flac") || name.endsWith(".mp3") || name.endsWith(".wav") || name.endsWith(".ogg")) {
@@ -123,6 +114,8 @@ public class FileUtil {
             return TYPE_IMAGE;
         } else if (name.endsWith(".3gp") || name.endsWith(".mp4") || name.endsWith(".mkv")) {
             return TYPE_VIDEO;
+        } else if (name.endsWith(".txt")) {
+            return TYPE_TEXT;
         }
         return 0;
     }
@@ -130,5 +123,13 @@ public class FileUtil {
     public static boolean isAudio(File file) {
         String name = file.getName().toLowerCase();
         return name.endsWith(".m4a") || name.endsWith(".aac") || name.endsWith(".flac") || name.endsWith(".mp3") || name.endsWith(".wav") || name.endsWith(".ogg");
+    }
+
+    public static boolean isFileExist(File file) {
+        return file.isFile() && file.exists();
+    }
+
+    public static boolean isFileExist(String path) {
+        return isFileExist(new File(path));
     }
 }

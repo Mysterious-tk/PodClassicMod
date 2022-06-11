@@ -2,35 +2,36 @@ package com.example.podclassic.view
 
 import android.annotation.SuppressLint
 import android.content.Context
-import com.example.podclassic.`object`.Core
-import com.example.podclassic.`object`.MediaPlayer
+import android.provider.MediaStore
+import com.example.podclassic.base.Core
 import com.example.podclassic.base.ScreenView
-import com.example.podclassic.storage.SaveMusicLists
-import com.example.podclassic.storage.SaveMusics
+import com.example.podclassic.bean.MusicList
+import com.example.podclassic.service.MediaPresenter
+import com.example.podclassic.storage.MusicListTable
+import com.example.podclassic.storage.MusicTable
 import com.example.podclassic.util.FileUtil
 import com.example.podclassic.util.MediaStoreUtil
+import com.example.podclassic.values.Strings
 import com.example.podclassic.widget.ListView
 import java.io.File
 import java.text.Collator
 import java.util.*
-import kotlin.collections.ArrayList
 
 
 @SuppressLint("ViewConstructor")
 class FileView(context: Context, val file: File) : ListView(context), ScreenView {
 
     private var hasAudio = false
-    val list: ArrayList<File> = file.let{
+    val list: ArrayList<File> = file.let {
         val array = file.listFiles()
-        val arrayList = ArrayList<File>(0)
+        val arrayList = ArrayList<File>(array?.size ?: 0)
         if (array != null) {
-            arrayList.ensureCapacity(array.size)
             for (f in array) {
                 if (!f.name.startsWith(".")) {
                     arrayList.add(f)
                 }
             }
-            val collator = Collator.getInstance(Locale.CHINA)
+            val collator = Collator.getInstance(Locale.getDefault())
             arrayList.sortWith { o1, o2 -> collator.compare(o1?.name, o2?.name) }
         }
         arrayList
@@ -40,7 +41,7 @@ class FileView(context: Context, val file: File) : ListView(context), ScreenView
 
     init {
         if (list.isEmpty()) {
-            itemList.add(Item("无内容", null, false))
+            itemList.add(Item(Strings.EMPTY, null, false))
         } else {
             itemList.ensureCapacity(list.size)
             for (file in list) {
@@ -52,7 +53,7 @@ class FileView(context: Context, val file: File) : ListView(context), ScreenView
             }
 
             if (hasAudio) {
-                itemList.add(0, Item("随机播放歌曲", null, true))
+                itemList.add(0, Item(Strings.SHUFFLE_PLAY, null, true))
             }
         }
         sorted = true
@@ -63,23 +64,26 @@ class FileView(context: Context, val file: File) : ListView(context), ScreenView
             return false
         }
         if (hasAudio && index == 0) {
-            val musics = MediaStoreUtil.searchMusic("${MediaStoreUtil.PATH} like ? ", "${file.path}%")
+            val musics = MediaStoreUtil.getMusicList(
+                "${MediaStore.Audio.Media.DATA} like ? ",
+                arrayOf("${file.path}%")
+            )
             if (musics.isEmpty()) {
                 musics.ensureCapacity(musicList.size)
                 for (file in musicList) {
                     musics.add(MediaStoreUtil.getMusicFromFile(file.path))
                 }
-            }
-            val lastIndex = file.path.length
-            val iterator = musics.iterator()
-            while (iterator.hasNext()) {
-                val music = iterator.next()
-                if (music.path.lastIndexOf('/') != lastIndex) {
-                    iterator.remove()
+            } else {
+                val lastIndex = file.path.length
+                val iterator = musics.iterator()
+                while (iterator.hasNext()) {
+                    val music = iterator.next()
+                    if (music.data?.lastIndexOf('/') != lastIndex) {
+                        iterator.remove()
+                    }
                 }
-
             }
-            MediaPlayer.shufflePlay(musics)
+            MediaPresenter.shufflePlay(musics)
             Core.addView(MusicPlayerView(context))
             return true
         }
@@ -94,9 +98,13 @@ class FileView(context: Context, val file: File) : ListView(context), ScreenView
                 FileUtil.TYPE_VIDEO -> Core.addView(VideoView(context, file))
                 FileUtil.TYPE_IMAGE -> Core.addView(ImageView(context, arrayListOf(file), 0))
                 FileUtil.TYPE_AUDIO -> {
-                    MediaPlayer.add(MediaStoreUtil.getMusic(file.path))
+                    MediaPresenter.set(MediaStoreUtil.getMusicFromFile(file.path))
                     Core.addView(MusicPlayerView(context))
                 }
+                FileUtil.TYPE_TEXT -> {
+                    Core.addView(TxtView(context, file))
+                }
+                else -> return false
             }
         }
         return true
@@ -110,18 +118,21 @@ class FileView(context: Context, val file: File) : ListView(context), ScreenView
             return false
         }
         val id = if (hasAudio) index - 1 else index
-
-        if (list[id].isDirectory) {
-            val folder = list[id].listFiles() ?: return false
-            for (file in folder) {
-                if (FileUtil.isAudio(file)) {
-                    SaveMusicLists.saveFolders.add(list[id].path)
+        val file = list[id]
+        if (file.isDirectory) {
+            val folder = file.listFiles() ?: return false
+            for (f in folder) {
+                if (FileUtil.isAudio(f)) {
+                    MusicListTable.folder.add(
+                        MusicList.Builder().apply { type = MusicList.TYPE_FOLDER; title = file.name; data = file.path }
+                            .build()
+                    )
                     shake()
                     return true
                 }
             }
-        } else if (FileUtil.isAudio(list[id])) {
-            SaveMusics.loveList.add(MediaStoreUtil.getMusic(list[id].path))
+        } else if (FileUtil.isAudio(file)) {
+            MusicTable.favourite.add(MediaStoreUtil.getMusicFromFile(file.path))
             shake()
             return true
         }
@@ -134,16 +145,5 @@ class FileView(context: Context, val file: File) : ListView(context), ScreenView
 
     override fun getTitle(): String {
         return file.name
-    }
-
-    override fun getLaunchMode(): Int {
-        return ScreenView.LAUNCH_MODE_NORMAL
-    }
-
-    override fun onStart() {
-
-    }
-
-    override fun onStop() {
     }
 }

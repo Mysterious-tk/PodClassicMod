@@ -32,7 +32,7 @@ class GameView : ViewGroup {
 
     private val objectList = ObjectList()
 
-    fun addObject(o : Object) {
+    fun addObject(o: Object) {
         objectList.add(o)
         addView(o.view)
     }
@@ -43,32 +43,32 @@ class GameView : ViewGroup {
         removeAllViews()
     }
 
-    fun removeObject(o : Object) {
+    fun removeObject(o: Object) {
         objectList.remove(o)
         removeView(o.view)
     }
 
-    fun moveObject(o : Object, offsetX : Int, offsetY : Int) {
+    fun moveObject(o: Object, offsetX: Int, offsetY: Int) {
         o.x += offsetX
         o.y += offsetY
     }
 
-    fun autoMoveObject(o : Object, velX : Int, velY : Int) {
+    fun autoMoveObject(o: Object, velX: Int, velY: Int) {
         o.autoMove.velX = velX
         o.autoMove.velY = velY
     }
 
-    var timer : Timer? = null
+    var timer: Timer? = null
 
     fun start() {
         timer?.cancel()
         timer = Timer()
-        timer?.schedule( object : TimerTask() {
+        timer?.schedule(object : TimerTask() {
             override fun run() {
                 ThreadUtil.runOnUiThread { refresh() }
 
             }
-        }, 0, 1000 / FPS )
+        }, 0, 1000 / FPS)
 
     }
 
@@ -78,7 +78,7 @@ class GameView : ViewGroup {
         timer = null
     }
 
-    private fun refreshObject(o : Object) {
+    private fun refreshObject(o: Object) {
         if (!o.visibility) {
             return
         }
@@ -109,13 +109,27 @@ class GameView : ViewGroup {
         if (o.onHitListener != null) {
             for (i in 0 until objectList.size()) {
                 val obj = objectList.get(i)
-                if (obj == o) { continue }
-                if (!obj.visibility) { continue }
-                if (!obj.hitable) { continue }
-                if (obj.x + obj.width < o.x) { continue }
-                if (obj.x > o.x + o.width) { continue }
-                if (obj.y > o.y + o.height) { continue }
-                if (obj.y + obj.height < o.y) { continue }
+                if (obj == o) {
+                    continue
+                }
+                if (!obj.visibility) {
+                    continue
+                }
+                if (!obj.hitable) {
+                    continue
+                }
+                if (obj.x + obj.width < o.x) {
+                    continue
+                }
+                if (obj.x > o.x + o.width) {
+                    continue
+                }
+                if (obj.y > o.y + o.height) {
+                    continue
+                }
+                if (obj.y + obj.height < o.y) {
+                    continue
+                }
                 if (o.x + o.width >= obj.x && o.x <= obj.x) {
                     o.x = obj.x - 1 - o.width
                 }
@@ -156,7 +170,14 @@ class GameView : ViewGroup {
 
     override fun onDraw(canvas: Canvas?) {
         super.onDraw(canvas)
-        paint.shader = Colors.getShader(width / 2f, 0f, width / 2f, height.toFloat(), Colors.background_1, Colors.background_2)
+        paint.shader = Colors.getShader(
+            width / 2f,
+            0f,
+            width / 2f,
+            height.toFloat(),
+            Colors.background_1,
+            Colors.background_2
+        )
         canvas?.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
     }
 
@@ -164,7 +185,7 @@ class GameView : ViewGroup {
         fun checkEnd()
     }
 
-    var gameChecker : GameChecker? = null
+    var gameChecker: GameChecker? = null
 
     override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
         refresh()

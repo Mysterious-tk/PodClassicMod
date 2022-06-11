@@ -5,15 +5,17 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import com.example.podclassic.base.ScreenView
-import com.example.podclassic.util.Colors
+import com.example.podclassic.values.Colors
+import com.example.podclassic.values.Strings
 import java.io.File
 import kotlin.math.max
 import kotlin.math.min
 
 
 @SuppressLint("ViewConstructor")
-class ImageView(context: Context, val list : ArrayList<File>, var index : Int) : androidx.appcompat.widget.AppCompatImageView(context),ScreenView {
-    private var currentBitmap : Bitmap? = null
+class ImageView(context: Context, val list: ArrayList<File>, var index: Int) :
+    androidx.appcompat.widget.AppCompatImageView(context), ScreenView {
+    private var currentBitmap: Bitmap? = null
 
     init {
         setBackgroundColor(Colors.text)
@@ -38,7 +40,7 @@ class ImageView(context: Context, val list : ArrayList<File>, var index : Int) :
         return true
     }
 
-    private fun loadImage(file : File) {
+    private fun loadImage(file: File) {
         if (!file.exists()) {
             return
         }
@@ -49,25 +51,21 @@ class ImageView(context: Context, val list : ArrayList<File>, var index : Int) :
         val scaleH = max(height, opt.outHeight) / (min(height, opt.outHeight) * 1f)
         opt.inSampleSize = max(scaleW, scaleH).toInt()
         opt.inJustDecodeBounds = false
-        setImageBitmap(null)
+        //setImageBitmap(null)
         currentBitmap?.recycle()
         currentBitmap = BitmapFactory.decodeFile(file.path, opt)
         setImageBitmap(currentBitmap)
     }
 
     override fun getTitle(): String {
-        return "照片"
+        return Strings.PHOTO
     }
 
-    override fun getLaunchMode(): Int {
-        return ScreenView.LAUNCH_MODE_NORMAL
-    }
-
-    override fun onStart() {
+    override fun onViewCreate() {
         post { loadImage(list[index]) }
     }
 
-    override fun onStop() {
+    override fun onViewDelete() {
         setImageBitmap(null)
         currentBitmap?.recycle()
     }

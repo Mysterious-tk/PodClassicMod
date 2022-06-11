@@ -1,186 +1,400 @@
 package com.example.podclassic.view
 
-import android.annotation.SuppressLint
 import android.content.Context
 import android.os.Build
 import android.os.Environment
 import android.os.StatFs
 import android.util.Base64
-import com.example.podclassic.`object`.Core
-import com.example.podclassic.`object`.MediaPlayer
+import com.example.podclassic.base.Core
 import com.example.podclassic.base.ScreenView
+import com.example.podclassic.media.PlayMode
+import com.example.podclassic.media.RepeatMode
+import com.example.podclassic.service.MediaPresenter
 import com.example.podclassic.storage.SPManager
 import com.example.podclassic.util.MediaStoreUtil
-import com.example.podclassic.util.Values
+import com.example.podclassic.values.Strings
+import com.example.podclassic.values.Values
 import com.example.podclassic.widget.ListView
+import com.example.podclassic.widget.OnSwitchListener
 import com.example.podclassic.widget.SwitchBar
 import java.util.*
-import kotlin.collections.ArrayList
 
 class SettingsView(context: Context) : ListView(context), ScreenView {
+    companion object {
+        const val about = "感谢您的使用!\n这里本应有个彩蛋, 但是没啥想法, 就这样吧.\n"
+    }
 
-    companion object { const val TITLE = "设置" }
-    override fun enter() : Boolean { return onItemClick() }
-    override fun enterLongClick() : Boolean { return false }
-    override fun slide(slideVal: Int): Boolean { return onSlide(slideVal) }
-    override fun getTitle(): String { return TITLE }
+    override fun enter(): Boolean {
+        return onItemClick()
+    }
+
+    override fun enterLongClick(): Boolean {
+        return false
+    }
+
+    override fun slide(slideVal: Int): Boolean {
+        return onSlide(slideVal)
+    }
+
+    override fun getTitle(): String {
+        return Strings.SETTINGS
+    }
 
     init {
         itemList = arrayListOf(
-            Item("关于本机", object : OnItemClickListener {
-                @SuppressLint("HardwareIds")
-                override fun onItemClick(index : Int, listView : ListView) : Boolean {
+            Item(Strings.ABOUT, object : OnItemClickListener {
+                override fun onItemClick(index: Int, listView: ListView): Boolean {
                     val statFs = StatFs(Environment.getDataDirectory().path)
                     val blockSizeLong = statFs.blockSizeLong
-                    Core.addView(ItemListView(context, arrayListOf(
-                        Item(Values.POD, null, false),
-                        Item("歌曲", null, MediaStoreUtil.musics.size.toString()),
-                        Item("视频", null, MediaStoreUtil.getVideoSize().toString()),
-                        Item("照片", null, MediaStoreUtil.getPhotoSize().toString()),
-                        Item("容量", null, (blockSizeLong * statFs.blockCountLong / 1024 / 1024 / 1024).toString() + " GB"),
-                        Item("可用容量", null, (blockSizeLong * statFs.availableBlocksLong / 1024 / 1024 / 1024).toString() + " GB"),
-                        Item("版本", null, Values.getVersionName()),
-                        Item("S/N", null,
-                            Base64.encodeToString(Build.ID.encodeToByteArray(), Base64.NO_PADDING).trim()
-                                .uppercase(Locale.ROOT)
-                        ),//android.os.Build.SERIAL),
-                        Item("型号", null, "MA446ZP"),
-                        Item("格式", null, "Windows")
-                    ), "关于本机", null))
+                    Core.addView(
+                        ItemListView(
+                            context, arrayListOf(
+                                Item(Strings.iPod, null, false),
+                                Item(Strings.SONG, null, MediaStoreUtil.getMusicSize().toString()),
+                                Item(Strings.VIDEO, null, MediaStoreUtil.getVideoSize().toString()),
+                                Item(Strings.PHOTO, null, MediaStoreUtil.getPhotoSize().toString()),
+                                Item(
+                                    Strings.CAPACITY,
+                                    null,
+                                    (blockSizeLong * statFs.blockCountLong / 1024 / 1024 / 1024).toString() + " GB"
+                                ),
+                                Item(
+                                    Strings.CAPACITY_AVAILABLE,
+                                    null,
+                                    (blockSizeLong * statFs.availableBlocksLong / 1024 / 1024 / 1024).toString() + " GB"
+                                ),
+                                Item(Strings.VERSION, object : OnItemClickListener {
+                                    var count = 0
+                                    override fun onItemClick(
+                                        index: Int,
+                                        listView: ListView
+                                    ): Boolean {
+                                        count++
+                                        if (count == 7) {
+                                            count = 0
+                                            Core.addView(TxtView(context, Strings.ABOUT, about))
+                                        }
+                                        return true
+                                    }
+                                }, Values.getVersionName()),
+                                Item(
+                                    Strings.SN, null,
+                                    Base64.encodeToString(
+                                        Build.ID.encodeToByteArray(),
+                                        Base64.NO_PADDING
+                                    ).trim()
+                                        .uppercase(Locale.ROOT)
+                                ),//android.os.Build.SERIAL),
+                                Item(Strings.MODEL, null, "MA446ZP"),
+                                Item(Strings.FORMAT, null, "Windows")
+                            ), Strings.ABOUT, null
+                        )
+                    )
                     return true
                 }
             }, true),
-            Item("睡眠定时", object : OnItemClickListener {
-                fun scheduleToStop(min : Int) {
-                    MediaPlayer.scheduleToStop(min)
+
+            Item(Strings.LANGUAGE, object : OnItemClickListener {
+                val itemList = arrayListOf(
+                    //id和这的顺序要对应
+                    Item(
+                        Strings.AUTO,
+                        null,
+                        if (SPManager.getInt(SPManager.Language.SP_NAME) == SPManager.Language.AUTO.id) Strings.CURRENT else Strings.NULL
+                    ),
+                    Item(
+                        Strings.LANGUAGE_CN,
+                        null,
+                        if (SPManager.getInt(SPManager.Language.SP_NAME) == SPManager.Language.CN.id) Strings.CURRENT else Strings.NULL
+                    ),
+                    Item(
+                        Strings.LANGUAGE_TW,
+                        null,
+                        if (SPManager.getInt(SPManager.Language.SP_NAME) == SPManager.Language.TW.id) Strings.CURRENT else Strings.NULL
+                    ),
+                    Item(
+                        Strings.LANGUAGE_EN,
+                        null,
+                        if (SPManager.getInt(SPManager.Language.SP_NAME) == SPManager.Language.EN.id) Strings.CURRENT else Strings.NULL
+                    ),
+                )
+
+                override fun onItemClick(index: Int, listView: ListView): Boolean {
+                    Core.addView(
+                        ItemListView(
+                            context,
+                            itemList,
+                            Strings.LANGUAGE,
+                            object : OnItemClickListener {
+                                override fun onItemClick(index: Int, listView: ListView): Boolean {
+                                    SPManager.setInt(SPManager.Language.SP_NAME, index)
+                                    //Toast.makeText(context, "set language", Toast.LENGTH_SHORT).show()
+                                    Core.reboot()
+                                    return true
+                                }
+                            })
+                    ); return true
+                }
+            }, true),
+
+            Item(Strings.SLEEP_TIME, object : OnItemClickListener {
+                fun scheduleToStop(min: Int) {
+                    MediaPresenter.setStopTime(min)
                     Core.removeView()
                 }
+
                 val itemList = arrayListOf(
-                    Item("关闭", object : OnItemClickListener { override fun onItemClick(index: Int, listView: ListView) : Boolean {scheduleToStop(0); return true } }, false),
-                    //Item("1 分钟", object : OnItemClickListener { override fun onItemClick(index: Int, listView: ListView) : Boolean {scheduleToStop(1); return true } }, false),
-                    Item("15 分钟", object : OnItemClickListener { override fun onItemClick(index: Int, listView: ListView) : Boolean {scheduleToStop(15); return true } }, false),
-                    Item("30 分钟", object : OnItemClickListener { override fun onItemClick(index: Int, listView: ListView) : Boolean {scheduleToStop(30); return true } }, false),
-                    Item("60 分钟", object : OnItemClickListener { override fun onItemClick(index: Int, listView: ListView) : Boolean {scheduleToStop(60); return true } }, false),
-                    Item("90 分钟", object : OnItemClickListener { override fun onItemClick(index: Int, listView: ListView) : Boolean {scheduleToStop(90); return true } }, false),
-                    Item("120 分钟", object : OnItemClickListener { override fun onItemClick(index: Int, listView: ListView) : Boolean {scheduleToStop(120); return true } }, false),
-                    Item("240 分钟", object : OnItemClickListener { override fun onItemClick(index: Int, listView: ListView) : Boolean {scheduleToStop(240); return true } }, false)
-
-                )
-                override fun onItemClick(index : Int, listView : ListView) : Boolean { Core.addView(ItemListView(context, itemList, "睡眠", null)); return true }
-            }, true),
-
-            Item("均衡器", object : OnItemClickListener {
-                override fun onItemClick(index : Int, listView: ListView) : Boolean {
-                    val nameList = MediaPlayer.equalizerList
-                    val itemList = ArrayList<Item>()
-                    val equalizerIndex = SPManager.getInt(SPManager.SP_EQUALIZER)
-                    for (i in nameList.indices) {
-                        itemList.add(if (i == equalizerIndex) Item(nameList[i], null, "当前") else Item(nameList[i], null, false))
-                    }
-                    Core.addView(ItemListView(context, itemList, "均衡器", object : OnItemClickListener {
+                    Item(Strings.DISABLE, object : OnItemClickListener {
                         override fun onItemClick(index: Int, listView: ListView): Boolean {
-                            val result = MediaPlayer.setEqualizer(index)
-                            Core.removeView()
-                            return result
+                            scheduleToStop(0); return true
                         }
-                    }))
+                    }, false),
+                    //Item("1 分钟", object : OnItemClickListener { override fun onItemClick(index: Int, listView: ListView) : Boolean {scheduleToStop(1); return true } }, false),
+                    Item("15 ${Strings.MINUTE}", object : OnItemClickListener {
+                        override fun onItemClick(index: Int, listView: ListView): Boolean {
+                            scheduleToStop(15); return true
+                        }
+                    }, false),
+                    Item("30 ${Strings.MINUTE}", object : OnItemClickListener {
+                        override fun onItemClick(index: Int, listView: ListView): Boolean {
+                            scheduleToStop(30); return true
+                        }
+                    }, false),
+                    Item("60 ${Strings.MINUTE}", object : OnItemClickListener {
+                        override fun onItemClick(index: Int, listView: ListView): Boolean {
+                            scheduleToStop(60); return true
+                        }
+                    }, false),
+                    Item("90 ${Strings.MINUTE}", object : OnItemClickListener {
+                        override fun onItemClick(index: Int, listView: ListView): Boolean {
+                            scheduleToStop(90); return true
+                        }
+                    }, false),
+                    Item("120 ${Strings.MINUTE}", object : OnItemClickListener {
+                        override fun onItemClick(index: Int, listView: ListView): Boolean {
+                            scheduleToStop(120); return true
+                        }
+                    }, false),
+                    Item("240 ${Strings.MINUTE}", object : OnItemClickListener {
+                        override fun onItemClick(index: Int, listView: ListView): Boolean {
+                            scheduleToStop(240); return true
+                        }
+                    }, false)
+                )
+
+                override fun onItemClick(index: Int, listView: ListView): Boolean {
+                    Core.addView(ItemListView(context, itemList, "睡眠定时", null)); return true
+                }
+            }, true),
+
+            Item(Strings.EQUALIZER, object : OnItemClickListener {
+                override fun onItemClick(index: Int, listView: ListView): Boolean {
+                    val nameList = MediaPresenter.getPresetList()
+                    val itemList = ArrayList<Item>()
+                    val equalizerIndex = SPManager.getInt(
+                        SPManager.SP_EQUALIZER
+                    )
+                    for (i in nameList.indices) {
+                        itemList.add(
+                            Item(
+                                nameList[i]!!,
+                                null,
+                                if (i == equalizerIndex) Strings.CURRENT else Strings.NULL
+                            )
+                        )
+                    }
+                    Core.addView(
+                        ItemListView(
+                            context,
+                            itemList,
+                            Strings.EQUALIZER,
+                            object : OnItemClickListener {
+                                override fun onItemClick(index: Int, listView: ListView): Boolean {
+                                    MediaPresenter.setEqualizer(index)
+                                    Core.removeView()
+                                    return true
+                                }
+                            })
+                    )
                     return true
                 }
             }, true),
 
-            Item("播放顺序", object : OnItemClickListener {
-                override fun onItemClick(index : Int, listView : ListView) : Boolean {
-                    MediaPlayer.setPlayMode()
-                    listView.getCurrentItem().rightText = MediaPlayer.getPlayModeString()
+            Item(Strings.PLAY_MODE, object : OnItemClickListener {
+                override fun onItemClick(index: Int, listView: ListView): Boolean {
+                    val playMode = MediaPresenter.getPlayMode()
+                    val next = PlayMode.getPlayMode((playMode.id + 1) % PlayMode.count)
+                    MediaPresenter.nextPlayMode()
+                    listView.getCurrentItem().rightText = next.title
                     return true
                 }
-            }, MediaPlayer.getPlayModeString()),
+            }, MediaPresenter.getPlayMode().title),
 
-            Item("随机播放", object : OnItemClickListener {
-                override fun onItemClick(index : Int, listView : ListView) : Boolean {
-                    SPManager.getBoolean(SPManager.SP_PLAY_ALL).let {
-                        SPManager.setBoolean(SPManager.SP_PLAY_ALL, !it)
-                        listView.getCurrentItem().rightText = if (it) "收藏歌曲" else "全部歌曲"
+            Item(
+                Strings.SHUFFLE_PLAY, object : OnItemClickListener {
+                    override fun onItemClick(index: Int, listView: ListView): Boolean {
+                        SPManager.getBoolean(
+                            SPManager.SP_PLAY_ALL
+                        ).let {
+                            SPManager.setBoolean(
+                                SPManager.SP_PLAY_ALL, !it
+                            )
+                            listView.getCurrentItem().rightText =
+                                if (it) Strings.SAVE else Strings.ALL
+                        }
+                        return true
                     }
+                }, if (SPManager.getBoolean(
+                        SPManager.SP_PLAY_ALL
+                    )
+                ) Strings.ALL else Strings.SAVE
+            ),
+
+            Item(Strings.REPEAT_MODE, object : OnItemClickListener {
+                override fun onItemClick(index: Int, listView: ListView): Boolean {
+                    val repeatMode = MediaPresenter.getRepeatMode()
+                    val next = RepeatMode.getRepeatMode((repeatMode.id + 1) % RepeatMode.count)
+                    MediaPresenter.nextRepeatMode()
+                    listView.getCurrentItem().rightText = next.title
                     return true
                 }
-            }, if (SPManager.getBoolean(SPManager.SP_PLAY_ALL))  "全部歌曲" else "收藏歌曲" ),
+            }, MediaPresenter.getRepeatMode().title),
 
-            SwitchBar("重复播放", SPManager.SP_REPEAT),
+            Item(
+                Strings.NIGHT_MODE, object : OnItemClickListener {
+                    override fun onItemClick(index: Int, listView: ListView): Boolean {
+                        var nightMode = SPManager.getInt(SPManager.NightMode.SP_NAME)
+                        nightMode++
+                        nightMode %= SPManager.NightMode.values
+                        SPManager.setInt(
+                            SPManager.NightMode.SP_NAME, nightMode
+                        )
+                        Core.setNightMode()
+                        listView.getCurrentItem().rightText =
+                            SPManager.NightMode.getTitle(nightMode)
+                        return true
+                    }
 
-            Item("夜间模式", object : OnItemClickListener {
-                override fun onItemClick(index : Int, listView : ListView) : Boolean {
-                    var nightMode = SPManager.getInt(SPManager.NightMode.SP_NAME)
-                    nightMode ++
-                    nightMode %= SPManager.NightMode.values
-                    Core.setNightMode(SPManager.NightMode.nightMode(nightMode))
-                    SPManager.setInt(SPManager.NightMode.SP_NAME, nightMode)
-                    listView.getCurrentItem().rightText = SPManager.NightMode.getString(nightMode)
-                    return true
-                }
+                }, SPManager.NightMode.getTitle(
+                    SPManager.getInt(
+                        SPManager.NightMode.SP_NAME
+                    )
+                )
+            ),
 
-            }, SPManager.NightMode.getString(SPManager.getInt(SPManager.NightMode.SP_NAME))),
+            SwitchBar(
+                Strings.PLAY_WITH_OTHER,
+                SPManager.SP_AUDIO_FOCUS,
+                true,
+                object : OnSwitchListener {
+                    override fun onSwitch() {
+                        MediaPresenter.setAudioFocus()
+                    }
+                }),
 
-            SwitchBar("与其它应用同时播放", SPManager.SP_AUDIO_FOCUS, true),
+            Item(
+                Strings.TOUCH_FEEDBACK, object : OnItemClickListener {
+                    override fun onItemClick(index: Int, listView: ListView): Boolean {
+                        var sound = SPManager.getInt(
+                            SPManager.Sound.SP_NAME
+                        )
+                        sound++
+                        sound %= SPManager.Sound.values
+                        SPManager.setInt(
+                            SPManager.Sound.SP_NAME, sound
+                        )
+                        listView.getCurrentItem().rightText = SPManager.Sound.getTitle(sound)
+                        return true
+                    }
+                }, SPManager.Sound.getTitle(
+                    SPManager.getInt(
+                        SPManager.Sound.SP_NAME
+                    )
+                )
+            ),
 
-            Item("按键反馈", object : OnItemClickListener {
-                override fun onItemClick(index : Int, listView: ListView) : Boolean {
-                    var sound = SPManager.getInt(SPManager.Sound.SP_NAME)
-                    sound ++
-                    sound %= SPManager.Sound.values
-                    SPManager.setInt(SPManager.Sound.SP_NAME, sound)
-                    listView.getCurrentItem().rightText = SPManager.Sound.getString(sound)
-                    return true
-                }
-            }, SPManager.Sound.getString(SPManager.getInt(SPManager.Sound.SP_NAME))),
-
-            Item("主题", object : OnItemClickListener {
-                override fun onItemClick(index : Int, listView: ListView) : Boolean {
-                    SPManager.getBoolean(SPManager.SP_THEME).let {
-                        SPManager.setBoolean(SPManager.SP_THEME, !it)
+            Item(
+                Strings.THEME, object : OnItemClickListener {
+                    override fun onItemClick(index: Int, listView: ListView): Boolean {
+                        val themeId = SPManager.getInt(SPManager.Theme.SP_NAME)
+                        SPManager.setInt(
+                            SPManager.Theme.SP_NAME,
+                            (themeId + 1) % SPManager.Theme.values
+                        )
                         Core.refresh()
-                        listView.getCurrentItem().rightText = if (it) "黑色" else "红色"
+                        listView.getCurrentItem().rightText =
+                            when (SPManager.getInt(SPManager.Theme.SP_NAME)) {
+                                SPManager.Theme.RED.id -> SPManager.Theme.RED.title
+                                SPManager.Theme.BLACK.id -> SPManager.Theme.BLACK.title
+                                SPManager.Theme.WHITE.id -> SPManager.Theme.WHITE.title
+                                else -> ""
+                            }
+                        return true
                     }
-                    return true
+                }, when (SPManager.getInt(SPManager.Theme.SP_NAME)) {
+                    SPManager.Theme.RED.id -> SPManager.Theme.RED.title
+                    SPManager.Theme.BLACK.id -> SPManager.Theme.BLACK.title
+                    SPManager.Theme.WHITE.id -> SPManager.Theme.WHITE.title
+                    else -> ""
                 }
-            }, if (SPManager.getBoolean(SPManager.SP_THEME))  "红色" else "黑色" ),
+            ),
 
-            SwitchBar("显示歌词", SPManager.SP_SHOW_LYRIC),
+            SwitchBar(Strings.SHOW_LYRIC, SPManager.SP_SHOW_LYRIC),
 
-            SwitchBar("显示歌手及专辑信息", SPManager.SP_SHOW_INFO),
+            SwitchBar(Strings.SHOW_INFO, SPManager.SP_SHOW_INFO),
 
-            SwitchBar("显示时间", SPManager.SP_SHOW_TIME),
+            SwitchBar(Strings.SHOW_TIME, SPManager.SP_SHOW_TIME),
 
-            Item("启动后自动开始播放", object : OnItemClickListener {
-                override fun onItemClick(index : Int, listView: ListView) : Boolean {
-                    var autoStop = SPManager.getInt(SPManager.AutoStop.SP_NAME)
-                    autoStop ++
-                    autoStop %= SPManager.AutoStop.values
-                    SPManager.setInt(SPManager.AutoStop.SP_NAME, autoStop)
-                    listView.getCurrentItem().rightText = SPManager.AutoStop.getString(autoStop)
-                    return true
-                }
-            }, SPManager.AutoStop.getString(SPManager.getInt(SPManager.AutoStop.SP_NAME))),
+            Item(
+                Strings.AUTO_PLAY, object : OnItemClickListener {
+                    override fun onItemClick(index: Int, listView: ListView): Boolean {
+                        var autoStop = SPManager.getInt(
+                            SPManager.AutoStop.SP_NAME
+                        )
+                        autoStop++
+                        autoStop %= SPManager.AutoStop.values
+                        SPManager.setInt(
+                            SPManager.AutoStop.SP_NAME, autoStop
+                        )
+                        listView.getCurrentItem().rightText = SPManager.AutoStop.getString(autoStop)
+                        return true
+                    }
+                }, SPManager.AutoStop.getString(
+                    SPManager.getInt(
+                        SPManager.AutoStop.SP_NAME
+                    )
+                )
+            ),
 
-            SwitchBar("CoverFlow", SPManager.SP_COVER_FLOW),
+            SwitchBar(Strings.COVER_FLOW, SPManager.SP_COVER_FLOW),
 
-            Item("Reset All Settings", object : OnItemClickListener {
-                override fun onItemClick(index : Int, listView: ListView) : Boolean {
-                    Core.addView(ItemListView(context, arrayListOf(
-                        Item("Cancel", object : OnItemClickListener { override fun onItemClick(index: Int, listView: ListView) : Boolean { Core.removeView(); return true } }, false),
-                        Item("Reset", object : OnItemClickListener { override fun onItemClick(index: Int, listView: ListView) : Boolean { SPManager.reset();Core.exit(); return true } }, false)
-                    ), "Reset All", null))
+            Item(Strings.RESET_ALL_SETTINGS, object : OnItemClickListener {
+                override fun onItemClick(index: Int, listView: ListView): Boolean {
+                    Core.addView(
+                        ItemListView(
+                            context, arrayListOf(
+                                Item(Strings.CANCEL, object : OnItemClickListener {
+                                    override fun onItemClick(
+                                        index: Int,
+                                        listView: ListView
+                                    ): Boolean {
+                                        Core.removeView(); return true
+                                    }
+                                }, false),
+                                Item(Strings.RESET, object : OnItemClickListener {
+                                    override fun onItemClick(
+                                        index: Int,
+                                        listView: ListView
+                                    ): Boolean {
+                                        Core.reset();Core.removeView(); return true
+                                    }
+                                }, false)
+                            ), Strings.RESET_ALL, null
+                        )
+                    )
                     return true
                 }
             }, true)
         )
     }
-
-    override fun getLaunchMode(): Int {
-        return ScreenView.LAUNCH_MODE_NORMAL
-    }
-
-    override fun onStart() {}
-
-    override fun onStop() {}
 }

@@ -1,48 +1,35 @@
 package com.example.podclassic.view
 
-import android.annotation.SuppressLint
 import android.content.Context
-import com.example.podclassic.`object`.Core
-import com.example.podclassic.`object`.MusicList
+import com.example.podclassic.base.Core
 import com.example.podclassic.base.ScreenView
-import com.example.podclassic.storage.SaveMusicLists
+import com.example.podclassic.bean.MusicList
+import com.example.podclassic.storage.MusicListTable
+import com.example.podclassic.values.Strings
 import com.example.podclassic.widget.ListView
 
-@SuppressLint("ViewConstructor")
-class AlbumListView : ListView, ScreenView {
+class AlbumListView(
+    context: Context,
+    list: ArrayList<MusicList>,
+    private val title: String,
+    private var longClick: Int
+) : ListView(context), ScreenView {
     companion object {
         const val LONG_CLICK_ADD = 0
         const val LONG_CLICK_REMOVE = 1
     }
 
-    private var musicList : ArrayList<MusicList>
-    private val title : String
-    private var longClick  = LONG_CLICK_ADD
-    constructor(context: Context, list : ArrayList<String>, type : Int, longClick : Int, title : String) : super(context) {
-        this.title = title
-        this.longClick = longClick
-        this.musicList = ArrayList(list.size)
-        itemList.ensureCapacity(list.size)
-        for (string in list) {
-            itemList.add(Item(string, null, true))
-            val musicList = MusicList()
-            musicList.type = type
-            musicList.name = string
-            this.musicList.add(musicList)
-        }
-        sorted = longClick == LONG_CLICK_ADD
-    }
+    private var musicList: ArrayList<MusicList> = list
+    private var hasAll = false
 
-    constructor(context: Context, list : ArrayList<MusicList>, title : String) : super(context) {
-        this.musicList = list
-        this.title = title
-        val hasAll = list.size >= 2 && list[0].type != list[1].type
+    init {
+        hasAll = list.size >= 2 && list[0].type != list[1].type
         itemList.ensureCapacity(list.size)
         for (musicList in list) {
-            itemList.add(Item(musicList.name, null, true))
+            itemList.add(Item(musicList.title, null, true))
         }
         if (hasAll) {
-            itemList[0].name = "全部"
+            itemList[0].name = Strings.ALL
         }
         sorted = longClick == LONG_CLICK_ADD
     }
@@ -51,13 +38,13 @@ class AlbumListView : ListView, ScreenView {
         return if (itemList.isEmpty()) {
             false
         } else {
-            Core.addView(MusicListView(context, musicList[index], MusicListView.LONG_CLICK_SET_LOVE))
+            Core.addView(MusicListView(context, musicList[index]))
             true
         }
     }
 
     override fun enterLongClick(): Boolean {
-        if (itemList.isEmpty()) {
+        if (itemList.isEmpty() || (hasAll && index == 0)) {
             return false
         }
         val musicList = musicList[index]
@@ -65,20 +52,20 @@ class AlbumListView : ListView, ScreenView {
             MusicList.TYPE_ALBUM -> {
                 if (longClick == LONG_CLICK_REMOVE) {
                     this.musicList.removeAt(index)
-                    SaveMusicLists.saveAlbums.remove(musicList.name)
+                    MusicListTable.album.delete(musicList)
                     removeCurrentItem()
                 } else {
-                    SaveMusicLists.saveAlbums.add(musicList.name)
+                    MusicListTable.album.add(musicList)
                     shake()
                 }
             }
-            MusicList.TYPE_SINGER -> {
+            MusicList.TYPE_ARTIST -> {
                 if (longClick == LONG_CLICK_REMOVE) {
                     this.musicList.removeAt(index)
-                    SaveMusicLists.saveSingers.remove(musicList.name)
+                    MusicListTable.artist.delete(musicList)
                     removeCurrentItem()
                 } else {
-                    SaveMusicLists.saveSingers.add(musicList.name)
+                    MusicListTable.artist.add(musicList)
                     shake()
                 }
             }
@@ -93,16 +80,4 @@ class AlbumListView : ListView, ScreenView {
     override fun getTitle(): String {
         return title
     }
-
-    override fun getLaunchMode(): Int {
-        return ScreenView.LAUNCH_MODE_NORMAL
-    }
-
-    override fun onStart() {
-
-    }
-
-    override fun onStop() {
-    }
-
 }

@@ -3,20 +3,18 @@ package com.example.podclassic.widget
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.Paint
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
-import com.example.podclassic.`object`.Core
-import com.example.podclassic.`object`.MediaPlayer
-import com.example.podclassic.util.Colors
-import com.example.podclassic.util.Icons.MENU
-import com.example.podclassic.util.Icons.NEXT
-import com.example.podclassic.util.Icons.PAUSE
-import com.example.podclassic.util.Icons.PREV
 import com.example.podclassic.util.ThreadUtil
-import com.example.podclassic.util.Values
 import com.example.podclassic.util.VolumeUtil
+import com.example.podclassic.values.Icons.MENU
+import com.example.podclassic.values.Icons.NEXT
+import com.example.podclassic.values.Icons.PAUSE
+import com.example.podclassic.values.Icons.PREV
+import com.example.podclassic.values.Values
 import java.util.*
 import kotlin.math.abs
 import kotlin.math.atan2
@@ -36,19 +34,21 @@ class SlideController : View {
 
     }
 
-    constructor(context : Context?) : super(context)
+    constructor(context: Context?) : super(context)
     constructor(context: Context?, attributeSet: AttributeSet?) : super(context, attributeSet)
 
     private val paint = Paint()
 
-    private var lock = false
-
-    fun lock(lock : Boolean) {
-        this.lock = lock
-        if (lock) {
-            cancelTimer()
+    var enable = true
+        set(value) {
+            if (!value) {
+                cancelTimer()
+            }
+            field = value
         }
-    }
+
+    var colorController: Int = Color.RED
+    var colorButton: Int = Color.BLACK
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec)
@@ -87,39 +87,59 @@ class SlideController : View {
         super.onDraw(canvas)
 
         paint.isAntiAlias = true
-        paint.color = Colors.controller
+        paint.color = colorController//Colors.controller
         canvas?.drawCircle(centerX, centerY, maxR, paint)
-        paint.color = Colors.color_primary
+        paint.color = colorButton//Colors.color_primary
         canvas?.drawCircle(centerX, centerY, minR, paint)
 
         val r = (minR + maxR) / 2
 
-        canvas?.drawBitmap(MENU.bitmap, centerX - MENU.width / 2, centerY - r - PAUSE.height - MENU.height / 2 , paint)
-        canvas?.drawBitmap(PREV.bitmap, (centerX - r) - PREV.width / 2 * 3, centerY - PREV.height / 2, paint)
-        canvas?.drawBitmap(NEXT.bitmap, (centerX + r) + NEXT.width / 2, centerY - NEXT.height / 2, paint)
-        canvas?.drawBitmap(PAUSE.bitmap, centerX - PAUSE.width / 2, centerY + r + PAUSE.height / 2, paint)
+        canvas?.drawBitmap(
+            MENU.bitmap,
+            centerX - MENU.width / 2,
+            centerY - r - PAUSE.height - MENU.height / 2,
+            paint
+        )
+        canvas?.drawBitmap(
+            PREV.bitmap,
+            (centerX - r) - PREV.width / 2 * 3,
+            centerY - PREV.height / 2,
+            paint
+        )
+        canvas?.drawBitmap(
+            NEXT.bitmap,
+            (centerX + r) + NEXT.width / 2,
+            centerY - NEXT.height / 2,
+            paint
+        )
+        canvas?.drawBitmap(
+            PAUSE.bitmap,
+            centerX - PAUSE.width / 2,
+            centerY + r + PAUSE.height / 2,
+            paint
+        )
 
     }
 
-    private var startPoint : TouchPoint =
+    private var startPoint: TouchPoint =
         TouchPoint.emptyTouchPoint()
-    private var prevPoint : TouchPoint =
+    private var prevPoint: TouchPoint =
         TouchPoint.emptyTouchPoint()
-    private var touchTimer : Timer? = null
+    private var touchTimer: Timer? = null
 
     private fun cancelTimer() {
         touchTimer?.cancel()
         touchTimer = null
     }
 
-    private fun setTimer(curPoint : TouchPoint) {
-        if (lock) {
+    private fun setTimer(curPoint: TouchPoint) {
+        if (!enable) {
             return
         }
         val timerTask = object : TimerTask() {
             override fun run() {
                 ThreadUtil.runOnUiThread(Runnable {
-                    Core.wake()
+                    onTouch()
                     if (startPoint.slided) {
                         return@Runnable
                     }
@@ -139,13 +159,14 @@ class SlideController : View {
             }
         }
         cancelTimer()
-        touchTimer = Timer()
-        touchTimer?.schedule(timerTask, 500, 600)
+        touchTimer = Timer().apply {
+            schedule(timerTask, 500, 600)
+        }
     }
 
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(event: MotionEvent?): Boolean {
-        if (event == null || lock) {
+        if (event == null || !enable) {
             return super.onTouchEvent(event)
         }
 
@@ -158,7 +179,7 @@ class SlideController : View {
         if (curPoint.r > maxR) {
             return super.onTouchEvent(event)
         }
-        Core.wake()
+        onTouch()
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
                 startPoint = curPoint
@@ -177,15 +198,15 @@ class SlideController : View {
                 if (startPoint.inCircle && curPoint.inCircle) {
                     if (!prevPoint.isEmpty() && slideVal != 0) {
                         //如果slideVal = 0 不会调用slide方法
-                        slide(slideVal)
-                        startPoint.slided= true
+                        onSlide(slideVal)
+                        startPoint.slided = true
                         cancelTimer()
                     }
                 }
                 prevPoint = curPoint
             }
 
-            MotionEvent.ACTION_UP,MotionEvent.ACTION_CANCEL -> {
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                 cancelTimer()
                 if (startPoint.slided) {
                     return true
@@ -195,11 +216,21 @@ class SlideController : View {
                         onEnterClick()
                     } else if (startPoint.inCircle && curPoint.inCircle) {
                         when (startPoint.deg) {
-                            in 45..135 -> { onMenuClick() }
-                            in 135..225 -> { onPrevClick() }
-                            in 225..315 -> { onPauseClick() }
-                            in 315..360 -> { onNextClick() }
-                            in 0..45 -> { onNextClick() }
+                            in 45..135 -> {
+                                onMenuClick()
+                            }
+                            in 135..225 -> {
+                                onPrevClick()
+                            }
+                            in 225..315 -> {
+                                onPauseClick()
+                            }
+                            in 315..360 -> {
+                                onNextClick()
+                            }
+                            in 0..45 -> {
+                                onNextClick()
+                            }
                         }
                     }
                 }
@@ -222,11 +253,11 @@ class SlideController : View {
         cancelTimer()
     }
 
-    class TouchPoint constructor(x : Float, y : Float, t : Long) {
+    class TouchPoint constructor(x: Float, y: Float, t: Long) {
 
         companion object {
 
-            fun emptyTouchPoint() : TouchPoint {
+            fun emptyTouchPoint(): TouchPoint {
                 return TouchPoint(
                     0f,
                     0f,
@@ -237,7 +268,7 @@ class SlideController : View {
             /**
              * 大于0：next，等于0：未移动，小于0：prev
              */
-            private fun calcSlideVal(prevDeg : Int, curDeg : Int) : Int {
+            private fun calcSlideVal(prevDeg: Int, curDeg: Int): Int {
                 val minus = prevDeg - curDeg
                 if (abs(minus) >= SLIDE_VAL * 4 || minus == 0) {
                     return 0
@@ -250,7 +281,7 @@ class SlideController : View {
                 return if (minus > 0) 1 else -1
             }
 
-            fun calcSlideVal(prevPoint : TouchPoint, curPoint : TouchPoint) : Int {
+            fun calcSlideVal(prevPoint: TouchPoint, curPoint: TouchPoint): Int {
 
                 return calcSlideVal(
                     prevPoint.deg,
@@ -292,12 +323,12 @@ class SlideController : View {
             slided = false
         }
 
-        private fun getR(x : Float, y : Float) : Float {
+        private fun getR(x: Float, y: Float): Float {
             return sqrt(x * x + y * y)
         }
 
-        private fun getDeg(x : Float, y : Float) : Int {
-            var deg : Int = Math.toDegrees(atan2(y.toDouble(), x.toDouble())).toInt()
+        private fun getDeg(x: Float, y: Float): Int {
+            var deg: Int = Math.toDegrees(atan2(y.toDouble(), x.toDouble())).toInt()
             if (deg < 0) {
                 deg += 360
             }
@@ -306,14 +337,14 @@ class SlideController : View {
             return deg
         }
 
-        fun isEmpty() : Boolean {
+        fun isEmpty(): Boolean {
             return t == 0L
         }
 
     }
 
     private fun onEnterClick() {
-        if (lock) {
+        if (!enable) {
             return
         }
         if (onTouchListener?.onEnterClick() == true) {
@@ -321,52 +352,8 @@ class SlideController : View {
         }
     }
 
-    private fun onMenuClick() {
-        if (lock) {
-            return
-        }
-        if (Core.removeView()) {
-            VolumeUtil.vibrate(this)
-        }
-    }
-
-    private fun onPrevClick() {
-        if (lock) {
-            return
-        }
-        MediaPlayer.prev()
-        VolumeUtil.vibrate(this)
-    }
-
-    private fun onNextClick() {
-        if (lock) {
-            return
-        }
-        MediaPlayer.next()
-        VolumeUtil.vibrate(this)
-    }
-
-
-    private fun slide(slideVal : Int) {
-        if (lock) {
-            return
-        }
-        if (onTouchListener?.onSlide(slideVal) == true) {
-            VolumeUtil.vibrate(this)
-        }
-    }
-
-
-    private fun onPauseClick() {
-        if (lock) {
-            return
-        }
-        MediaPlayer.pause()
-        VolumeUtil.vibrate(this)
-    }
-
     private fun onEnterLongClick() {
-        if (lock) {
+        if (!enable) {
             return
         }
         if (onTouchListener?.onEnterLongClick() == true) {
@@ -374,38 +361,109 @@ class SlideController : View {
         }
     }
 
-    private fun onNextLongClick() {
-        if (lock) {
+    private fun onMenuClick() {
+        if (!enable) {
             return
         }
-        MediaPlayer.forward()
-        VolumeUtil.vibrate(this)
-    }
-
-    private fun onPauseLongClick() {}
-
-    private fun onPrevLongClick() {
-        if (lock) {
-            return
+        if (onTouchListener?.onMenuClick() == true) {
+            VolumeUtil.vibrate(this)
         }
-        MediaPlayer.backward()
-        VolumeUtil.vibrate(this)
     }
 
     private fun onMenuLongClick() {
-        if (lock) {
+        if (!enable) {
             return
         }
-        Core.home()
-        cancelTimer()
-        VolumeUtil.vibrate(this)
+        if (onTouchListener?.onMenuLongClick() == true) {
+            VolumeUtil.vibrate(this)
+        }
     }
 
-    var onTouchListener : OnTouchListener? = null
+    private fun onPrevClick() {
+        if (!enable) {
+            return
+        }
+        if (onTouchListener?.onPrevClick() == true) {
+            VolumeUtil.vibrate(this)
+        }
+    }
+
+    private fun onPrevLongClick() {
+        if (!enable) {
+            return
+        }
+        if (onTouchListener?.onPrevLongClick() == true) {
+            VolumeUtil.vibrate(this)
+        }
+    }
+
+    private fun onNextClick() {
+        if (!enable) {
+            return
+        }
+        if (onTouchListener?.onNextClick() == true) {
+            VolumeUtil.vibrate(this)
+        }
+    }
+
+    private fun onNextLongClick() {
+        if (!enable) {
+            return
+        }
+        if (onTouchListener?.onNextLongClick() == true) {
+            VolumeUtil.vibrate(this)
+        }
+    }
+
+    private fun onPauseClick() {
+        if (!enable) {
+            return
+        }
+        if (onTouchListener?.onPauseClick() == true) {
+            VolumeUtil.vibrate(this)
+        }
+    }
+
+    private fun onPauseLongClick() {
+        if (!enable) {
+            return
+        }
+        if (onTouchListener?.onPauseLongClick() == true) {
+            VolumeUtil.vibrate(this)
+        }
+    }
+
+    private fun onSlide(slideVal: Int) {
+        if (!enable) {
+            return
+        }
+        if (onTouchListener?.onSlide(slideVal) == true) {
+            VolumeUtil.vibrate(this)
+        }
+    }
+
+    private fun onTouch() {
+        if (!enable) {
+            return
+        }
+        onTouchListener?.onTouch()
+    }
+
+
+    var onTouchListener: OnTouchListener? = null
 
     interface OnTouchListener {
-        fun onEnterClick() : Boolean
-        fun onEnterLongClick() : Boolean
-        fun onSlide(slideVal: Int) : Boolean
+        fun onSlide(slideVal: Int) = false
+        fun onEnterClick() = false
+        fun onEnterLongClick() = false
+        fun onPrevClick() = false
+        fun onPrevLongClick() = false
+        fun onNextClick() = false
+        fun onNextLongClick() = false
+        fun onMenuClick() = false
+        fun onMenuLongClick() = false
+        fun onPauseClick() = false
+        fun onPauseLongClick() = false
+        fun onTouch()
     }
 }

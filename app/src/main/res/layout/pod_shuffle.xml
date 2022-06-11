@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:background="@drawable/round_rectangle">
+
+    <FrameLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:padding="10dp">
+
+        <ImageView
+            android:layout_width="120dp"
+            android:layout_height="120dp"
+            android:src="@drawable/circle" />
+
+        <Button
+            android:id="@+id/btn_volume_up"
+            android:layout_width="21dp"
+            android:layout_height="21dp"
+            android:layout_gravity="center|top"
+            android:background="@android:color/transparent"
+            android:text="+"
+            android:textColor="@color/white" />
+
+        <Button
+            android:id="@+id/btn_volume_down"
+            android:layout_width="21dp"
+            android:layout_height="21dp"
+            android:layout_gravity="bottom|center"
+            android:background="@android:color/transparent"
+            android:text="-"
+            android:textColor="@color/white" />
+
+        <ImageView
+            android:id="@+id/btn_prev"
+
+            android:layout_width="21dp"
+            android:layout_height="21dp"
+            android:layout_gravity="center|start"
+            android:padding="5dp"
+            android:scaleType="centerCrop"
+            android:src="@drawable/ic_skip_previous_white_24dp" />
+
+        <ImageView
+            android:id="@+id/btn_next"
+            android:layout_width="21dp"
+            android:layout_height="21dp"
+            android:layout_gravity="center|end"
+            android:padding="5dp"
+            android:scaleType="centerCrop"
+
+            android:src="@drawable/ic_skip_next_white_24dp" />
+
+        <ImageView
+            android:id="@+id/btn_pause"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_gravity="center"
+            android:padding="12dp"
+            android:scaleType="centerCrop"
+            android:src="@drawable/ic_pause_white_24dp" />
+    </FrameLayout>
+
+
+</FrameLayout>

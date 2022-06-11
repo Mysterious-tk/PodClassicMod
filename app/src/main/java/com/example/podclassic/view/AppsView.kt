@@ -1,112 +1,107 @@
 package com.example.podclassic.view
 
 import android.content.Context
-import com.example.podclassic.`object`.Core
-import com.example.podclassic.game.Brick
-import com.example.podclassic.storage.SPManager
-import com.example.podclassic.util.Values
+import com.example.podclassic.base.Core
+import com.example.podclassic.bean.App
+import com.example.game.Brick
+import com.example.podclassic.storage.AppTable
+import com.example.podclassic.values.Strings
+import com.example.podclassic.values.Values
 import com.example.podclassic.widget.ListView
 
-class AppsView(context: Context) : ItemListView(context,
+class AppsView(context: Context) : ItemListView(
+    context,
     //这是构造方法的一个参数...轻喷
     arrayListOf(
-        Item("游戏", object : OnItemClickListener {
+        Item(Strings.GAME, object : OnItemClickListener {
             val itemList = arrayListOf(
-                Item("Brick", object : OnItemClickListener {
-                    override fun onItemClick(
-                        index: Int,
-                        listView: ListView
-                    ): Boolean {
+                Item(Strings.BRICK, object : OnItemClickListener {
+                    override fun onItemClick(index: Int, listView: ListView): Boolean {
                         Core.addView(Brick(context)); return true
                     }
                 }, true),
-                Item("Music Quiz", object : OnItemClickListener {
-                    override fun onItemClick(
-                        index: Int,
-                        listView: ListView
-                    ): Boolean {
+                Item(Strings.MUSIC_QUIZ, object : OnItemClickListener {
+                    override fun onItemClick(index: Int, listView: ListView): Boolean {
                         Core.addView(MusicQuizView(context)); return true
                     }
                 }, true)
             )
 
             override fun onItemClick(index: Int, listView: ListView): Boolean {
-                Core.addView(
-                    ItemListView(context, itemList, "游戏", null)
-                ); return true
+                Core.addView(ItemListView(context, itemList, Strings.GAME, null)); return true
             }
 
-        }, true)).apply {
-            if (Values.LAUNCHER) {
-                this.add(Item("所有程序", object : OnItemClickListener {
-                    override fun onItemClick(index: Int, listView: ListView): Boolean {
-                        val itemList = ArrayList<Item>()
-                        val appList = SPManager.AppList.getAppList()
-                        for (app in appList) {
-                            itemList.add(Item(app.name, null, true))
-                        }
-                        Core.addView(
-                            ItemListView(context, itemList, "所有程序",
-                                object : OnItemClickListener {
-                                    override fun onItemClick(index: Int, listView: ListView): Boolean {
-                                        context.startActivity(appList[index].intent)
-                                        return true
-                                    }
-
-                                    override fun onItemLongClick(index: Int, listView: ListView): Boolean {
-                                        listView.shake()
-                                        SPManager.AppList.addApp(appList[index])
-                                        return true
-                                    }
-                                })
-                        )
-                        return true
+        }, true)
+    ).apply {
+        if (Values.LAUNCHER) {
+            this.add(Item(Strings.APPLICATION, object : OnItemClickListener {
+                override fun onItemClick(index: Int, listView: ListView): Boolean {
+                    val itemList = ArrayList<Item>()
+                    val appList = AppTable.getAppList()
+                    for (app in appList) {
+                        itemList.add(Item(app.name, null, true))
                     }
-                }, true))
-            }
+                    Core.addView(
+                        ItemListView(context, itemList, Strings.APPLICATION,
+                            object : OnItemClickListener {
+                                override fun onItemClick(index: Int, listView: ListView): Boolean {
+                                    context.startActivity(appList[index].intent)
+                                    return true
+                                }
+
+                                override fun onItemLongClick(
+                                    index: Int,
+                                    listView: ListView
+                                ): Boolean {
+                                    listView.shake()
+                                    AppTable.favourite.add(appList[index])
+                                    return true
+                                }
+                            })
+                    )
+                    return true
+                }
+            }, true))
         }
-    , "附加程序", null) {
+    }, Strings.EXTRA_APPLICATION, null
+) {
 
     init {
         this.defaultOnItemClickListener = object : OnItemClickListener {
             override fun onItemClick(index: Int, listView: ListView): Boolean {
                 if (Values.LAUNCHER && index >= 2) {
-                    context.startActivity((listView.getItem(index).extra as SPManager.App).intent)
+                    context.startActivity((listView.getItem(index).extra as App).intent)
                     return true
                 }
                 return false
             }
+
             override fun onItemLongClick(index: Int, listView: ListView): Boolean {
                 if (Values.LAUNCHER && index >= 2) {
-                    SPManager.AppList.removeApp((listView.getItem(index).extra as SPManager.App))
+                    AppTable.favourite.remove((listView.getItem(index).extra as App))
                     listView.removeCurrentItem()
                     return true
                 }
                 return false
             }
         }
-        val appList = SPManager.AppList.getSavedAppList()
-
-        for (app in appList) {
-            itemList.add(Item(app.name, null, true).apply {
-                extra = app
-            })
-        }
-
     }
-    override fun onStart() {
+
+    override fun onViewAdd() {
         if (Values.LAUNCHER) {
-            val appList = SPManager.AppList.getSavedAppList()
+            val appList = AppTable.favourite.list
 
             for (app in appList) {
                 val item = Item(app.name, null, true).apply {
                     extra = app
                 }
-                if (!itemList.contains(item)) {
-                    itemList.add(item)
-                }
+                addIfNotExist(item)
             }
             refreshList()
         }
+    }
+
+    override fun getTitle(): String {
+        return Strings.EXTRA_APPLICATION
     }
 }

@@ -1,64 +1,121 @@
 package com.example.podclassic.widget
 
-import android.annotation.SuppressLint
 import android.content.Context
+import android.graphics.Outline
 import android.util.AttributeSet
 import android.view.View
-import android.widget.FrameLayout
+import android.view.ViewOutlineProvider
+import android.widget.LinearLayout
 import com.example.podclassic.base.ScreenView
-import com.example.podclassic.util.Colors
 import com.example.podclassic.view.MainView
 
-class Screen(context: Context, attributeSet: AttributeSet?) : FrameLayout(context, attributeSet) {
+class Screen(context: Context, attributeSet: AttributeSet?) : LinearLayout(context, attributeSet) {
 
     private val mainView = MainView(context)
-    var currentView : ScreenView = mainView
+    var currentView: ScreenView = mainView
+
     private val screenLayout = ScreenLayout(context)
+    private val titleBar = TitleBar(context)
 
     init {
-        setBackgroundColor(Colors.background)
-        addView(screenLayout, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
+        //addView(view)
+        outlineProvider = object : ViewOutlineProvider() {
+            override fun getOutline(p0: View?, p1: Outline?) {
+                p1?.setRoundRect(0, 0, width, height, 12f)
+            }
+        }
+        clipToOutline = true
+
+        addView(titleBar, LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f))
+        addView(screenLayout, LayoutParams(LayoutParams.MATCH_PARENT, 0, 9f))
+        orientation = VERTICAL
         screenLayout.onViewChangeListener = object : ScreenLayout.OnViewChangeListener {
-            override fun onViewRemove(view: View) {
-                (view as ScreenView).onStop()
+            override fun onViewDelete(view: View) {
+                (view as ScreenView).onViewDelete()
+                view.getObserver()?.onViewDelete()
             }
+
+            override fun onViewCreate(view: View) {
+                (view as ScreenView).onViewCreate()
+                view.getObserver()?.onViewCreate()
+            }
+
             override fun onViewAdd(view: View) {
-                (view as ScreenView).onStart()
+                (view as ScreenView).onViewAdd()
+                view.getObserver()?.onViewAdd()
             }
 
-            override fun onViewAdded(view: View) {
-                (view as ScreenView).onStartFinished()
+            override fun onViewRemove(view: View) {
+                (view as ScreenView).onViewRemove()
+                view.getObserver()?.onViewRemove()
             }
         }
-        screenLayout.addView(mainView as View)
+        screenLayout.add(mainView as View)
 
+        setTitle()
     }
 
-    fun removeView() : ScreenView? {
-        if (currentView == mainView) {
-            return null
+    private fun setTitle() {
+        val title = currentView.getTitle()
+        if (title == null) {
+            titleBar.showTime()
         } else {
-            val view = screenLayout.removeView()
-            if (view != null) {
-                currentView = view as ScreenView
-            }
+            titleBar.showTitle(title)
         }
+    }
+
+    private fun removeView(): ScreenView? {
+        return if (currentView == mainView) {
+            null
+        } else {
+            val view = screenLayout.remove()
+            currentView = view as ScreenView
+            currentView
+        }
+    }
+
+    private fun getCurrent(): ScreenView {
         return currentView
     }
 
-    fun getCurrent(): ScreenView {
-        return currentView
-    }
-
-    @SuppressLint("ObjectAnimatorBinding")
-    fun clearViews() {
-        screenLayout.removeAllViews()
+    private fun clearViews() {
+        screenLayout.removeAll()
         currentView = mainView
-        screenLayout.addView(mainView as View)
+        screenLayout.add(mainView as View)
     }
 
-    fun addView(child: ScreenView) {
-        screenLayout.addView(child as View)
-        currentView = child
+    override fun addView(child: View) {
+        screenLayout.add(child)
+        currentView = child as ScreenView
     }
+
+    fun add(view: ScreenView): Boolean {
+        if (view.getLaunchMode() == ScreenView.LAUNCH_MODE_SINGLE) {
+            screenLayout.removeInstanceOf(view.javaClass)
+        }
+        addView(view as View)
+        setTitle()
+        return true
+    }
+
+    fun remove(): Boolean {
+        val view = removeView()
+        return if (view != null) {
+            setTitle()
+            true
+        } else {
+            false
+        }
+    }
+
+    fun get(): ScreenView {
+        return currentView
+    }
+
+    fun home(): Boolean {
+        clearViews()
+        setTitle()
+        return true
+    }
+
 }
