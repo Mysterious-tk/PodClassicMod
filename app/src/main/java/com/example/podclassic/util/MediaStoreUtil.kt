@@ -8,6 +8,7 @@ import android.media.ThumbnailUtils
 import android.net.Uri
 import android.provider.MediaStore
 import android.text.TextUtils
+import android.util.Log
 import com.example.podclassic.base.BaseApplication
 import com.example.podclassic.bean.Music
 import com.example.podclassic.bean.MusicList
@@ -75,7 +76,18 @@ object MediaStoreUtil {
         val albumIndex = cursor.getColumnIndex(MediaStore.Audio.Albums.ALBUM)
         val albumIdIndex = cursor.getColumnIndex(MediaStore.Audio.Albums._ID)
         val artistIndex = cursor.getColumnIndex(MediaStore.Audio.Albums.ARTIST)
+        var albumIDIndex = cursor.getColumnIndex(MediaStore.Audio.Albums.ALBUM_ID)
+
+        var AlbumsMap = mutableMapOf<Long, Long>()
+        for (music in musicCache!!)
+        {
+            if (music.albumId != null)
+                AlbumsMap.put(music.albumId, 1)
+        }
+
         while (cursor.moveToNext()) {
+            var albumID = cursor.getString(albumIDIndex).toLong()
+            Log.d("GetAlbum2:", albumID.toString())
             val musicList = MusicList.Builder()
                 .apply {
                     title = cursor.getString(albumIndex)
@@ -84,7 +96,11 @@ object MediaStoreUtil {
                     id = cursor.getLong(albumIdIndex)
                     type = MusicList.TYPE_ALBUM
                 }.build()
-            set.add(musicList)
+            if (AlbumsMap.get(albumID) != null)
+            {
+                set.add(musicList)
+            }
+
         }
         cursor.close()
 
@@ -174,6 +190,7 @@ object MediaStoreUtil {
         val cursor = BaseApplication.context.contentResolver.query(
             MediaStore.Audio.Albums.EXTERNAL_CONTENT_URI,
             arrayOf(
+                MediaStore.Audio.Albums.ALBUM_ID,
                 MediaStore.Audio.Albums.ALBUM,
                 MediaStore.Audio.Albums.ARTIST,
                 MediaStore.Audio.Albums._ID,
@@ -182,6 +199,11 @@ object MediaStoreUtil {
             null,
             null//"${MediaStore.Audio.Albums.ALBUM} collate localized"
         ) ?: return ArrayList()
+
+
+
+
+
         val list = getAlbumFromCursor(cursor)
         cursor.close()
         list.sort()
