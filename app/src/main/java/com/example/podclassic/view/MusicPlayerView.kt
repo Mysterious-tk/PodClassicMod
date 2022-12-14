@@ -337,9 +337,9 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
                     matrix.postScale(scaleWidth, scaleHeight)
                     val result = Bitmap.createBitmap(this, 0, 0, this.width, this.height, matrix, false)
                     image.setImageBitmap(result)
-                }
+                }*/
 
-                 */
+
 
 
             }

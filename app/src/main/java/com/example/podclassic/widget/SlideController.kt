@@ -437,7 +437,8 @@ class SlideController : View {
         if (!enable) {
             return
         }
-        if (onTouchListener?.onSlide(slideVal) == true) {
+        val bOnSlide = onTouchListener?.onSlide(slideVal)
+        if (bOnSlide == true) {
             VolumeUtil.vibrate(this)
         }
     }

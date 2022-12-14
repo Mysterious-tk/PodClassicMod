@@ -9,29 +9,83 @@ import com.example.podclassic.bean.Lyric;
 import com.example.podclassic.bean.Music;
 import com.example.podclassic.values.Strings;
 
+import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.RandomAccessFile;
 import java.util.ArrayList;
 
 public class MediaMetadataUtil {
     private MediaMetadataUtil() {
     }
+    public static String convertCodeAndGetText(String str_filepath) {
 
+        File file = new File(str_filepath);
+        BufferedReader reader;
+        String text = "";
+        try {
+
+            FileInputStream fis = new FileInputStream(file);
+            BufferedInputStream in = new BufferedInputStream(fis);
+            in.mark(4);
+            byte[] first3bytes = new byte[3];
+            in.read(first3bytes);
+            in.reset();
+            if (first3bytes[0] == (byte) 0xEF && first3bytes[1] == (byte) 0xBB
+                    && first3bytes[2] == (byte) 0xBF) {// utf-8
+
+                reader = new BufferedReader(new InputStreamReader(in, "utf-8"));
+
+            } else if (first3bytes[0] == (byte) 0xFF
+                    && first3bytes[1] == (byte) 0xFE) {
+
+                reader = new BufferedReader(
+                        new InputStreamReader(in, "unicode"));
+            } else if (first3bytes[0] == (byte) 0xFE
+                    && first3bytes[1] == (byte) 0xFF) {
+
+                reader = new BufferedReader(new InputStreamReader(in,
+                        "utf-16be"));
+            } else if (first3bytes[0] == (byte) 0xFF
+                    && first3bytes[1] == (byte) 0xFF) {
+
+                reader = new BufferedReader(new InputStreamReader(in,
+                        "utf-16le"));
+            } else {
+
+                reader = new BufferedReader(new InputStreamReader(in, "GBK"));
+            }
+            StringBuilder stringBuilder = new StringBuilder();
+            String str = reader.readLine();
+
+            while (str != null) {
+                stringBuilder.append(str);
+                str = reader.readLine();
+
+            }
+            reader.close();
+            text = stringBuilder.toString();
+
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return text;
+    }
     public static Lyric getLyric(File file) {
         String path = file.getPath();
-        File lyricFile = new File(path.substring(0, path.lastIndexOf('.')) + ".lrc");
+        String lyricPath = path.substring(0, path.lastIndexOf('.')) + ".lrc";
+        File lyricFile = new File(lyricPath);
         if (lyricFile.exists() && lyricFile.isFile()) {
-            try (BufferedReader bufferedReader = new BufferedReader(new FileReader(lyricFile))) {
-                StringBuilder stringBuilder = new StringBuilder();
-                String buffer;
-                while ((buffer = bufferedReader.readLine()) != null) {
-                    stringBuilder.append(buffer);
-                }
-                return decodeLyric(stringBuilder.toString());
-            } catch (Exception ignored) {
+            {
+                String lyric = convertCodeAndGetText(lyricPath);
+                return decodeLyric(lyric);
             }
         } else {
             try {

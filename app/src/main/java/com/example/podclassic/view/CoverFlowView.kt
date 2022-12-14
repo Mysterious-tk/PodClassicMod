@@ -160,10 +160,10 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
             } else {
                 slides += slideVal
             }
-            return false
+            return true
         }
-        loadAnimation(slideVal)
-        return false
+        var ret : Boolean = loadAnimation(slideVal)
+        return ret
     }
 
     private val animatorListener = object : Animator.AnimatorListener {
@@ -199,11 +199,11 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
     private val interpolator = LinearInterpolator()
     private val startValues = Array(MAX_SIZE) { 0 }
 
-    private fun loadAnimation(slideVal: Int) {
+    private fun loadAnimation(slideVal: Int) : Boolean{
         if ((index == -CENTER_OFFSET && slideVal < 0) || (index + CENTER_OFFSET == albums.size - 1 && slideVal > 0)) {
             duration = DEFAULT_DURATION
             slides = 0
-            return
+            return false
         }
 
         index += slideVal
@@ -264,6 +264,7 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
         setTexts(index + CENTER_OFFSET)
 
         animator?.start()
+        return true
     }
 
     override fun getTitle(): String {
