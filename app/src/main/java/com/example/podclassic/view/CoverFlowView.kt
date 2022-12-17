@@ -5,7 +5,9 @@ import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.*
 import android.view.Gravity
+import android.view.animation.AnticipateInterpolator
 import android.view.animation.LinearInterpolator
+import android.view.animation.OvershootInterpolator
 import android.widget.FrameLayout
 import com.example.podclassic.base.Core
 import com.example.podclassic.base.ScreenView

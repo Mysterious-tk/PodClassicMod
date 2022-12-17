@@ -1,6 +1,6 @@
 package com.example.podclassic.bean
 
-import android.graphics.Bitmap
+import android.graphics.*
 import android.net.Uri
 import android.text.TextUtils
 import androidx.collection.LruCache
@@ -18,6 +18,7 @@ data class Music(
         private val imageCache = LruCache<Music, Bitmap>(4)
         private val lyricCache = LruCache<Music, Lyric>(4)
     }
+    private val defaultPaint = Paint().apply { isAntiAlias = true }
 
     class Builder {
         var title: String? = null
@@ -51,15 +52,60 @@ data class Music(
             return field
         }
 
+    private fun getReflectBitmap(bitmap: Bitmap): Bitmap {
+        val reflectionGap = 0
+        val width = bitmap.width
+        val height = bitmap.height
+        val matrix = Matrix()
+        matrix.preScale(1f, -1f)
+        val reflectionImage =
+            Bitmap.createBitmap(bitmap, 0, height / 2, width, height / 2, matrix, false)
+        val bitmap4Reflection =
+            Bitmap.createBitmap(width, height + height / 2, Bitmap.Config.ARGB_8888)
+        val canvasRef = Canvas(bitmap4Reflection)
+
+        canvasRef.drawBitmap(bitmap, 0f, 0f, null)
+        canvasRef.drawRect(
+            0f,
+            height.toFloat(),
+            width.toFloat(),
+            height + reflectionGap.toFloat(),
+            defaultPaint
+        )
+        canvasRef.drawBitmap(reflectionImage, 0f, height + reflectionGap.toFloat(), null)
+        val paint = Paint()
+        val shader = LinearGradient(
+            0f,
+            bitmap.height.toFloat(),
+            0f,
+            bitmap4Reflection.height.toFloat() + reflectionGap,
+            0x70ffffff,
+            0x00ffffff,
+            Shader.TileMode.CLAMP
+        )
+        paint.shader = shader
+        paint.xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN)
+
+        canvasRef.drawRect(
+            0f,
+            height.toFloat(),
+            width.toFloat(),
+            (bitmap4Reflection.height + reflectionGap).toFloat(),
+            paint
+        )
+        return bitmap4Reflection
+    }
+
     private var hasBitmap: Boolean? = null
     val image: Bitmap?
         get() {
             if (hasBitmap == null) {
-                val image = MediaUtil.getMusicImage(this)
+                var image = MediaUtil.getMusicImage(this)
                 return if (image != null) {
+                    val ReflectBitmap:Bitmap = getReflectBitmap(image)
                     hasBitmap = true
-                    imageCache.put(this, image)
-                    image
+                    imageCache.put(this, ReflectBitmap)
+                    ReflectBitmap
                 } else {
                     hasBitmap = false
                     null
@@ -67,9 +113,12 @@ data class Music(
             } else {
                 return if (hasBitmap == true) {
                     if (imageCache[this] == null) {
-                        val image = MediaUtil.getMusicImage(this)
+                        var image = MediaUtil.getMusicImage(this)
+
                         if (image != null) {
-                            imageCache.put(this, image)
+                            val ReflectBitmap = getReflectBitmap(image)
+                            imageCache.put(this, ReflectBitmap)
+                            image = ReflectBitmap
                         }
                         image
                     } else {

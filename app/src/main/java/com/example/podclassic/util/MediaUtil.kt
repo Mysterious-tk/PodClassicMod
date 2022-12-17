@@ -1,5 +1,6 @@
 package com.example.podclassic.util
 
+import android.content.ContentResolver
 import android.content.ContentUris
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -80,4 +81,5 @@ object MediaUtil {
     fun getLyric() {
 
     }
+
 }

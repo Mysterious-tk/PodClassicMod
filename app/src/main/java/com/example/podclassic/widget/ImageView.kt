@@ -12,12 +12,13 @@ class ImageView : androidx.appcompat.widget.AppCompatImageView {
 
     private val paint = Paint().apply {
         color = Colors.text
-        style = Paint.Style.STROKE
-        strokeWidth = 1f
+        style = Paint.Style.FILL
+        strokeWidth = 0f
     }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
+        /*
         val rect = canvas.clipBounds.apply {
             bottom--
             right--
@@ -26,5 +27,7 @@ class ImageView : androidx.appcompat.widget.AppCompatImageView {
         }
 
         canvas.drawRect(rect, paint)
+
+         */
     }
 }

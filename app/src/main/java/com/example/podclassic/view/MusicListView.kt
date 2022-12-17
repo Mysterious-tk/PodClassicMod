@@ -93,8 +93,12 @@ class MusicListView : ListView, ScreenView {
 
     override fun enter(): Boolean {
         return if (index in 0 until musicList.size) {
-            MediaPresenter.setPlayMode(PlayMode.ORDER)
-            MediaPresenter.setPlaylist(musicList, index)
+            if (musicList[index] != MediaPresenter.getCurrent())
+            {
+                MediaPresenter.setPlayMode(PlayMode.ORDER)
+                MediaPresenter.setPlaylist(musicList, index)
+            }
+
             Core.addView(MusicPlayerView(context))
             true
         } else {

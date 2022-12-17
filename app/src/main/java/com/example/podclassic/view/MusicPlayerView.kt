@@ -4,13 +4,11 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.graphics.Bitmap
-import android.graphics.Matrix
-import android.graphics.Typeface
-import android.view.Gravity
-import android.view.LayoutInflater
-import android.view.ViewGroup
+import android.graphics.*
+import android.os.Bundle
+import android.view.*
 import android.widget.FrameLayout
+import androidx.appcompat.app.AppCompatActivity
 import com.example.podclassic.R
 import com.example.podclassic.base.Core
 import com.example.podclassic.base.Observer
@@ -29,6 +27,8 @@ import com.example.podclassic.widget.ScreenLayout
 import com.example.podclassic.widget.SeekBar
 import com.example.podclassic.widget.TextView
 import java.util.*
+import kotlin.math.abs
+import kotlin.math.pow
 
 
 class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
@@ -62,6 +62,7 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
     private val lyric: TextView?
     private val icon1: androidx.appcompat.widget.AppCompatImageView
     private val icon2: androidx.appcompat.widget.AppCompatImageView
+    private var imageCenter = 0;
 
     private val progressTimer =
         com.example.podclassic.util.Timer(500L) { a -> ThreadUtil.runOnUiThread { onProgress(a.toInt()) } }
@@ -118,6 +119,45 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
         //onPlayStateChange()
         //onMusicChange()
         setVolumeBar()
+    }
+    private fun sgn(x: Float): Float {
+        return when {
+            x < 0f -> -1f
+            x > 0f -> 1f
+            else -> 0f
+        }
+    }
+    override fun onMeasure(widthMeasureSec: Int, heightMeasureSpec: Int) {
+        super.onMeasure(widthMeasureSec, heightMeasureSpec)
+        val imageWidth = measuredHeight / 4 * 3
+        val halfImageWidth = imageWidth / 2
+        val imageBottom = measuredHeight / 2 + halfImageWidth
+        val centerX = (image.left + image.right) / 2
+        val centerY = imageBottom - halfImageWidth
+
+        imageCenter = measuredWidth / 2
+        val scale = -abs(imageCenter - centerX) / 4
+        image.animate().scaleX(0.8f).scaleY(0.9f)
+
+        val temp = (imageCenter - (image.left + image.right) / 2).toFloat()
+        if (temp == 0f) {
+            image.rotationY = 0f
+        } else {
+            val x = temp / width.toFloat()
+            image.rotationY = sgn(x) * (1f / (1f + 3f.pow(-18f * abs(x))) - 0.5f) * 40f
+        }
+        image.z = abs(temp * 3)
+/*
+        val viewOutlineProvider: ViewOutlineProvider = object : ViewOutlineProvider() {
+            override fun getOutline(View : View?, outline: Outline) {
+                outline.setRoundRect(0, 0, image.getWidth(), image.getHeight(), 5f)
+            }
+        }
+        image.setOutlineProvider(viewOutlineProvider)
+        image.setClipToOutline(true)
+*/
+
+
     }
 
     override fun enter(): Boolean {
