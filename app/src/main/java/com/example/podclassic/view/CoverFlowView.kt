@@ -573,10 +573,14 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
                 if (bitmap != null) {
                     val temp = getReflectBitmap(bitmap)
                     bitmap.recycle()
-                    ThreadUtil.runOnUiThread { setImageBitmap(temp) }
+                    ThreadUtil.runOnUiThread { 
+                        setImageBitmap(temp)
+                        alpha = 0.8f // 添加20%半透明效果
+                    }
                 }
             }
             threadPoolExecutor.execute(runnable)
+            alpha = 0.8f // 添加20%半透明效果
         }
 
         private fun getReflectBitmap(bitmap: Bitmap): Bitmap {

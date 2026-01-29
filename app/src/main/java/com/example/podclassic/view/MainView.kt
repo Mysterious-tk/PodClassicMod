@@ -34,6 +34,7 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
     private val random = Random()
     private var dx = 0f
     private var dy = 0f
+    private val coverImages = arrayOf("img/1.jpg", "img/2.jpg", "img/3.jpg", "img/4.jpg", "img/5.jpg", "img/6.jpg")
     private val handler = object : Handler(Looper.getMainLooper()) {
         override fun handleMessage(msg: Message) {
             super.handleMessage(msg)
@@ -83,6 +84,9 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
         coverImageView.scaleType = ImageView.ScaleType.CENTER_CROP
         // 添加背景，使其看起来更像唱片
         coverImageView.setBackgroundColor(android.graphics.Color.BLACK)
+        // 放大两倍
+        coverImageView.scaleX = 2f
+        coverImageView.scaleY = 2f
 
         // 设置ListView
         val listParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
@@ -307,8 +311,13 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
             listView.addIfNotExist(item)
         }
 
-        updateCoverImage()
-        handler.sendEmptyMessage(0)
+        // 延迟执行，确保coverImageView尺寸已测量完成
+        coverImageView.post {
+            updateCoverImage()
+            // 强制重置位置到中心
+            resetCoverPosition()
+            handler.sendEmptyMessage(0)
+        }
     }
 
     private fun updateCoverImage() {
@@ -317,6 +326,8 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
             val coverBitmap = currentMusic.image
             if (coverBitmap != null) {
                 coverImageView.setImageBitmap(coverBitmap)
+                // 图片加载完成后重置位置
+                resetCoverPosition()
             } else {
                 // 随机选一个图片当封面
                 setRandomCover()
@@ -327,84 +338,110 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
         }
     }
 
+    private fun resetCoverPosition() {
+        // 重置位置到中心
+        val viewWidth = coverImageView.width
+        val viewHeight = coverImageView.height
+        val scaledWidth = viewWidth * 2
+        val scaledHeight = viewHeight * 2
+        
+        // 计算中心位置
+        val centerX = (viewWidth - scaledWidth) / 2f
+        val centerY = (viewHeight - scaledHeight) / 2f
+        
+        coverImageView.x = centerX
+        coverImageView.y = centerY
+        
+        // 重置速度
+        dx = (random.nextInt(6) - 3).toFloat()
+        dy = (random.nextInt(6) - 3).toFloat()
+    }
+
     private fun setRandomCover() {
-        // 从项目的img目录中随机选择图片作为封面
-        val imgFiles = File("l:\\Search\\PodClassicMod\\img").listFiles()
-        if (imgFiles != null && imgFiles.isNotEmpty()) {
-            val randomFile = imgFiles[random.nextInt(imgFiles.size)]
-            val bitmap = android.graphics.BitmapFactory.decodeFile(randomFile.absolutePath)
+        // 从assets目录中随机选择图片作为封面
+        try {
+            val randomImage = coverImages[random.nextInt(coverImages.size)]
+            val inputStream = context.assets.open(randomImage)
+            val bitmap = android.graphics.BitmapFactory.decodeStream(inputStream)
             if (bitmap != null) {
                 coverImageView.setImageBitmap(bitmap)
+                // 图片加载完成后重置位置
+                resetCoverPosition()
             } else {
                 // 如果解码失败，使用默认图片
                 coverImageView.setImageResource(android.R.drawable.ic_media_play)
+                // 重置位置
+                resetCoverPosition()
             }
-        } else {
-            // 如果没有找到图片，使用默认图片
+            inputStream.close()
+        } catch (e: Exception) {
+            // 如果发生异常，使用默认图片
             coverImageView.setImageResource(android.R.drawable.ic_media_play)
+            // 重置位置
+            resetCoverPosition()
         }
     }
 
     private fun updateCoverPosition() {
-        // 计算中线位置（ListView的宽度）
-        val centerLine = (resources.displayMetrics.widthPixels * 0.5).toInt()
-        // 计算隐藏边界位置（比中线靠左一些）
-        val hiddenBoundary = centerLine - 50
+        // 计算移动范围，考虑放大两倍的尺寸
+        val viewWidth = coverImageView.width
+        val viewHeight = coverImageView.height
+        val scaledWidth = viewWidth * 2
+        val scaledHeight = viewHeight * 2
         
-        // 计算移动范围，比图片view大两倍
-        val maxX = centerLine
-        val minX = hiddenBoundary - coverImageView.width // 左边界扩展
-        val maxY = coverImageView.height * 2 // 下边界扩展
-        val minY = -coverImageView.height // 上边界扩展
+        // 计算最大和最小位置，确保图片不会露白
+        // 左边界：图片左边缘不超过view左边缘
+        val minX = viewWidth - scaledWidth.toFloat()
+        // 右边界：图片右边缘不超过view右边缘
+        val maxX = 0f
+        // 上边界：图片上边缘不超过view上边缘
+        val minY = viewHeight - scaledHeight.toFloat()
+        // 下边界：图片下边缘不超过view下边缘
+        val maxY = 0f
         
         // 获取ImageView的当前位置
         val currentX = coverImageView.x + dx
         val currentY = coverImageView.y + dy
         
-        // 碰撞检测
-        // 检查是否撞到左边界
-        if (currentX <= minX) {
-            // 撞到左边界，往对角线方向反弹
-            dx = -dx * 0.8f // 反弹并稍微减速
-            dy = (random.nextInt(4) - 2).toFloat() * 0.5f // 随机调整Y方向速度
+        // 边界检查和随机方向改变
+        // 检查是否接近左边界
+        if (currentX <= minX + 30) {
+            // 接近左边界，随机改变方向
+            dx = (random.nextInt(4) + 2).toFloat() // 向右移动
+            dy = (random.nextInt(6) - 3).toFloat() // 随机Y方向
         }
-        // 检查是否撞到右边界
-        if (currentX >= maxX) {
-            // 撞到右边界（中线），往对角线方向反弹
-            dx = -dx * 0.8f // 反弹并稍微减速
-            dy = (random.nextInt(4) - 2).toFloat() * 0.5f // 随机调整Y方向速度
+        // 检查是否接近右边界
+        if (currentX >= maxX - 30) {
+            // 接近右边界，随机改变方向
+            dx = -(random.nextInt(4) + 2).toFloat() // 向左移动
+            dy = (random.nextInt(6) - 3).toFloat() // 随机Y方向
         }
-        // 检查是否撞到上边界
-        if (currentY <= minY) {
-            // 撞到上边界，反弹
-            dy = -dy * 0.8f // 反弹并稍微减速
+        // 检查是否接近上边界
+        if (currentY <= minY + 30) {
+            // 接近上边界，随机改变方向
+            dx = (random.nextInt(6) - 3).toFloat() // 随机X方向
+            dy = (random.nextInt(4) + 2).toFloat() // 向下移动
         }
-        // 检查是否撞到下边界
-        if (currentY >= maxY) {
-            // 撞到下边界，反弹
-            dy = -dy * 0.8f // 反弹并稍微减速
+        // 检查是否接近下边界
+        if (currentY >= maxY - 30) {
+            // 接近下边界，随机改变方向
+            dx = (random.nextInt(6) - 3).toFloat() // 随机X方向
+            dy = -(random.nextInt(4) + 2).toFloat() // 向上移动
         }
+        
+        // 限制位置在安全范围内
+        var newX = currentX
+        var newY = currentY
+        
+        // 确保不会超过边界
+        if (newX < minX) newX = minX
+        if (newX > maxX) newX = maxX
+        if (newY < minY) newY = minY
+        if (newY > maxY) newY = maxY
         
         // 更新ImageView的位置
-        coverImageView.x += dx
-        coverImageView.y += dy
-        
-        // 确保ImageView不会超过中线
-        if (coverImageView.x > maxX) {
-            coverImageView.x = maxX.toFloat()
-        }
-        // 确保ImageView不会超过左边界
-        if (coverImageView.x < minX) {
-            coverImageView.x = minX.toFloat()
-        }
-        // 确保ImageView不会超过上边界
-        if (coverImageView.y < minY) {
-            coverImageView.y = minY.toFloat()
-        }
-        // 确保ImageView不会超过下边界
-        if (coverImageView.y > maxY) {
-            coverImageView.y = maxY.toFloat()
-        }
+        coverImageView.x = newX
+        coverImageView.y = newY
     }
 
     override fun onDetachedFromWindow() {
