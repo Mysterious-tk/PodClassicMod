@@ -27,6 +27,9 @@ import kotlin.math.abs
 
 
 open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(context) {
+    
+    // 标志：是否需要为右侧时间预留空间
+    var reserveSpaceForTime = true
 
     companion object {
         const val DEFAULT_MAX_SIZE = 9
@@ -222,11 +225,13 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
     open fun onItemCreated(index: Int, itemView: ItemView) {
         itemView.itemIndex = index
         itemView.onItemClickListener = object : ItemView.OnItemClickListener {
-            override fun onItemClick(itemIndex: Int) {
-                this@ListView.index = itemIndex
+            override fun onItemClick(index: Int) {
+                this@ListView.index = index
                 onItemClick()
             }
         }
+        // 设置ItemView是否需要为右侧时间预留空间
+        itemView.setReserveSpaceForTime(reserveSpaceForTime)
     }
 
     //index 为list中位置
@@ -588,6 +593,12 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
         }
 
         private var hasRightIcon = false
+        private var reserveSpaceForTime = true // 默认需要为右侧时间预留空间
+        
+        fun setReserveSpaceForTime(reserve: Boolean) {
+            reserveSpaceForTime = reserve
+        }
+        
         private fun setRightIcon(drawable: Drawable?) {
             rightIcon.setImageDrawable(drawable)
             hasRightIcon = (drawable != null)
@@ -615,8 +626,12 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
                     setRightIcon(null)
                 }
             }
-            // 为左侧文本添加足够的右侧内边距，避免与右侧文本重叠
-            leftText.paddingRight = DEFAULT_PADDING * 12
+            // 根据是否需要为右侧时间预留空间来设置左侧文本的右侧内边距
+            if (reserveSpaceForTime) {
+                leftText.paddingRight = DEFAULT_PADDING * 8
+            } else {
+                leftText.paddingRight = DEFAULT_PADDING
+            }
         }
 
         private var shakeCount = 0
