@@ -7,6 +7,7 @@ import com.example.podclassic.bean.MusicList
 import com.example.podclassic.storage.MusicListTable
 import com.example.podclassic.values.Strings
 import com.example.podclassic.widget.ListView
+import com.example.podclassic.widget.ListView.OnItemClickListener
 
 class AlbumListView(
     context: Context,
@@ -32,6 +33,13 @@ class AlbumListView(
             itemList[0].name = Strings.ALL
         }
         sorted = longClick == LONG_CLICK_ADD
+        
+        // 设置默认点击监听器，处理触摸播放歌曲的功能
+        defaultOnItemClickListener = object : OnItemClickListener {
+            override fun onItemClick(index: Int, listView: ListView): Boolean {
+                return enter()
+            }
+        }
     }
 
     override fun enter(): Boolean {
