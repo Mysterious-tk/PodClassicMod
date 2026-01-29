@@ -55,6 +55,7 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
 
     private val screenLayout: ScreenLayout
     private val index: TextView
+    private val time: TextView
     private val image: com.example.podclassic.widget.ImageView
     private val title: TextView
     private val artist: TextView
@@ -67,6 +68,11 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
 
     private val progressTimer =
         com.example.podclassic.util.Timer(500L) { a -> ThreadUtil.runOnUiThread { onProgress(a.toInt()) } }
+
+    // 时间更新计时器
+    private val timeTimer = com.example.podclassic.util.Timer(1000L) { _ -> 
+        ThreadUtil.runOnUiThread { updateTime() }
+    }
 
     private val container : ViewGroup
 
@@ -94,10 +100,19 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
             setPadding(0, 0, 0, 0)
             setTextColor(Colors.text_secondary)
         }
+        
+        // 时间显示
+        time = view.findViewById<TextView?>(R.id.tv_time).apply {
+            setTextColor(Colors.text)
+        }
+        
+        // 启用SeekBar内置的时间显示
+        progressBar.textVisibility = View.VISIBLE
+        
         screenLayout = (view.findViewById(R.id.seek_bar) as ScreenLayout).apply { add(progressBar) }
         icon1 = view.findViewById(R.id.ic_play_mode)
         icon2 = view.findViewById(R.id.ic_repeat_mode)
-        stopTime = view.findViewById(R.id.tv_stop_time)
+        stopTime = view.findViewById<TextView?>(R.id.tv_stop_time)
         container = view.findViewById(R.id.container)
         lyric = if (SPManager.getBoolean(SPManager.SP_SHOW_LYRIC)) {
             (view.findViewById(R.id.tv_lyric) as TextView).apply {
@@ -108,15 +123,15 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
         } else {
             null
         }
+        
+        observer.addLiveData(MediaPresenter.stopTime, object : LiveData.OnDataChangeListener {
+            override fun onStart() { setStopTime() }
+            override fun onDataChange() = ThreadUtil.runOnUiThread { setStopTime() }
+        })
 
         observer.addLiveData(MediaPresenter.music, object : LiveData.OnDataChangeListener {
             override fun onStart() { onMusicChange() }
             override fun onDataChange() = ThreadUtil.runOnUiThread { onMusicChange() }
-        })
-
-        observer.addLiveData(MediaPresenter.stopTime, object : LiveData.OnDataChangeListener {
-            override fun onStart() { setStopTime() }
-            override fun onDataChange() = ThreadUtil.runOnUiThread { setStopTime() }
         })
 
         observer.addLiveData(MediaPresenter.playState, object : LiveData.OnDataChangeListener {
@@ -205,10 +220,10 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
     private fun setStopTime() {
         val time = MediaPresenter.getStopTime()
         if (time == 0) {
-            stopTime?.visibility = GONE
+            stopTime?.visibility = View.GONE
         } else {
-            stopTime?.visibility = VISIBLE
-            stopTime?.text = time.toString()
+            stopTime?.visibility = View.VISIBLE
+            stopTime?.text = "${time}分钟"
         }
     }
 
@@ -255,6 +270,9 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
             context.registerReceiver(volumeBroadcastReceiver, intentFilter)
             broadcastReceiverRegistered = true
         }
+        // 启动时间计时器
+        timeTimer.start()
+        updateTime()
         //onMusicChange()
         //onPlayStateChange()
 
@@ -265,6 +283,16 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
             context.unregisterReceiver(volumeBroadcastReceiver)
             broadcastReceiverRegistered = false
         }
+        // 停止时间计时器
+        timeTimer.pause()
+    }
+    
+    // 更新顶部时间显示
+    private fun updateTime() {
+        val calendar = Calendar.getInstance()
+        val hour = calendar.get(Calendar.HOUR_OF_DAY)
+        val minute = calendar.get(Calendar.MINUTE)
+        time.text = String.format("%02d:%02d", hour, minute)
     }
 
     override fun slide(slideVal: Int): Boolean {
@@ -323,7 +351,7 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
         }
         val music = MediaPresenter.getCurrent()
         if (music == null) {
-            postDelayed({
+            postDelayed({  
                 if (observer.enable && MediaPresenter.getCurrent() == null) {
                     Core.removeView()
                     return@postDelayed
@@ -338,6 +366,8 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
             MediaPresenter.getDuration()
         }
         progressBar.set(MediaPresenter.getProgress(), duration)
+
+        
 
         // iPod Classic 风格：带动画的文本更新
         title.text = music.title
@@ -432,6 +462,14 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
             progressBar.setCurrent(progress)
         }
         lyric?.setBufferedText(MediaPresenter.getCurrent()?.lyric?.getLyric(progress))
+    }
+    
+    // 格式化时间为 mm:ss 格式
+    private fun formatTime(milliseconds: Int): String {
+        val totalSeconds = milliseconds / 1000
+        val minutes = totalSeconds / 60
+        val seconds = totalSeconds % 60
+        return String.format("%02d:%02d", minutes, seconds)
     }
 
 

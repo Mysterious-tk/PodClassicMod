@@ -6,7 +6,7 @@
     android:padding="@dimen/padding_1"
     android:background="@color/background">
 
-    <!-- 顶部信息栏 - 歌曲序号和播放模式 -->
+    <!-- 顶部信息栏 - 时间和播放模式 -->
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
@@ -15,23 +15,45 @@
         android:paddingStart="8dp"
         android:paddingEnd="8dp">
 
+        <!-- 左侧：歌曲序号 -->
         <com.example.podclassic.widget.TextView
             android:id="@+id/tv_index"
-            android:layout_width="match_parent"
+            android:layout_width="wrap_content"
             android:layout_height="match_parent"
+            android:gravity="center_vertical"
             android:textColor="@color/text_secondary"
             android:textSize="14sp" />
 
-        <com.example.podclassic.widget.TextView
-            android:id="@+id/tv_stop_time"
+        <!-- 中间：时间显示和睡眠定时器 -->
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
             android:layout_gravity="center"
-            android:drawableLeft="@drawable/ic_access_time_grey_600_18dp"
             android:gravity="center"
-            android:textColor="@color/text_secondary"
-            android:textSize="13sp" />
+            android:orientation="horizontal">
+            
+            <!-- 时间显示 -->
+            <com.example.podclassic.widget.TextView
+                android:id="@+id/tv_time"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:textColor="@color/text"
+                android:textSize="14sp" />
+            
+            <!-- 睡眠定时器 -->
+            <com.example.podclassic.widget.TextView
+                android:id="@+id/tv_stop_time"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:layout_marginStart="8dp"
+                android:drawableLeft="@drawable/ic_access_time_grey_600_18dp"
+                android:gravity="center"
+                android:textColor="@color/text_secondary"
+                android:textSize="13sp" />
+        </LinearLayout>
 
+        <!-- 右侧：播放模式图标 -->
         <androidx.appcompat.widget.AppCompatImageView
             android:id="@+id/ic_repeat_mode"
             android:layout_width="@dimen/icon_size"
@@ -126,7 +148,7 @@
 
     </LinearLayout>
 
-    <!-- 进度条区域 -->
+    <!-- 进度条区域 - iPod Classic 风格 -->
     <com.example.podclassic.widget.ScreenLayout
         android:id="@+id/seek_bar"
         android:layout_width="match_parent"
