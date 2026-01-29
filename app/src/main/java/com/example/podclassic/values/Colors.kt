@@ -9,6 +9,7 @@ import com.example.podclassic.storage.SPManager
 
 object Colors {
     val text by lazy { ContextCompat.getColor(BaseApplication.context, R.color.text) }
+    val text_secondary by lazy { ContextCompat.getColor(BaseApplication.context, R.color.text_secondary) }
 
     val color_primary by lazy {
         ContextCompat.getColor(
@@ -19,6 +20,8 @@ object Colors {
 
     val text_light by lazy { ContextCompat.getColor(BaseApplication.context, R.color.text_light) }
     val background by lazy { ContextCompat.getColor(BaseApplication.context, R.color.background) }
+    val background_light by lazy { ContextCompat.getColor(BaseApplication.context, R.color.background_light) }
+    val divider_light by lazy { ContextCompat.getColor(BaseApplication.context, R.color.divider_light) }
     val background_dark_1 by lazy {
         ContextCompat.getColor(
             BaseApplication.context,
@@ -35,6 +38,12 @@ object Colors {
 
     val main by lazy { ContextCompat.getColor(BaseApplication.context, R.color.main) }
     val main_light by lazy { ContextCompat.getColor(BaseApplication.context, R.color.main_light) }
+    val main_dark by lazy { ContextCompat.getColor(BaseApplication.context, R.color.main_dark) }
+    
+    // iPod Classic 风格选中色
+    val ipod_selected_top by lazy { ContextCompat.getColor(BaseApplication.context, R.color.ipod_selected_top) }
+    val ipod_selected_bottom by lazy { ContextCompat.getColor(BaseApplication.context, R.color.ipod_selected_bottom) }
+    val ipod_selected_border by lazy { ContextCompat.getColor(BaseApplication.context, R.color.ipod_selected_border) }
 
     val battery_green by lazy {
         ContextCompat.getColor(

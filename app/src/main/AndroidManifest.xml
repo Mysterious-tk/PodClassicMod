@@ -55,6 +55,7 @@
             android:resizeableActivity="false"
             android:roundIcon="@mipmap/ic_launcher"
             android:screenOrientation="unspecified"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout"
             >
             <!--android:excludeFromRecents="true" -->
 

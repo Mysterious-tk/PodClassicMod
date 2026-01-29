@@ -4,7 +4,9 @@ import android.animation.Animator
 import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.*
+import android.view.GestureDetector
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.animation.AnticipateInterpolator
 import android.view.animation.LinearInterpolator
 import android.view.animation.OvershootInterpolator
@@ -28,8 +30,8 @@ import kotlin.math.sqrt
 
 class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
     companion object {
-        private const val MAX_SIZE = 11
-        private const val CENTER_OFFSET = 6
+        private const val MAX_SIZE = 15
+        private const val CENTER_OFFSET = 7
         private const val DEFAULT_DURATION = 300L
         private const val MIN_DURATION = 10L
 
@@ -54,6 +56,17 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
 
     private var index = -CENTER_OFFSET
 
+    // 触摸滑动相关
+    private var gestureDetector: GestureDetector
+    private var touchStartX = 0f
+    private var touchStartY = 0f
+    private var isTouching = false
+    private var isDragging = false
+    private var dragStartX = 0f
+    private var currentOffset = 0
+    private val SWIPE_THRESHOLD = 60f  // 增大滑动阈值，确保只有长滑动才有反应
+    private val FLING_VELOCITY_THRESHOLD = 300f  // 增大快速滑动阈值
+
     init {
         for (i in 0 until MAX_SIZE) {
             val imageView = ImageView(context)
@@ -64,6 +77,20 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
         artist.gravity = Gravity.CENTER_HORIZONTAL
         addView(album)
         addView(artist)
+        
+        // 初始化手势检测器
+        gestureDetector = GestureDetector(context, GestureListener())
+        
+        // 设置触摸监听器
+        setOnTouchListener { _, event ->
+            gestureDetector.onTouchEvent(event)
+            handleTouchEvent(event)
+            true
+        }
+        
+        // 允许点击和获取焦点，以便响应中间圆盘的点击
+        isClickable = true
+        isFocusable = true
     }
 
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
@@ -84,6 +111,224 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
         setTexts(index + CENTER_OFFSET)
         artist.layout(0, bottom - textHeight, width, bottom)
         album.layout(0, artist.top - textHeight, width, artist.top)
+    }
+    
+    // 处理触摸事件
+    private fun handleTouchEvent(event: MotionEvent): Boolean {
+        when (event.action) {
+            MotionEvent.ACTION_DOWN -> {
+                touchStartX = event.x
+                touchStartY = event.y
+                isTouching = true
+                isDragging = false
+                currentOffset = 0
+            }
+            MotionEvent.ACTION_MOVE -> {
+                if (isTouching) {
+                    val deltaX = event.x - touchStartX
+                    val deltaY = event.y - touchStartY
+                    
+                    // 增加垂直移动检查，避免误触
+                    // 如果垂直移动超过水平移动，不进入拖拽模式
+                    if (abs(deltaY) > abs(deltaX) * 0.5f) {
+                        return true
+                    }
+                    
+                    // 如果水平移动超过阈值，才进入拖拽模式
+                    // 确保只有长滑动才有反应
+                    if (!isDragging && abs(deltaX) > SWIPE_THRESHOLD) {
+                        isDragging = true
+                        dragStartX = touchStartX
+                    }
+                    
+                    // 跟随手指实时滑动
+                    if (isDragging) {
+                        updatePositionByDrag(deltaX)
+                    }
+                }
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                if (isDragging) {
+                    val deltaX = event.x - touchStartX
+                    // 根据滑动距离决定是否切换
+                    // 确保只有长滑动才有反应
+                    if (abs(deltaX) > SWIPE_THRESHOLD) {
+                        finishDrag(deltaX)
+                    } else {
+                        // 滑动距离不够，恢复原位
+                        snapBackToPosition()
+                    }
+                } else {
+                    // 没有滑动，视为点击中间圆盘
+                    if (animator?.isRunning == true) {
+                        // 动画正在运行，取消动画并直接定位到当前应该显示的封面
+                        animator?.cancel()
+                        animator = null
+                        slides = 0
+                        duration = DEFAULT_DURATION
+                        // 重新布局，确保所有图片位置正确（封面转向正面）
+                        requestLayout()
+                    } else {
+                        // 动画没有运行，进入歌单
+                        enter()
+                    }
+                }
+                isTouching = false
+                isDragging = false
+                currentOffset = 0
+            }
+        }
+        return true
+    }
+    
+    // 跟随手指实时更新位置
+    private fun updatePositionByDrag(deltaX: Float) {
+        // 计算偏移量（限制范围）
+        val maxOffset = imagePadding
+        val offset = (deltaX / 2).toInt().coerceIn(-maxOffset, maxOffset)
+        currentOffset = offset
+        
+        // 计算实际的index偏移
+        val adjustedIndex = index + (deltaX / imagePadding).toInt()
+        
+        // 实时更新所有图片位置、旋转和数据
+        for (i in imageViews.indices) {
+            val imageView = imageViews[i]
+            val baseCenterX = imageCenter + (i - CENTER_OFFSET) * imagePadding
+            scaleImageView(baseCenterX + offset, imageView)
+            setRotationY(imageView)
+            
+            // 实时更新图片数据，确保滑动过程中图片内容与位置匹配
+            val albumIndex = adjustedIndex + i
+            if (albumIndex in 0 until albums.size) {
+                imageView.bindItem(albums[albumIndex])
+            } else {
+                imageView.bindItem(null)
+            }
+        }
+    }
+    
+    // 结束拖拽，决定是否切换唱片
+    private fun finishDrag(deltaX: Float) {
+        // 只有当滑动距离超过阈值时才切换唱片
+        // 确保只有长滑动才有反应
+        when {
+            abs(deltaX) > SWIPE_THRESHOLD -> {
+                if (deltaX > 0) {
+                    // 向右滑动超过阈值 -> 切换到左边唱片
+                    slide(-1)
+                } else {
+                    // 向左滑动超过阈值 -> 切换到右边唱片
+                    slide(1)
+                }
+            }
+            else -> {
+                // 滑动距离不够，恢复原位
+                snapBackToPosition()
+            }
+        }
+    }
+    
+    // 恢复到中心位置
+    private fun snapBackToPosition() {
+        // 创建回弹动画
+        val startOffset = currentOffset
+        val snapAnimator = ValueAnimator.ofInt(startOffset, 0).apply {
+            duration = 250  // 稍微增加动画时长，使回弹更自然
+            interpolator = OvershootInterpolator(0.3f)  // 调整插值器参数，减少过度回弹
+            addUpdateListener { animation ->
+                val offset = animation.animatedValue as Int
+                for (i in imageViews.indices) {
+                    val imageView = imageViews[i]
+                    val centerX = imageCenter + (i - CENTER_OFFSET) * imagePadding + offset
+                    scaleImageView(centerX, imageView)
+                    setRotationY(imageView)
+                }
+            }
+            addListener(object : Animator.AnimatorListener {
+                override fun onAnimationStart(animation: Animator?) {}
+                override fun onAnimationEnd(animation: Animator?) {
+                    // 动画结束后，更新所有图片数据，确保位置和数据匹配
+                    for (i in imageViews.indices) {
+                        val imageView = imageViews[i]
+                        val albumIndex = index + i
+                        if (albumIndex in 0 until albums.size) {
+                            imageView.bindItem(albums[albumIndex])
+                        } else {
+                            imageView.bindItem(null)
+                        }
+                    }
+                }
+                override fun onAnimationCancel(animation: Animator?) {}
+                override fun onAnimationRepeat(animation: Animator?) {}
+            })
+        }
+        snapAnimator.start()
+    }
+    
+    // 快速滑动多个唱片
+    private fun flingSlide(direction: Int, count: Int) {
+        slides = count * direction
+        loadAnimation(direction)
+    }
+    
+    private inner class GestureListener : GestureDetector.SimpleOnGestureListener() {
+        
+        override fun onDown(e: MotionEvent): Boolean {
+            return true
+        }
+        
+        override fun onFling(
+            e1: MotionEvent?,
+            e2: MotionEvent,
+            velocityX: Float,
+            velocityY: Float
+        ): Boolean {
+            if (e1 == null) return false
+            
+            val diffX = e2.x - e1.x
+            
+            // 只有当滑动距离和速度都超过阈值时才滑动
+            // 确保只有长滑动才有反应
+            if (abs(diffX) > SWIPE_THRESHOLD) {
+                // 根据速度快速滑动多个唱片
+                val slideCount = when {
+                    abs(velocityX) > FLING_VELOCITY_THRESHOLD * 4 -> 4
+                    abs(velocityX) > FLING_VELOCITY_THRESHOLD * 3 -> 3
+                    abs(velocityX) > FLING_VELOCITY_THRESHOLD * 2 -> 2
+                    abs(velocityX) > FLING_VELOCITY_THRESHOLD -> 1
+                    else -> 0
+                }
+                
+                if (slideCount > 0) {
+                    // 根据速度方向滑动多个
+                    val direction = if (diffX > 0) -1 else 1
+                    flingSlide(direction, slideCount)
+                    return true
+                }
+                
+                // 普通滑动
+                if (abs(diffX) > SWIPE_THRESHOLD) {
+                    if (diffX > 0) {
+                        slide(-1)
+                    } else {
+                        slide(1)
+                    }
+                    return true
+                }
+            }
+            return false
+        }
+        
+        override fun onScroll(
+            e1: MotionEvent?,
+            e2: MotionEvent,
+            distanceX: Float,
+            distanceY: Float
+        ): Boolean {
+            // 可以在这里实现跟随手指的实时滑动效果
+            return false
+        }
     }
 
     private fun setTexts(index: Int) {
@@ -130,13 +375,24 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
         imageWidth = measuredHeight / 4 * 3
         halfImageWidth = imageWidth / 2
         imageBottom = measuredHeight / 2 + halfImageWidth
-        imagePadding = (measuredWidth - imageWidth) / 4
+        
+        // 根据屏幕宽高比动态调整imagePadding
+        val screenRatio = measuredWidth.toFloat() / measuredHeight.toFloat()
+        if (screenRatio > 1.5f) { // 横屏模式
+            // 减小padding，显示更多唱片
+            imagePadding = (measuredWidth - imageWidth) / 6
+        } else {
+            // 竖屏模式，保持原有padding
+            imagePadding = (measuredWidth - imageWidth) / 4
+        }
+        
         imageCenter = measuredWidth / 2
         centerY = imageBottom - halfImageWidth
         textHeight = measuredHeight / 10
     }
 
     override fun enter(): Boolean {
+        // 点击中间圆盘进入歌单
         Core.addView(MusicListView(context, albums[index + CENTER_OFFSET]))
         return true
     }

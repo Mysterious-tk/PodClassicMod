@@ -21,6 +21,7 @@ import com.example.podclassic.storage.SPManager
 import com.example.podclassic.util.LiveData
 import com.example.podclassic.util.ThreadUtil
 import com.example.podclassic.util.VolumeUtil
+import com.example.podclassic.values.Colors
 import com.example.podclassic.values.Icons
 import com.example.podclassic.values.Strings
 import com.example.podclassic.widget.ScreenLayout
@@ -76,8 +77,23 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
         artist = view.findViewById(R.id.tv_artist)
         title = view.findViewById(R.id.tv_title)
         image = view.findViewById(R.id.image)
-        //image.visibility = GONE
-        index = view.findViewById<TextView?>(R.id.tv_index).apply { setPadding(0, 0, 0, 0) }
+        
+        // iPod Classic 风格的文本样式
+        title.apply {
+            setTextColor(Colors.text)
+            setShadowLayer(0.5f, 0f, 1f, Colors.white)
+        }
+        artist.apply {
+            setTextColor(Colors.main)
+        }
+        album.apply {
+            setTextColor(Colors.text_secondary)
+        }
+        
+        index = view.findViewById<TextView?>(R.id.tv_index).apply { 
+            setPadding(0, 0, 0, 0)
+            setTextColor(Colors.text_secondary)
+        }
         screenLayout = (view.findViewById(R.id.seek_bar) as ScreenLayout).apply { add(progressBar) }
         icon1 = view.findViewById(R.id.ic_play_mode)
         icon2 = view.findViewById(R.id.ic_repeat_mode)
@@ -323,11 +339,34 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
         }
         progressBar.set(MediaPresenter.getProgress(), duration)
 
+        // iPod Classic 风格：带动画的文本更新
         title.text = music.title
+        title.alpha = 0f
+        title.animate().alpha(1f).setDuration(400).start()
+        
         artist.text = music.artist
+        artist.alpha = 0f
+        artist.animate().alpha(1f).setDuration(400).setStartDelay(100).start()
+        
         album.text = music.album
+        album.alpha = 0f
+        album.animate().alpha(1f).setDuration(400).setStartDelay(200).start()
 
         index.text = "${(MediaPresenter.getIndex() + 1)}/${MediaPresenter.getPlaylist().size}"
+        
+        // 添加专辑封面进入动画
+        image.apply {
+            alpha = 0f
+            scaleX = 0.8f
+            scaleY = 0.8f
+            animate()
+                .alpha(1f)
+                .scaleX(1f)
+                .scaleY(1f)
+                .setDuration(500)
+                .setInterpolator(android.view.animation.OvershootInterpolator())
+                .start()
+        }
 
         lyric?.setBufferedText(null)
     }
@@ -362,6 +401,7 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
                 //image.setImageBitmap(null)
                 container.requestLayout()
             } else {
+                // 设置专辑封面并添加圆角效果
                 image.setImageBitmap(bitmap)
                 image.visibility = VISIBLE
 
@@ -369,19 +409,9 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
                 artist.gravity = Gravity.START
                 album.gravity = Gravity.START
                 lyric?.gravity = Gravity.START
-                /*
-                bitmap?.apply {
-                    val scaleWidth: Float = image.height / this.width.toFloat()
-                    val scaleHeight: Float = image.height / this.height.toFloat()
-                    val matrix = Matrix()
-                    matrix.postScale(scaleWidth, scaleHeight)
-                    val result = Bitmap.createBitmap(this, 0, 0, this.width, this.height, matrix, false)
-                    image.setImageBitmap(result)
-                }*/
-
-
-
-
+                
+                // 显示歌词区域（如果启用）
+                lyric?.visibility = if (lyric?.text.isNullOrEmpty()) GONE else VISIBLE
             }
 
         })

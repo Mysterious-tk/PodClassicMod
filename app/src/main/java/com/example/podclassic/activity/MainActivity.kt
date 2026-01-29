@@ -3,6 +3,7 @@ package com.example.podclassic.activity
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
@@ -289,6 +290,16 @@ class MainActivity : AppCompatActivity() {
         } else {
             prepare()
         }
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        // 重新计算屏幕尺寸
+        initScreen()
+        // 重新初始化布局，适应新的屏幕方向
+        initView()
+        // 刷新界面，确保所有视图正确显示
+        Core.refresh()
     }
 }
 

@@ -41,16 +41,19 @@ class TitleBar : FrameLayout {
     }
 
     init {
-        setBackgroundColor(Colors.theme_white)
+        // iPod Classic 风格的银色金属质感背景
+        setBackgroundColor(Colors.background_light)
         addView(
             playState,
             LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT).apply {
                 gravity = Gravity.START
+                setMargins(DEFAULT_PADDING, 0, 0, 0)
             })
         addView(
             battery,
             LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT).apply {
-                gravity = Gravity.END; setMargins(0, DEFAULT_PADDING / 2, 0, DEFAULT_PADDING / 2)
+                gravity = Gravity.END
+                setMargins(0, DEFAULT_PADDING / 2, DEFAULT_PADDING, DEFAULT_PADDING / 2)
             })
         addView(
             title,
@@ -58,13 +61,17 @@ class TitleBar : FrameLayout {
                 gravity = Gravity.CENTER
             })
 
-        title.textSize = 16f
+        // iPod Classic 风格的标题文字
+        title.textSize = 17f
+        title.setTextColor(Colors.text)
         title.setPadding(
             DEFAULT_PADDING * 8,
-            DEFAULT_PADDING / 3,
+            DEFAULT_PADDING / 2,
             DEFAULT_PADDING * 8,
-            DEFAULT_PADDING / 3
+            DEFAULT_PADDING / 2
         )
+        // 添加微妙的阴影效果
+        title.setShadowLayer(0.5f, 0f, 1f, Colors.white)
 
         MediaPresenter.playState.addObserver(observer, onDataChangeListener)
         observer.enable = true
@@ -132,24 +139,27 @@ class TitleBar : FrameLayout {
 
     override fun onDraw(canvas: Canvas?) {
         super.onDraw(canvas)
+        // iPod Classic 风格：银色金属质感渐变
         paint.shader = Colors.getShader(
             0f,
             0f,
             0f,
             height.toFloat(),
-            Colors.background_dark_1,
-            Colors.background_dark_2
+            Colors.background_light,  // 顶部亮银
+            Colors.background_dark_1  // 底部稍暗
         )
         canvas?.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
         paint.shader = null
-        paint.color = Colors.line
-        canvas?.drawRect(
-            0f,
-            height - Values.LINE_WIDTH.toFloat(),
-            width.toFloat(),
-            height.toFloat(),
-            paint
-        )
+        
+        // 顶部高光线
+        paint.color = Colors.white
+        canvas?.drawRect(0f, 0f, width.toFloat(), 1f, paint)
+        
+        // 底部分隔线 - iPod Classic 风格的双线
+        paint.color = Colors.background_dark_2
+        canvas?.drawRect(0f, height - 2f, width.toFloat(), height - 1f, paint)
+        paint.color = Colors.divider_light
+        canvas?.drawRect(0f, height - 1f, width.toFloat(), height.toFloat(), paint)
     }
 
     private fun registerBatteryBroadcastReceiver() {

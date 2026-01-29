@@ -4,15 +4,18 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Shader
-import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.LayerDrawable
+import android.graphics.drawable.Drawable
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.LinearLayout.VERTICAL
+import android.widget.RelativeLayout
 import com.example.podclassic.util.PinyinUtil
 import com.example.podclassic.util.ThreadUtil
 import com.example.podclassic.values.Colors
@@ -138,6 +141,10 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
         return getItem(index)
     }
 
+    fun getCurrentIndex(): Int {
+        return index
+    }
+
     fun setCurrent(index: Int) {
         this.index = index
         this.position =
@@ -212,7 +219,15 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
         }
     }
 
-    open fun onItemCreated(index: Int, itemView: ItemView) {}
+    open fun onItemCreated(index: Int, itemView: ItemView) {
+        itemView.itemIndex = index
+        itemView.onItemClickListener = object : ItemView.OnItemClickListener {
+            override fun onItemClick(itemIndex: Int) {
+                this@ListView.index = itemIndex
+                onItemClick()
+            }
+        }
+    }
 
     //index 为list中位置
     protected var index = 0
@@ -495,6 +510,9 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
         private val rightText = TextView(context)
         private val leftText = TextView(context)
         private val rightIcon = ImageView(context)
+        
+        var onItemClickListener: OnItemClickListener? = null
+        var itemIndex = -1
 
         init {
 
@@ -506,9 +524,24 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
 
             rightIcon.scaleType = ImageView.ScaleType.CENTER
             leftText.setSingleLine()
+            rightText.setSingleLine()
             addView(leftText, layoutParams1)
             addView(rightText, layoutParams2)
             addView(rightIcon, layoutParams3)
+            
+            // 添加触摸事件监听器
+            setOnTouchListener {_, event ->
+                when (event.action) {
+                    MotionEvent.ACTION_UP -> {
+                        onItemClickListener?.onItemClick(itemIndex)
+                    }
+                }
+                true
+            }
+        }
+        
+        interface OnItemClickListener {
+            fun onItemClick(index: Int)
         }
 
         override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
@@ -565,22 +598,25 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
                 setBackgroundColor(Colors.main)
                 leftText.setTextColor(Colors.text_light)
                 rightText.setTextColor(Colors.text_light)
-                when {
-                    enable -> setRightIcon(Icons.ARROW_WHITE.drawable)
-                    playing -> setRightIcon(Icons.PLAYING_WHITE.drawable)
-                    else -> setRightIcon(null)
+                // 只在播放时显示图标，移除箭头图标
+                if (playing) {
+                    setRightIcon(Icons.PLAYING_WHITE.drawable)
+                } else {
+                    setRightIcon(null)
                 }
             } else {
                 background = null
                 leftText.setTextColor(Colors.text)
                 rightText.setTextColor(Colors.text)
-                when {
-                    enable -> setRightIcon(Icons.ARROW_BLACK.drawable)
-                    playing -> setRightIcon(Icons.PLAYING_BLACK.drawable)
-                    else -> setRightIcon(null)
+                // 只在播放时显示图标，移除箭头图标
+                if (playing) {
+                    setRightIcon(Icons.PLAYING_BLACK.drawable)
+                } else {
+                    setRightIcon(null)
                 }
             }
-            leftText.paddingRight = if (hasRightIcon) DEFAULT_PADDING * 4 else DEFAULT_PADDING
+            // 为左侧文本添加足够的右侧内边距，避免与右侧文本重叠
+            leftText.paddingRight = DEFAULT_PADDING * 12
         }
 
         private var shakeCount = 0

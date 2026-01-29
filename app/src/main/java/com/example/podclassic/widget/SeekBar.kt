@@ -94,11 +94,11 @@ class SeekBar(context: Context) : LinearLayout(context) {
         }
         linearLayout.apply {
             addView(
-                leftView.apply { gravity = Gravity.START; setPadding(0, 0, 0, 0) },
+                leftView.apply { gravity = Gravity.START; setPadding(Values.DEFAULT_PADDING, 0, 0, 0) },
                 LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT, 1f)
             )
             addView(
-                rightView.apply { gravity = Gravity.END; setPadding(0, 0, 0, 0) },
+                rightView.apply { gravity = Gravity.END; setPadding(0, 0, Values.DEFAULT_PADDING, 0) },
                 LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT, 1f)
             )
             setPadding(0, Values.DEFAULT_PADDING, 0, 0)
@@ -196,7 +196,7 @@ class SeekBar(context: Context) : LinearLayout(context) {
         if (textVisibility == View.VISIBLE) {
             val ms = (current / 1000) * 1000
             leftView.text = toMinute(ms)
-            rightView.text = toMinute(ms - max)
+            rightView.text = toMinute(max - ms)
         }
         front.layout(0, 0, width * current / max, BAR_HEIGHT)
     }
@@ -204,13 +204,7 @@ class SeekBar(context: Context) : LinearLayout(context) {
 
     private fun toMinute(temp: Int): String {
         val stringBuilder = StringBuilder()
-        val ms = if (temp < 0) {
-            stringBuilder.append('-')
-            -temp
-        } else {
-            temp
-        }
-        //val s = (if (temp < 0) floor(ms.toDouble() / 1000.0) else ceil(ms.toDouble() / 1000.0)).toInt()
+        val ms = temp
         val s = ms / 1000
         val min = s / 60
         if (min < 10) {
