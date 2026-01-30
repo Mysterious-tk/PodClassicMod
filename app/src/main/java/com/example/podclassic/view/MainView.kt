@@ -7,6 +7,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.Message
 import android.view.View
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.RelativeLayout
 import android.widget.RelativeLayout.LayoutParams
@@ -29,6 +30,9 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
         // 主菜单不需要为右侧时间预留空间
         reserveSpaceForTime = false
     }
+    // 图片容器（可见区域）
+    private val coverContainer = FrameLayout(context)
+    // 图片视图（比容器大，在容器内飘动）
     private val coverImageView = ImageView(context)
 
     private val random = Random()
@@ -48,8 +52,8 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
 
     init {
         // 初始化随机移动方向和速度
-        dx = (random.nextInt(6) - 3).toFloat() * 2.5f // 进一步增加移动速度
-        dy = (random.nextInt(6) - 3).toFloat() * 2.5f // 进一步增加移动速度和y轴移动
+        dx = (random.nextInt(6) - 3).toFloat() * 5f // 增加移动速度
+        dy = (random.nextInt(6) - 3).toFloat() * 5f // 增加移动速度和y轴移动
     }
 
     override fun getTitle(): String? {
@@ -75,21 +79,25 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
     }, true)
 
     init {
-        // 设置ImageView
-        val coverParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
-        coverParams.addRule(RelativeLayout.ALIGN_PARENT_RIGHT)
-        coverParams.width = (resources.displayMetrics.widthPixels * 0.6).toInt()
-        // 设置ImageView的z轴顺序，使其位于ListView下方
-        coverParams.addRule(RelativeLayout.BELOW, -1)
-        addView(coverImageView, coverParams)
+        // 设置图片容器（可见区域）
+        val containerWidth = (resources.displayMetrics.widthPixels * 0.65).toInt()
+        val containerHeight = resources.displayMetrics.heightPixels
+        val containerParams = LayoutParams(containerWidth, containerHeight)
+        containerParams.addRule(RelativeLayout.ALIGN_PARENT_RIGHT)
+        // 设置容器的z轴顺序，使其位于ListView下方
+        containerParams.addRule(RelativeLayout.BELOW, -1)
+        addView(coverContainer, containerParams)
+        coverContainer.setBackgroundColor(android.graphics.Color.BLACK)
+
+        // 设置图片视图（比容器大，在容器内飘动，能看到图片的不同部分）
+        // 图片是容器的1.5倍，这样有足够空间飘动看到不同部分
+        val imageParams = FrameLayout.LayoutParams(
+            (containerWidth * 1.5).toInt(),
+            (containerHeight * 1.5).toInt()
+        )
+        coverImageView.layoutParams = imageParams
         coverImageView.scaleType = ImageView.ScaleType.CENTER_CROP
-        // 添加背景，使其看起来更像唱片
-        coverImageView.setBackgroundColor(android.graphics.Color.BLACK)
-        // 放大两倍，设置锚点为左上角，这样x/y属性可以直接控制位置
-        coverImageView.scaleX = 2f
-        coverImageView.scaleY = 2f
-        coverImageView.pivotX = 0f
-        coverImageView.pivotY = 0f
+        coverContainer.addView(coverImageView)
 
         // 设置ListView
         val listParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
@@ -314,12 +322,14 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
             listView.addIfNotExist(item)
         }
 
-        // 延迟执行，确保coverImageView尺寸已测量完成
-        coverImageView.post {
-            updateCoverImage()
-            // 强制重置位置到中心
-            resetCoverPosition()
-            handler.sendEmptyMessage(0)
+        // 延迟执行，确保coverContainer和coverImageView尺寸已测量完成
+        coverContainer.post {
+            coverContainer.post {
+                updateCoverImage()
+                // 强制重置位置到中心
+                resetCoverPosition()
+                handler.sendEmptyMessage(0)
+            }
         }
     }
 
@@ -343,15 +353,21 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
 
     private fun resetCoverPosition() {
         // 重置位置到中心
-        val viewWidth = coverImageView.width
-        val viewHeight = coverImageView.height
-        // 锚点设为左上角后，scaled尺寸就是实际显示尺寸
-        val scaledWidth = viewWidth * 2
-        val scaledHeight = viewHeight * 2
+        val containerWidth = coverContainer.width
+        val containerHeight = coverContainer.height
+        val imageWidth = coverImageView.width
+        val imageHeight = coverImageView.height
 
-        // 计算中心位置（让放大的图片中心对准view中心）
-        val centerX = (viewWidth - scaledWidth) / 2f
-        val centerY = (viewHeight - scaledHeight) / 2f
+        if (containerWidth == 0 || containerHeight == 0 || imageWidth == 0 || imageHeight == 0) {
+            // view还未测量完成，延迟再试
+            coverContainer.post { resetCoverPosition() }
+            return
+        }
+
+        // 计算中心位置（让图片中心对准容器中心）
+        // 图片比容器大，所以x/y应该是负值
+        val centerX = (containerWidth - imageWidth) / 2f
+        val centerY = (containerHeight - imageHeight) / 2f
 
         coverImageView.x = centerX
         coverImageView.y = centerY
@@ -387,64 +403,65 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
     }
 
     private fun updateCoverPosition() {
-        // 计算移动范围，考虑放大两倍的尺寸
-        val viewWidth = coverImageView.width
-        val viewHeight = coverImageView.height
-        // 锚点设为左上角后，scaled尺寸就是实际显示尺寸
-        val scaledWidth = viewWidth * 2
-        val scaledHeight = viewHeight * 2
+        // 获取容器和图片的尺寸
+        val containerWidth = coverContainer.width
+        val containerHeight = coverContainer.height
+        val imageWidth = coverImageView.width
+        val imageHeight = coverImageView.height
 
-        // 计算最大和最小位置，确保图片不会露白
-        // 左边界：图片左边缘不超过view左边缘（x=0时，图片左边缘正好在view左边缘）
-        val minX = (viewWidth - scaledWidth).toFloat() // 负值，让图片右边缘对齐view右边缘
-        // 右边界：图片右边缘不超过view右边缘（x=0时，图片左边缘正好在view左边缘）
+        if (containerWidth == 0 || containerHeight == 0 || imageWidth == 0 || imageHeight == 0) {
+            return
+        }
+
+        // 计算边界：图片在容器内移动
+        // 当 x = 0 时，图片左边缘对齐容器左边缘
+        // 当 x = containerWidth - imageWidth 时，图片右边缘对齐容器右边缘
+        val minX = (containerWidth - imageWidth).toFloat() // 负值
         val maxX = 0f
-        // 上边界：图片上边缘不超过view上边缘
-        val minY = (viewHeight - scaledHeight).toFloat() // 负值，让图片下边缘对齐view下边缘
-        // 下边界：图片下边缘不超过view下边缘
+        val minY = (containerHeight - imageHeight).toFloat() // 负值
         val maxY = 0f
 
-        // 获取ImageView的当前位置
+        // 获取图片的当前位置
         val currentX = coverImageView.x + dx
         val currentY = coverImageView.y + dy
 
         var bounced = false
 
         // 边界检查和随机方向改变
-        // 检查是否接近左边界（minX是负值，currentX越小越靠左）
-        if (currentX <= minX + 30) {
-            // 接近左边界，随机改变方向
-            dx = (random.nextInt(4) + 2).toFloat() // 向右移动
-            dy = (random.nextInt(6) - 3).toFloat() // 随机Y方向
+        // 检查是否碰到左边界
+        if (currentX <= minX) {
+            // 碰到左边界，向右随机方向移动（确保x速度为正，行程长）
+            dx = (random.nextInt(3) + 3).toFloat() * 2f // 3-5的速度向右
+            dy = (random.nextInt(7) - 3).toFloat() * 2f // -3到3的随机y速度
             bounced = true
         }
-        // 检查是否接近右边界（maxX=0，currentX越大越靠右）
-        if (currentX >= maxX - 30) {
-            // 接近右边界，随机改变方向
-            dx = -(random.nextInt(4) + 2).toFloat() // 向左移动
-            dy = (random.nextInt(6) - 3).toFloat() // 随机Y方向
+        // 检查是否碰到右边界
+        if (currentX >= maxX) {
+            // 碰到右边界，向左随机方向移动（确保x速度为负，行程长）
+            dx = -(random.nextInt(3) + 3).toFloat() * 2f // 3-5的速度向左
+            dy = (random.nextInt(7) - 3).toFloat() * 2f // -3到3的随机y速度
             bounced = true
         }
-        // 检查是否接近上边界
-        if (currentY <= minY + 30) {
-            // 接近上边界，随机改变方向
-            dx = (random.nextInt(6) - 3).toFloat() // 随机X方向
-            dy = (random.nextInt(4) + 2).toFloat() // 向下移动
+        // 检查是否碰到上边界
+        if (currentY <= minY) {
+            // 碰到上边界，向下随机方向移动（确保y速度为正，行程长）
+            dx = (random.nextInt(7) - 3).toFloat() * 2f // -3到3的随机x速度
+            dy = (random.nextInt(3) + 3).toFloat() * 2f // 3-5的速度向下
             bounced = true
         }
-        // 检查是否接近下边界
-        if (currentY >= maxY - 30) {
-            // 接近下边界，随机改变方向
-            dx = (random.nextInt(6) - 3).toFloat() // 随机X方向
-            dy = -(random.nextInt(4) + 2).toFloat() // 向上移动
+        // 检查是否碰到下边界
+        if (currentY >= maxY) {
+            // 碰到下边界，向上随机方向移动（确保y速度为负，行程长）
+            dx = (random.nextInt(7) - 3).toFloat() * 2f // -3到3的随机x速度
+            dy = -(random.nextInt(3) + 3).toFloat() * 2f // 3-5的速度向上
             bounced = true
         }
 
         // 如果发生碰撞，增加计数
         if (bounced) {
             bounceCount++
-            // 碰撞4次后换图
-            if (bounceCount >= 4) {
+            // 碰撞50次后换图
+            if (bounceCount >= 50) {
                 bounceCount = 0
                 changeCoverImage()
             }
@@ -460,7 +477,7 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
         if (newY < minY) newY = minY
         if (newY > maxY) newY = maxY
 
-        // 更新ImageView的位置
+        // 更新图片的位置
         coverImageView.x = newX
         coverImageView.y = newY
     }
