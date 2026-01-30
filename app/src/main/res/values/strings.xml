@@ -6,7 +6,7 @@
     <string name="file">文件</string>
     <string name="extra_application">附加程序</string>
     <string name="settings">设置</string>
-    <string name="shuffle_play">随机播放歌曲</string>
+    <string name="shuffle_play">随机播放</string>
     <string name="now_playing">正在播放</string>
     <string name="current_playlist">当前播放列表</string>
     <string name="music">歌曲</string>
