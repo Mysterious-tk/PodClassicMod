@@ -37,18 +37,24 @@ class MediaPlayer<E>(context: Context, mediaAdapter: MediaAdapter<E>) :
 
     private val mediaPlayer: MediaPlayer
 
-    private val equalizer: Equalizer
+    private var equalizer: Equalizer? = null
 
     var equalizerId: Int = 0
         set(value) {
-            if (value in 0 until equalizer.numberOfPresets) {
-                equalizer.usePreset(value.toShort())
+            equalizer?.let {
+                if (value in 0 until it.numberOfPresets) {
+                    it.usePreset(value.toShort())
+                }
             }
             field = value
             onDataChangeListener?.onEqualizerChange()
         }
 
-    val presetList: Array<String?>
+    private var presetList: Array<String?> = arrayOf()
+
+    fun getPresetList(): Array<String?> {
+        return presetList
+    }
 
     interface OnDataChangeListener {
         fun onPlaylistChange() {}
@@ -136,7 +142,7 @@ class MediaPlayer<E>(context: Context, mediaAdapter: MediaAdapter<E>) :
         stop()
         mediaPlayer.release()
         onMediaChangeListeners.clear()
-        equalizer.release()
+        equalizer?.release()
     }
 
     fun stop() {
@@ -431,14 +437,22 @@ class MediaPlayer<E>(context: Context, mediaAdapter: MediaAdapter<E>) :
             setOnPreparedListener(this@MediaPlayer)
             setAudioAttributes(audioFocusManager.audioAttributes)
         }
-        this.equalizer = Equalizer(1000, mediaPlayer.audioSessionId).apply {
-            if (hasControl()) {
-                enabled = true
+        try {
+            this.equalizer = Equalizer(1000, mediaPlayer.audioSessionId).apply {
+                if (hasControl()) {
+                    enabled = true
+                }
             }
-        }
-        this.presetList = arrayOfNulls(equalizer.numberOfPresets.toInt())
-        for (i in 0 until equalizer.numberOfPresets) {
-            this.presetList[i] = equalizer.getPresetName(i.toShort())
+            this.equalizer?.let {
+                this.presetList = arrayOfNulls(it.numberOfPresets.toInt())
+                for (i in 0 until it.numberOfPresets) {
+                    this.presetList[i] = it.getPresetName(i.toShort())
+                }
+            }
+        } catch (e: Exception) {
+            // 均衡器初始化失败，跳过均衡器设置
+            this.equalizer = null
+            this.presetList = arrayOf()
         }
     }
 

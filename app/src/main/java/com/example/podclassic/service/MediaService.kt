@@ -513,6 +513,6 @@ class MediaService : Service() {
         fun getPlaylist(): ArrayList<Music> = mediaPlayer.getPlaylist()
         fun isPlaying(): Boolean = mediaPlayer.isPlaying
         fun isPrepared(): Boolean = mediaPlayer.isPrepared
-        fun getPresetList(): Array<String?> = mediaPlayer.presetList
+        fun getPresetList(): Array<String?> = mediaPlayer.getPresetList()
     }
 }
