@@ -87,8 +87,10 @@ class AppTable(private val name: String) {
         }
 
         private fun buildApp(cursor: Cursor): App {
-            val appName = cursor.getString(cursor.getColumnIndex(APP_NAME))
-            val packageName = cursor.getString(cursor.getColumnIndex(PACKAGE_NAME))
+            val appNameIndex = cursor.getColumnIndex(APP_NAME)
+            val packageNameIndex = cursor.getColumnIndex(PACKAGE_NAME)
+            val appName = if (appNameIndex >= 0) cursor.getString(appNameIndex) else ""
+            val packageName = if (packageNameIndex >= 0) cursor.getString(packageNameIndex) else ""
             return App(appName, packageName)
         }
 

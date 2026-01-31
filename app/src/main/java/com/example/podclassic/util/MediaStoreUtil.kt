@@ -8,6 +8,7 @@ import android.media.ThumbnailUtils
 import android.net.Uri
 import android.provider.MediaStore
 import android.text.TextUtils
+import android.util.Log
 import com.example.podclassic.base.BaseApplication
 import com.example.podclassic.bean.Music
 import com.example.podclassic.bean.MusicList
@@ -31,40 +32,60 @@ object MediaStoreUtil {
         val albumIdIndex = cursor.getColumnIndex(MediaStore.Audio.Media.ALBUM_ID)
         val idIndex = cursor.getColumnIndex(MediaStore.Audio.Media._ID)
 
-
         while (cursor.moveToNext()) {
-            val duration = cursor.getLong(durationIndex)
-            val size = cursor.getLong(sizeIndex)
-            val data = cursor.getString(pathIndex)
-            val lowerPath = data.lowercase()
+            try {
+                // 检查索引是否有效
+                if (durationIndex < 0 || sizeIndex < 0 || pathIndex < 0 || 
+                    albumIndex < 0 || artistIndex < 0 || titleIndex < 0 || 
+                    albumIdIndex < 0 || idIndex < 0) {
+                    continue
+                }
 
-            // 屏蔽通话录音
-            if (lowerPath.contains("通话录音") || lowerPath.contains("Recorder") || lowerPath.contains("Recordings") || (lowerPath.contains(
-                    "call"
-                ) && lowerPath.contains("record"))
-            ) {
+                val duration = cursor.getLong(durationIndex)
+                val size = cursor.getLong(sizeIndex)
+                val data = cursor.getString(pathIndex)
+                
+                // 检查数据是否有效
+                if (data.isNullOrBlank()) {
+                    continue
+                }
+
+                val lowerPath = data.lowercase()
+
+                // 屏蔽通话录音
+                if (lowerPath.contains("通话录音") || lowerPath.contains("Recorder") || lowerPath.contains("Recordings") || (lowerPath.contains(
+                        "call"
+                    ) && lowerPath.contains("record"))
+                ) {
+                    continue
+                }
+                
+                // 屏蔽过长或过短音频（放宽限制）
+                if (duration < 1000 || size < 1024 || duration > MAX_DURATION) {
+                    continue
+                }
+
+                val album = cursor.getString(albumIndex)
+                val artist = cursor.getString(artistIndex)
+                val title = cursor.getString(titleIndex)
+                val id = cursor.getLong(idIndex)
+                val albumId = cursor.getLong(albumIdIndex)
+                
+                val music = Music.Builder().apply {
+                    this.title = title
+                    this.artist = artist
+                    this.album = album
+                    this.id = id
+                    this.albumId = albumId
+                    this.data = data
+                    this.duration = duration
+                }.build()
+                list.add(music)
+            } catch (e: Exception) {
+                // 忽略异常，继续处理下一首
+                e.printStackTrace()
                 continue
             }
-            // 屏蔽过长或过短音频
-            if (duration < MIN_DURATION || size < MIN_SIZE || duration > MAX_DURATION) {
-                continue
-            }
-
-            val album = cursor.getString(albumIndex)
-            val artist = cursor.getString(artistIndex)
-            val title = cursor.getString(titleIndex)
-            val id = cursor.getLong(idIndex)
-            val albumId = cursor.getLong(albumIdIndex)
-            val music = Music.Builder().apply {
-                this.title = title
-                this.artist = artist
-                this.album = album
-                this.id = id
-                this.albumId = albumId
-                this.data = data
-                this.duration = duration
-            }.build()
-            list.add(music)
         }
         return list
     }
@@ -391,14 +412,19 @@ object MediaStoreUtil {
     fun getMusicList(): ArrayList<Music> {
         val time = System.currentTimeMillis()
         if (musicCache == null || time - cacheTime > HOUR) {
+            Log.d("MediaStoreUtil", "Scanning music files...")
             musicCache = getMusicList(null, null)
+            Log.d("MediaStoreUtil", "Scanned ${musicCache?.size ?: 0} music files")
             cacheTime = time
         }
+        Log.d("MediaStoreUtil", "Returning ${musicCache?.size ?: 0} music files from cache")
         return musicCache!!
     }
 
     fun init() {
+        Log.d("MediaStoreUtil", "Initializing music cache...")
         musicCache = getMusicList()
+        Log.d("MediaStoreUtil", "Initialized with ${musicCache?.size ?: 0} music files")
         cacheTime = System.currentTimeMillis()
     }
 
@@ -411,11 +437,13 @@ object MediaStoreUtil {
             null
         ) ?: return 0
         val size = cursor.count
+        Log.d("MediaStoreUtil", "Found $size total audio files in MediaStore")
         cursor.close()
         return size
     }
 
     fun getMusicList(selection: String?, selectionArgs: Array<String>?): ArrayList<Music> {
+        Log.d("MediaStoreUtil", "Querying MediaStore for music files...")
         val cursor = BaseApplication.context.contentResolver.query(
             MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
             arrayOf(
@@ -433,8 +461,10 @@ object MediaStoreUtil {
             null,//MediaStore.Audio.Media.DEFAULT_SORT_ORDER
 
         ) ?: return ArrayList()
+        Log.d("MediaStoreUtil", "Query returned ${cursor.count} rows")
         val list = getMusicsFromCursor(cursor)
         cursor.close()
+        Log.d("MediaStoreUtil", "Processed ${list.size} music files after filtering")
         //list.sortBy { pinyinUtil.getPinyinChar( it.title[0]) }
         //list.sortBy { PinyinUtil.getInstance(BaseApplication.context).getPinyinChar(it.title[0]) }
         list.sort()

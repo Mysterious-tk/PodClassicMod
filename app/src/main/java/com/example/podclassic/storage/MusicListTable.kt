@@ -92,10 +92,14 @@ class MusicListTable(val name: String) {
         val artist = MusicListTable(ARTIST_LIST)
 
         private fun buildMusicListFromCursor(cursor: Cursor, type: Int): MusicList {
-            val title = cursor.getString(cursor.getColumnIndex(TITLE))
-            val data = cursor.getString(cursor.getColumnIndex(DATA))
-            val subtitle = cursor.getString(cursor.getColumnIndex(SUBTITLE))
-            val id = cursor.getLong(cursor.getColumnIndex(ALBUM_ID))
+            val titleIndex = cursor.getColumnIndex(TITLE)
+            val dataIndex = cursor.getColumnIndex(DATA)
+            val subtitleIndex = cursor.getColumnIndex(SUBTITLE)
+            val albumIdIndex = cursor.getColumnIndex(ALBUM_ID)
+            val title = if (titleIndex >= 0) cursor.getString(titleIndex) else ""
+            val data = if (dataIndex >= 0) cursor.getString(dataIndex) else ""
+            val subtitle = if (subtitleIndex >= 0) cursor.getString(subtitleIndex) else ""
+            val id = if (albumIdIndex >= 0) cursor.getLong(albumIdIndex) else 0L
             return MusicList.Builder().apply {
                 this.title = title
                 this.data = data

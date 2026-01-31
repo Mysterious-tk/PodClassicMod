@@ -8,7 +8,7 @@ android {
     defaultConfig {
         applicationId "com.example.podclassic"
         minSdk 21
-        targetSdk 32
+        targetSdk 33
         versionCode 25
         versionName "1.5"
 

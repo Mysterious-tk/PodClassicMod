@@ -30,7 +30,7 @@ object MediaPresenter {
 
     private var mediaController: MediaService.MediaController? = null
         get() {
-            if (field == null && connectionState == STATE_UNCONNECTED) {
+            if (field == null) {
                 connect()
             }
             return field
@@ -42,7 +42,7 @@ object MediaPresenter {
     }
 
     private fun connect() {
-        if (connectionState != STATE_UNCONNECTED) {
+        if (connectionState == STATE_CONNECTING) {
             return
         }
         connectionState = STATE_CONNECTING
@@ -52,16 +52,14 @@ object MediaPresenter {
 
         context.bindService(intent, object : ServiceConnection {
             override fun onServiceConnected(p0: ComponentName?, p1: IBinder?) {
-                (p1 as MediaService.ServiceBinder)
-                mediaController = p1.mediaController
+                val binder = p1 as MediaService.ServiceBinder
+                mediaController = binder.mediaController
                 connectionState = STATE_CONNECTED
             }
 
             override fun onServiceDisconnected(p0: ComponentName?) {
                 mediaController = null
-                if (connectionState == STATE_CONNECTED) {
-                    connectionState = STATE_UNCONNECTED
-                }
+                connectionState = STATE_UNCONNECTED
             }
 
         }, BIND_AUTO_CREATE)

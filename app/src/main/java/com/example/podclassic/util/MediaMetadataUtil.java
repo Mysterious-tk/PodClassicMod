@@ -199,7 +199,14 @@ public class MediaMetadataUtil {
         long duration = Long.parseLong(mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION));
         mediaMetadataRetriever.release();
         if (title == null) {
-            title = Strings.INSTANCE.getEMPTY();
+            // 从文件名中提取标题
+            File file = new File(path);
+            String fileName = file.getName();
+            if (fileName.contains(".")) {
+                title = fileName.substring(0, fileName.lastIndexOf('.'));
+            } else {
+                title = fileName;
+            }
         }
         if (artist == null) {
             artist = Strings.INSTANCE.getEMPTY();

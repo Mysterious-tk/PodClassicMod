@@ -39,7 +39,7 @@ class MusicListView : FrameLayout, ScreenView {
     }
 
     override fun getTitle(): String {
-        return "Cover Flow"
+        return "CoverFlow"
     }
 
     private val musicList: ArrayList<Music>

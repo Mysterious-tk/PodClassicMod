@@ -64,8 +64,11 @@ class MainActivity : AppCompatActivity() {
     private fun prepare() {
         supportFragmentManager
             .beginTransaction()
-            .replace(R.id.screen, SplashFragment {
+            .replace(R.id.screen, SplashFragment { 
                 Core.lock(true)
+                // 启动MediaService
+                val intent = Intent(this@MainActivity, MediaService::class.java)
+                startService(intent)
                 Core.initUI()
                 initMediaPlayer()
                 Core.lock(false)
@@ -261,17 +264,37 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkPermission() {
+        // Android 13 及以上版本使用 READ_MEDIA_AUDIO 权限
+        val READ_MEDIA_AUDIO = "android.permission.READ_MEDIA_AUDIO"
+        val isAndroid13OrHigher = android.os.Build.VERSION.SDK_INT >= 33 // TIRAMISU is API 33
+        
+        val permissions = if (isAndroid13OrHigher) {
+            // Android 13 及以上版本
+            arrayOf(
+                READ_MEDIA_AUDIO
+            )
+        } else {
+            // Android 12 及以下版本
+            arrayOf(
+                Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                Manifest.permission.READ_EXTERNAL_STORAGE
+            )
+        }
+        
+        val permissionToCheck = if (isAndroid13OrHigher) {
+            READ_MEDIA_AUDIO
+        } else {
+            Manifest.permission.WRITE_EXTERNAL_STORAGE
+        }
+        
         if (ContextCompat.checkSelfPermission(
                 this,
-                Manifest.permission.WRITE_EXTERNAL_STORAGE
+                permissionToCheck
             ) != PackageManager.PERMISSION_GRANTED
         ) {
             ActivityCompat.requestPermissions(
                 this,
-                arrayOf(
-                    Manifest.permission.WRITE_EXTERNAL_STORAGE,
-                    Manifest.permission.READ_EXTERNAL_STORAGE
-                ),
+                permissions,
                 1
             )
         } else {

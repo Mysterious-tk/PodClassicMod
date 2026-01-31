@@ -172,7 +172,13 @@ class MediaPlayer<E>(context: Context, mediaAdapter: MediaAdapter<E>) :
         if (playlist.play(mediaPlayer)) {
             mediaPlayer.prepareAsync()
         } else {
-            stop()
+            // 加载失败时，尝试播放下一首，而不是清空播放列表
+            val nextMedia = playlist.next()
+            if (nextMedia != null) {
+                startMediaPlayer()
+            } else {
+                stop()
+            }
         }
     }
 

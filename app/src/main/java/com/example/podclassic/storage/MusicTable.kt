@@ -139,13 +139,22 @@ class MusicTable(private val name: String) {
 
 
         fun buildMusicFromCursor(cursor: Cursor): Music {
-            val title = cursor.getString(cursor.getColumnIndex(TITLE))
-            val album = cursor.getString(cursor.getColumnIndex(ALBUM))
-            val albumId = cursor.getLong(cursor.getColumnIndex(ALBUM_ID))
-            val artist = cursor.getString(cursor.getColumnIndex(ARTIST))
-            val data = cursor.getString(cursor.getColumnIndex(DATA))
-            val id = cursor.getLong(cursor.getColumnIndex(ID))
-            val duration = cursor.getLong(cursor.getColumnIndex(DURATION))
+            val titleIndex = cursor.getColumnIndex(TITLE)
+            val albumIndex = cursor.getColumnIndex(ALBUM)
+            val albumIdIndex = cursor.getColumnIndex(ALBUM_ID)
+            val artistIndex = cursor.getColumnIndex(ARTIST)
+            val dataIndex = cursor.getColumnIndex(DATA)
+            val idIndex = cursor.getColumnIndex(ID)
+            val durationIndex = cursor.getColumnIndex(DURATION)
+            
+            val title = if (titleIndex >= 0) cursor.getString(titleIndex) else ""
+            val album = if (albumIndex >= 0) cursor.getString(albumIndex) else ""
+            val albumId = if (albumIdIndex >= 0) cursor.getLong(albumIdIndex) else 0L
+            val artist = if (artistIndex >= 0) cursor.getString(artistIndex) else ""
+            val data = if (dataIndex >= 0) cursor.getString(dataIndex) else null
+            val id = if (idIndex >= 0) cursor.getLong(idIndex) else null
+            val duration = if (durationIndex >= 0) cursor.getLong(durationIndex) else 0L
+            
             return Music(title, id, artist, album, albumId, duration, data, null)
         }
 

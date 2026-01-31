@@ -113,7 +113,7 @@ class MediaService : Service() {
         }
 
         override fun onPlay() {
-            if (!mediaPlayer.isPlaying) mediaPlayer.pause()
+            if (!mediaPlayer.isPlaying) mediaPlayer.play()
         }
 
         override fun onSeekTo(pos: Long) {
@@ -190,11 +190,21 @@ class MediaService : Service() {
     private val mediaAdapter = object : MediaPlayer.MediaAdapter<Music> {
         override fun onLoadMedia(e: Music, mediaPlayer: android.media.MediaPlayer): Boolean {
             if (e.data != null && e.data.isNotBlank()) {
-                mediaPlayer.setDataSource(e.data)
-                return true
+                try {
+                    mediaPlayer.setDataSource(e.data)
+                    return true
+                } catch (ex: Exception) {
+                    ex.printStackTrace()
+                    return false
+                }
             } else if (e.uri != null) {
-                mediaPlayer.setDataSource(this@MediaService, e.uri)
-                return true
+                try {
+                    mediaPlayer.setDataSource(this@MediaService, e.uri)
+                    return true
+                } catch (ex: Exception) {
+                    ex.printStackTrace()
+                    return false
+                }
             }
             return false
         }
