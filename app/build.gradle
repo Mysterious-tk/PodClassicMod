@@ -1,6 +1,5 @@
 plugins {
     id 'com.android.application'
-    id 'kotlin-android'
 }
 
 android {
@@ -20,18 +19,20 @@ android {
         release {
             minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            zipAlignEnabled true
-            shrinkResources true
+            zipAlignEnabled = true
+            shrinkResources = true
         }
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_11
         targetCompatibility JavaVersion.VERSION_11
+        encoding = 'UTF-8'
     }
-    kotlinOptions {
-        jvmTarget = '11'
+
+    tasks.withType(JavaCompile) {
+        options.compilerArgs += ["-Xlint:unchecked"]
     }
-    namespace 'com.example.podclassic'
+    namespace = 'com.example.podclassic'
 }
 
 dependencies {

@@ -15,6 +15,7 @@ public class PinyinUtil {
     private PinyinUtil() {
     }
 
+    @SuppressWarnings("unchecked")
     private static HashMap<Character, Character> getPinyinMap(Context context) {
         try (ObjectInputStream in = new ObjectInputStream(context.getResources().openRawResource(R.raw.pinyin))) {
             Object obj = in.readObject();
@@ -22,7 +23,7 @@ public class PinyinUtil {
             if (obj == null) {
                 return new HashMap<>();
             } else {
-                return (HashMap) obj;
+                return (HashMap<Character, Character>) obj;
             }
 
 

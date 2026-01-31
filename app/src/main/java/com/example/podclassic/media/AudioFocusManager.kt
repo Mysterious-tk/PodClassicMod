@@ -31,6 +31,7 @@ class AudioFocusManager(
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             audioManager.requestAudioFocus(audioFocusRequest!!)
         } else {
+            @Suppress("DEPRECATION")
             audioManager.requestAudioFocus(
                 this,
                 AudioManager.STREAM_MUSIC,
@@ -43,6 +44,7 @@ class AudioFocusManager(
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             audioManager.abandonAudioFocusRequest(audioFocusRequest!!)
         } else {
+            @Suppress("DEPRECATION")
             audioManager.abandonAudioFocus(this)
         }
     }

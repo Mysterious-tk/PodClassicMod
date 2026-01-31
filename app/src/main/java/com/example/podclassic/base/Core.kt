@@ -158,9 +158,13 @@ object Core {
             SPManager.Language.EN.id -> configuration.setLocale(Locale.US)
             SPManager.Language.AUTO.id -> configuration.setLocale(Locale.getDefault())
         }
-        resources.updateConfiguration(configuration, resources.displayMetrics)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
+            context.createConfigurationContext(configuration)
+        } else {
+            @Suppress("DEPRECATION")
+            resources.updateConfiguration(configuration, resources.displayMetrics)
+        }
         Strings.init()
-        //context.createConfigurationContext(configuration)
     }
 
     private const val DELAY = 10000L
