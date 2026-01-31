@@ -26,13 +26,20 @@ import com.example.podclassic.values.Icons
 import com.example.podclassic.values.Strings
 import com.example.podclassic.widget.ScreenLayout
 import com.example.podclassic.widget.SeekBar
-import com.example.podclassic.widget.TextView
 import java.util.*
 import kotlin.math.abs
 import kotlin.math.pow
+import android.util.Log
 
 
 class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
+    init {
+        // 设置布局参数为 match_parent
+        layoutParams = FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.MATCH_PARENT
+        )
+    }
 
     private val observer = Observer()
 
@@ -44,8 +51,8 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
     private var timer: Timer? = null
     private var prevTimerSetTime = 0L
 
-    override fun getTitle(): String {
-        return Strings.NOW_PLAYING
+    override fun getTitle(): String? {
+        return null
     }
 
     private var seekMode = false
@@ -54,14 +61,15 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
     private val volumeBar: SeekBar = SeekBar(context)
 
     private val screenLayout: ScreenLayout
-    private val index: TextView
-    private val time: TextView
+    private val index: androidx.appcompat.widget.AppCompatTextView
+    private val currentTime: androidx.appcompat.widget.AppCompatTextView
+    private val remainingTime: androidx.appcompat.widget.AppCompatTextView
     private val image: com.example.podclassic.widget.ImageView
-    private val title: TextView
-    private val artist: TextView
-    private val album: TextView
-    private val stopTime: TextView?
-    private val lyric: TextView?
+    private val title: androidx.appcompat.widget.AppCompatTextView
+    private val artist: androidx.appcompat.widget.AppCompatTextView
+    private val album: androidx.appcompat.widget.AppCompatTextView
+    private val stopTime: androidx.appcompat.widget.AppCompatTextView?
+    private val lyric: com.example.podclassic.widget.TextView?
     private val icon1: androidx.appcompat.widget.AppCompatImageView
     private val icon2: androidx.appcompat.widget.AppCompatImageView
     private var imageCenter = 0;
@@ -69,56 +77,78 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
     private val progressTimer =
         com.example.podclassic.util.Timer(500L) { a -> ThreadUtil.runOnUiThread { onProgress(a.toInt()) } }
 
-    // 时间更新计时器
-    private val timeTimer = com.example.podclassic.util.Timer(1000L) { _ -> 
-        ThreadUtil.runOnUiThread { updateTime() }
-    }
+    
 
     private val container : ViewGroup
 
     init {
-        val view = LayoutInflater.from(context).inflate(R.layout.view_player, this, false)
-            .apply { addView(this) }
+        Log.d("MusicPlayerView", "Init started")
+        val view = LayoutInflater.from(context).inflate(R.layout.view_player, this, true)
         album = view.findViewById(R.id.tv_album)
         artist = view.findViewById(R.id.tv_artist)
         title = view.findViewById(R.id.tv_title)
         image = view.findViewById(R.id.image)
         
+        Log.d("MusicPlayerView", "Views found: album=$album, artist=$artist, title=$title, image=$image")
+        
+        // 初始化所有视图
+        index = view.findViewById(R.id.tv_index)
+        
         // iPod Classic 风格的文本样式
         title.apply {
             setTextColor(Colors.text)
             setShadowLayer(0.5f, 0f, 1f, Colors.white)
+            // 标准TextView没有scrollable属性，使用标准的跑马灯设置
+            ellipsize = android.text.TextUtils.TruncateAt.MARQUEE
+            isSelected = true
+            isFocusable = true
+            isFocusableInTouchMode = true
+            setPadding(0, 0, 0, 0)
+            gravity = Gravity.START
         }
         artist.apply {
             setTextColor(Colors.main)
+            setPadding(0, 0, 0, 0)
+            gravity = Gravity.START
         }
         album.apply {
-            setTextColor(Colors.text_secondary)
-        }
-        
-        index = view.findViewById<TextView?>(R.id.tv_index).apply { 
+            setTextColor(Colors.text)
             setPadding(0, 0, 0, 0)
-            setTextColor(Colors.text_secondary)
+            gravity = Gravity.START
         }
-        
-        // 时间显示
-        time = view.findViewById<TextView?>(R.id.tv_time).apply {
+        index.apply {
+            setPadding(0, 0, 0, 0)
+            setTextColor(Colors.text)
+            gravity = Gravity.START
+        }
+
+        // 当前播放时间和剩余时间（底部进度条区域）
+        currentTime = view.findViewById<androidx.appcompat.widget.AppCompatTextView>(R.id.tv_current_time).apply {
+            setTextColor(Colors.text)
+        }
+        remainingTime = view.findViewById<androidx.appcompat.widget.AppCompatTextView>(R.id.tv_remaining_time).apply {
             setTextColor(Colors.text)
         }
         
-        // 启用SeekBar内置的时间显示
-        progressBar.textVisibility = View.VISIBLE
+        Log.d("MusicPlayerView", "Time views found: index=$index, currentTime=$currentTime, remainingTime=$remainingTime")
+
+        // 禁用SeekBar内置的时间显示，使用独立的TextView
+        progressBar.textVisibility = View.GONE
         
         screenLayout = (view.findViewById(R.id.seek_bar) as ScreenLayout).apply { add(progressBar) }
         icon1 = view.findViewById(R.id.ic_play_mode)
         icon2 = view.findViewById(R.id.ic_repeat_mode)
-        stopTime = view.findViewById<TextView?>(R.id.tv_stop_time)
+        stopTime = view.findViewById<androidx.appcompat.widget.AppCompatTextView>(R.id.tv_stop_time).apply {
+            setTextColor(Colors.text)
+        }
         container = view.findViewById(R.id.container)
         lyric = if (SPManager.getBoolean(SPManager.SP_SHOW_LYRIC)) {
-            (view.findViewById(R.id.tv_lyric) as TextView).apply {
+            view.findViewById<com.example.podclassic.widget.TextView>(R.id.tv_lyric).apply {
                 scrollable = true
                 typeface = Typeface.defaultFromStyle(Typeface.NORMAL)
                 textSize = 12f
+                setPadding(0, 0, 0, 0)
+                gravity = Gravity.CENTER
             }
         } else {
             null
@@ -266,15 +296,16 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
     private val intentFilter = IntentFilter("android.media.VOLUME_CHANGED_ACTION")
 
     override fun onViewAdd() {
+        Log.d("MusicPlayerView", "onViewAdd() started")
         if (!broadcastReceiverRegistered) {
             context.registerReceiver(volumeBroadcastReceiver, intentFilter)
             broadcastReceiverRegistered = true
+            Log.d("MusicPlayerView", "Broadcast receiver registered")
         }
-        // 启动时间计时器
-        timeTimer.start()
-        updateTime()
-        //onMusicChange()
-        //onPlayStateChange()
+        onMusicChange()
+        Log.d("MusicPlayerView", "onMusicChange() called")
+        onPlayStateChange()
+        Log.d("MusicPlayerView", "onPlayStateChange() called")
 
     }
 
@@ -283,16 +314,6 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
             context.unregisterReceiver(volumeBroadcastReceiver)
             broadcastReceiverRegistered = false
         }
-        // 停止时间计时器
-        timeTimer.pause()
-    }
-    
-    // 更新顶部时间显示
-    private fun updateTime() {
-        val calendar = Calendar.getInstance()
-        val hour = calendar.get(Calendar.HOUR_OF_DAY)
-        val minute = calendar.get(Calendar.MINUTE)
-        time.text = String.format("%02d:%02d", hour, minute)
     }
 
     override fun slide(slideVal: Int): Boolean {
@@ -345,20 +366,25 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
     }
 
     private fun onMusicChange() {
+        Log.d("MusicPlayerView", "onMusicChange() started")
         if (seekMode) {
             seekMode = false
             progressBar.setSeekMode(false)
         }
         val music = MediaPresenter.getCurrent()
+        Log.d("MusicPlayerView", "Current music: $music")
         if (music == null) {
+            Log.d("MusicPlayerView", "Music is null, waiting for media controller")
+            // 延迟重试，不要移除视图
             postDelayed({  
-                if (observer.enable && MediaPresenter.getCurrent() == null) {
-                    Core.removeView()
-                    return@postDelayed
+                if (observer.enable) {
+                    Log.d("MusicPlayerView", "Retrying onMusicChange()")
+                    onMusicChange()
                 }
             }, 1000)
             return
         }
+        Log.d("MusicPlayerView", "Music data: title=${music.title}, artist=${music.artist}, album=${music.album}, duration=${music.duration}")
         loadImage(music)
         val duration = if (music.duration > 1) {
             music.duration.toInt()
@@ -369,33 +395,28 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
 
         
 
-        // iPod Classic 风格：带动画的文本更新
+        // iPod Classic 风格：直接设置文本，不使用动画避免显示问题
         title.text = music.title
-        title.alpha = 0f
-        title.animate().alpha(1f).setDuration(400).start()
+        title.alpha = 1f
         
         artist.text = music.artist
-        artist.alpha = 0f
-        artist.animate().alpha(1f).setDuration(400).setStartDelay(100).start()
+        artist.alpha = 1f
         
         album.text = music.album
-        album.alpha = 0f
-        album.animate().alpha(1f).setDuration(400).setStartDelay(200).start()
+        album.alpha = 1f
 
         index.text = "${(MediaPresenter.getIndex() + 1)}/${MediaPresenter.getPlaylist().size}"
-        
-        // 添加专辑封面进入动画
+
+        // 初始化时间显示
+        currentTime.text = formatTime(0)
+        remainingTime.text = "-" + formatTime(duration)
+
+        // 确保图片可见
         image.apply {
-            alpha = 0f
-            scaleX = 0.8f
-            scaleY = 0.8f
-            animate()
-                .alpha(1f)
-                .scaleX(1f)
-                .scaleY(1f)
-                .setDuration(500)
-                .setInterpolator(android.view.animation.OvershootInterpolator())
-                .start()
+            visibility = VISIBLE
+            alpha = 1f
+            scaleX = 1f
+            scaleY = 1f
         }
 
         lyric?.setBufferedText(null)
@@ -415,35 +436,53 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
     }
 
     private fun loadImage(music : Music) {
+        Log.d("MusicPlayerView", "loadImage() started for music: ${music.title}")
         var bitmap: Bitmap? = null
 
+        // 先显示占位图或保持可见
+        Log.d("MusicPlayerView", "Setting image visibility to VISIBLE")
+        image.visibility = VISIBLE
+        Log.d("MusicPlayerView", "Setting placeholder bitmap: ${empty != null}")
         image.setImageBitmap(empty)
 
         ThreadUtil.asyncTask({
             bitmap = music.image
+            Log.d("MusicPlayerView", "Bitmap loaded: ${bitmap != null}")
         }, {
+            Log.d("MusicPlayerView", "Image load callback: bitmap=$bitmap")
             if (bitmap == null) {
-                image.visibility = GONE
-                title.gravity = Gravity.CENTER
-                artist.gravity = Gravity.CENTER
-                album.gravity = Gravity.CENTER
-                lyric?.gravity = Gravity.CENTER
-                //image.setImageBitmap(null)
-                container.requestLayout()
+                Log.d("MusicPlayerView", "Bitmap is null, using default placeholder")
+                // 没有封面时使用默认占位图
+                image.setImageResource(android.R.drawable.ic_media_play)
+                title.gravity = Gravity.START
+                title.setPadding(0, 0, 0, 0)
+                artist.gravity = Gravity.START
+                artist.setPadding(0, 0, 0, 0)
+                album.gravity = Gravity.START
+                album.setPadding(0, 0, 0, 0)
+                index.gravity = Gravity.START
+                index.setPadding(0, 0, 0, 0)
+                lyric?.gravity = Gravity.START
             } else {
-                // 设置专辑封面并添加圆角效果
+                Log.d("MusicPlayerView", "Bitmap is not null, setting to image view")
+                // 设置专辑封面
                 image.setImageBitmap(bitmap)
                 image.visibility = VISIBLE
 
                 title.gravity = Gravity.START
+                title.setPadding(0, 0, 0, 0)
                 artist.gravity = Gravity.START
+                artist.setPadding(0, 0, 0, 0)
                 album.gravity = Gravity.START
+                album.setPadding(0, 0, 0, 0)
+                index.gravity = Gravity.START
+                index.setPadding(0, 0, 0, 0)
                 lyric?.gravity = Gravity.START
                 
                 // 显示歌词区域（如果启用）
                 lyric?.visibility = if (lyric?.text.isNullOrEmpty()) GONE else VISIBLE
             }
-
+            Log.d("MusicPlayerView", "Image load completed")
         })
     }
 
@@ -462,6 +501,11 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
             progressBar.setCurrent(progress)
         }
         lyric?.setBufferedText(MediaPresenter.getCurrent()?.lyric?.getLyric(progress))
+
+        // 更新底部时间显示（iPod Classic 风格）
+        val duration = MediaPresenter.getDuration()
+        currentTime.text = formatTime(progress)
+        remainingTime.text = "-" + formatTime(duration - progress)
     }
     
     // 格式化时间为 mm:ss 格式
