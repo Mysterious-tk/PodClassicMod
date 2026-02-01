@@ -200,7 +200,7 @@ class MainActivity : AppCompatActivity() {
         Values.screenHeight = displayMetrics.heightPixels
     }
 
-    private fun initView() {
+    fun initView() {
         /*
         val layoutParams = slide_controller.layoutParams as RelativeLayout.LayoutParams
 
@@ -232,23 +232,34 @@ class MainActivity : AppCompatActivity() {
 
         val linearLayout = findViewById<ViewGroup>(R.id.layout_rectangle)
         val layoutParams = (linearLayout.layoutParams as LinearLayout.LayoutParams)
-        val screenRatio = Values.screenHeight / Values.screenWidth
-        val topMargin = statusBarHeight + when {
-            screenRatio <= 16f / 9f -> {
-                0
-            }
-            screenRatio <= 17f / 9f -> {
-                TOP_MARGIN / 2
-            }
-            screenRatio >= 21f / 10f -> {
-                TOP_MARGIN * 2
-            }
-            else -> {
-                TOP_MARGIN
-            }
+        val slideController = findViewById<View>(R.id.slide_controller)
+        val slideControllerParams = (slideController.layoutParams as LinearLayout.LayoutParams)
+        
+        // 检查是否是横屏模式且当前显示的是CoverFlowView
+        val isLandscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+        val isCoverFlowView = try {
+            Core.getView()::class.java.simpleName == "CoverFlowView"
+        } catch (e: Exception) {
+            false
         }
-
-        layoutParams.topMargin = topMargin
+        
+        if (isLandscape && isCoverFlowView) {
+            // 横屏且是CoverFlowView，全屏显示
+            layoutParams.height = LinearLayout.LayoutParams.MATCH_PARENT
+            layoutParams.topMargin = 0
+            layoutParams.leftMargin = 0
+            layoutParams.rightMargin = 0
+            slideControllerParams.height = 0
+        } else {
+            // 其他情况，保持默认布局
+            // 使用dp单位设置高度，确保在不同分辨率屏幕上显示一致
+            layoutParams.height = resources.getDimensionPixelSize(R.dimen.layout_rectangle_height)
+            val topMargin = statusBarHeight + TOP_MARGIN
+            layoutParams.topMargin = topMargin
+            layoutParams.leftMargin = resources.getDimensionPixelSize(R.dimen.padding_1)
+            layoutParams.rightMargin = resources.getDimensionPixelSize(R.dimen.padding_1)
+            slideControllerParams.height = LinearLayout.LayoutParams.MATCH_PARENT
+        }
 
         //linearLayout.clipToOutline = true
 

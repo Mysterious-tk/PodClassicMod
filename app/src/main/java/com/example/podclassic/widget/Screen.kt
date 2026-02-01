@@ -95,6 +95,8 @@ class Screen(context: Context, attributeSet: AttributeSet?) : LinearLayout(conte
         }
         addView(view as View)
         setTitle()
+        // 通知MainActivity更新布局
+        (context as? com.example.podclassic.activity.MainActivity)?.initView()
         return true
     }
 
@@ -102,6 +104,8 @@ class Screen(context: Context, attributeSet: AttributeSet?) : LinearLayout(conte
         val view = removeView()
         return if (view != null) {
             setTitle()
+            // 通知MainActivity更新布局
+            (context as? com.example.podclassic.activity.MainActivity)?.initView()
             true
         } else {
             false
@@ -115,6 +119,8 @@ class Screen(context: Context, attributeSet: AttributeSet?) : LinearLayout(conte
     fun home(): Boolean {
         clearViews()
         setTitle()
+        // 通知MainActivity更新布局
+        (context as? com.example.podclassic.activity.MainActivity)?.initView()
         return true
     }
 
