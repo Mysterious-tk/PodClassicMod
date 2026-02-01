@@ -7,6 +7,8 @@ import android.graphics.*
 import android.view.GestureDetector
 import android.view.Gravity
 import android.view.MotionEvent
+import android.view.animation.AccelerateDecelerateInterpolator
+import android.view.animation.DecelerateInterpolator
 import android.view.animation.LinearInterpolator
 import android.view.animation.OvershootInterpolator
 import android.widget.FrameLayout
@@ -20,6 +22,7 @@ import com.example.podclassic.util.ThreadUtil
 import com.example.podclassic.values.Icons
 import com.example.podclassic.values.Strings
 import com.example.podclassic.widget.TextView
+import com.example.podclassic.view.MusicListView
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
@@ -64,8 +67,6 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
     private var touchStartX = 0f
     private var touchStartY = 0f
     private var isTouching = false
-    private var isDragging = false
-    private var dragStartX = 0f
     private var currentOffset = 0
 
     // 转动圆盘相关
@@ -74,7 +75,7 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
     private var slides = 0
     private var lastSlideVal = 0
     private val startValues = Array(MAX_SIZE) { 0 }
-    private val interpolator = LinearInterpolator()
+    private val interpolator = DecelerateInterpolator(1.5f)
 
     init {
         initViews()
@@ -117,19 +118,9 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
 
                 val diffX = e2.x - e1.x
                 if (abs(diffX) > SWIPE_THRESHOLD) {
-                    // 根据速度快速滑动多个唱片
-                    val slideCount = calculateFlingSlideCount(velocityX)
-                    if (slideCount > 0) {
-                        val direction = if (diffX > 0) -1 else 1
-                        flingSlide(direction, slideCount)
-                        return true
-                    }
-
                     // 普通滑动
-                    if (abs(diffX) > SWIPE_THRESHOLD) {
-                        slide(if (diffX > 0) -1 else 1)
-                        return true
-                    }
+                    slide(if (diffX > 0) -1 else 1)
+                    return true
                 }
                 return false
             }
@@ -158,7 +149,6 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
         touchStartX = event.x
         touchStartY = event.y
         isTouching = true
-        isDragging = false
         currentOffset = 0
     }
 
@@ -173,27 +163,23 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
             return
         }
 
-        // 检查是否达到滑动阈值
-        if (!isDragging && abs(deltaX) > SWIPE_THRESHOLD) {
-            isDragging = true
-            dragStartX = touchStartX
-        }
-
         // 跟随手指实时滑动
-        if (isDragging) {
-            updatePositionByDrag(deltaX)
-        }
+        updatePositionByDrag(deltaX)
     }
 
     private fun handleActionUp(event: MotionEvent) {
-        if (isDragging) {
-            val deltaX = event.x - touchStartX
-            if (abs(deltaX) > SWIPE_THRESHOLD) {
-                finishDrag(deltaX)
-            } else {
-                snapBackToPosition()
-            }
+        val deltaX = event.x - touchStartX
+        val deltaTime = event.eventTime - event.downTime
+        val velocity = deltaX / deltaTime * 1000 // 转换为像素/秒
+        
+        // 计算拖动距离的绝对值
+        val absDeltaX = abs(deltaX)
+        
+        // 如果滑动距离超过了阈值，或者拖动距离超过了imagePadding的一半，就滑动到下一张唱片
+        if (absDeltaX > SWIPE_THRESHOLD || absDeltaX > imagePadding / 2) {
+            finishDrag(deltaX, velocity)
         } else {
+            snapBackToPosition()
             handleCenterClick()
         }
         resetTouchState()
@@ -201,7 +187,6 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
 
     private fun resetTouchState() {
         isTouching = false
-        isDragging = false
         currentOffset = 0
     }
 
@@ -218,8 +203,8 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
 
     private fun updatePositionByDrag(deltaX: Float) {
         // 计算偏移量（限制范围）
-        val maxOffset = imagePadding
-        val offset = (deltaX / 2).toInt().coerceIn(-maxOffset, maxOffset)
+        val maxOffset = imagePadding * 2
+        val offset = deltaX.toInt().coerceIn(-maxOffset, maxOffset)
         currentOffset = offset
 
         // 实时更新所有图片位置和旋转
@@ -230,8 +215,19 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
         }
     }
 
-    private fun finishDrag(deltaX: Float) {
+    private fun finishDrag(deltaX: Float, velocity: Float) {
         val direction = if (deltaX > 0) -1 else 1
+        
+        // 根据速度调整动画持续时间，实现惯性减速效果
+        val velocityMagnitude = abs(velocity)
+        val minDuration = MIN_DURATION
+        val maxDuration = DEFAULT_DURATION
+        
+        // 速度越快，动画持续时间越短，实现惯性减速效果
+        duration = (maxDuration - min((velocityMagnitude / 10), (maxDuration - minDuration).toFloat())).toLong()
+        duration = duration.coerceIn(minDuration, maxDuration)
+        
+        // 只滑动一张唱片，避免滑动多张唱片导致的视觉不一致
         slide(direction)
     }
 
@@ -252,8 +248,8 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
             addListener(object : Animator.AnimatorListener {
                 override fun onAnimationStart(animation: Animator?) {}
                 override fun onAnimationEnd(animation: Animator?) {
-                    // 回弹动画不需要更新图片数据，只更新文字
-                    updateCenterText()
+                    // 回弹动画结束后，触发一个动画，让专辑封面对正屏幕
+                    alignCoversToCenter()
                 }
                 override fun onAnimationCancel(animation: Animator?) {}
                 override fun onAnimationRepeat(animation: Animator?) {}
@@ -277,10 +273,16 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
             return true
         }
 
-        // 更新索引
+        // 直接更新索引
         index += slideVal
-        // 先更新图片数据（保持旋转角度），再开始动画
-        refreshAlbumsWithoutResetRotation()
+        
+        // 直接更新图片数据（保持旋转角度）
+        refreshAlbumsData()
+        
+        // 刷新中心文本，确保专辑名与封面对应
+        refreshCenterText()
+        
+        // 开始动画，动画结束后会更新文本
         return loadAnimation(slideVal)
     }
 
@@ -296,10 +298,14 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
         // 取消当前动画
         cancelAnimation()
 
-        // 更新索引
+        // 直接更新索引
         index += slideVal
-        // 先更新图片数据（保持旋转角度），再开始动画
-        refreshAlbumsWithoutResetRotation()
+        
+        // 直接更新图片数据
+        refreshAlbumsData()
+        
+        // 刷新中心文本，确保专辑名与封面对应
+        refreshCenterText()
 
         // 开始新动画，移动距离与索引更新一致
         loadAnimation(slideVal)
@@ -339,18 +345,8 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
         override fun onAnimationStart(animation: Animator?) {}
 
         override fun onAnimationEnd(animation: Animator?) {
-            // 重置所有图片到标准布局位置
-            for (i in imageViews.indices) {
-                val imageView = imageViews[i]
-                val baseCenterX = imageCenter + (i - CENTER_OFFSET) * imagePadding
-                updateImageViewPosition(baseCenterX, imageView)
-            }
-
-            // 只更新文字，图片数据已经在动画开始前更新过了
-            updateCenterText()
-
-            // 动画结束后直接重置状态，不再使用 slides 计数
-            resetAnimationState()
+            // 触发一个动画，让专辑封面对正屏幕
+            alignCoversToCenter()
         }
 
         override fun onAnimationCancel(animation: Animator?) {
@@ -390,37 +386,103 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
             return
         }
 
-        // 直接更新索引，不使用 slides 计数
+        // 直接更新索引
         index += direction * count
-        // 先更新图片数据（保持旋转角度），再开始动画
-        refreshAlbumsWithoutResetRotation()
+        
+        // 直接更新图片数据
+        refreshAlbumsData()
+        
+        // 刷新中心文本，确保专辑名与封面对应
+        refreshCenterText()
+        
         // 开始动画，移动距离与索引更新一致
         loadAnimation(direction * count)
     }
 
     private fun updateImageViewPosition(centerX: Int, imageView: ImageView) {
-        scaleImageView(centerX, imageView)
-        setRotationY(imageView)
+        // 计算与中心的距离，用于确定层级和透明度
+        val distance = abs(imageCenter - centerX)
+        
+        // 先设置缩放和位置
+        val scale = -distance / 4
+        val left = centerX - halfImageWidth - scale
+        val top = centerY - halfImageWidth - scale
+        val right = centerX + halfImageWidth + scale
+        val bottom = centerY + halfImageWidth + scale
+        
+        // 只在位置真正改变时才更新布局
+        if (imageView.left != left || imageView.top != top || imageView.right != right || imageView.bottom != bottom) {
+            imageView.layout(left, top, right, bottom)
+        }
+        
+        // 计算旋转角度
+        val temp = (imageCenter - centerX).toFloat()
+        if (temp == 0f) {
+            imageView.rotationY = 0f
+        } else {
+            val x = temp / width.toFloat()
+            val rotation = sgn(x) * min(abs(x) * 200f, 40f)
+            imageView.rotationY = rotation
+        }
+        
+        // 设置 z 轴顺序，距离中心越近，z 值越大，显示在前面
+        imageView.z = -distance.toFloat()
+        
+        // 设置透明度，距离中心越远，透明度越低
+        val maxDistance = imagePadding * 3
+        val alpha = 1.0f - (distance.toFloat() / maxDistance) * 0.3f
+        imageView.alpha = alpha.coerceIn(0.7f, 1.0f)
+    }
+
+    private fun setRotationY(imageView: ImageView) {
+        val centerX = imageView.centerX()
+        val temp = (imageCenter - centerX).toFloat()
+
+        // 只有当位置变化时才更新旋转和z轴
+        val lastCenterX = imageView.getTag(R.id.tag_last_center_x) as? Int
+        if (lastCenterX != centerX) {
+            imageView.setTag(R.id.tag_last_center_x, centerX)
+
+            if (temp == 0f) {
+                imageView.rotationY = 0f
+            } else {
+                val x = temp / width.toFloat()
+                val rotation = sgn(x) * min(abs(x) * 200f, 40f)
+                imageView.rotationY = rotation
+            }
+            imageView.z = -abs(temp)
+        }
+    }
+
+    private fun updateAlpha(imageView: ImageView) {
+        val centerX = imageView.centerX()
+        val distance = abs(imageCenter - centerX)
+        val maxDistance = imagePadding * 3 // 最大距离，可根据实际情况调整
+        
+        // 距离中心越远，透明度越低，最低为0.7f
+        val alpha = 1.0f - (distance.toFloat() / maxDistance) * 0.3f
+        imageView.alpha = alpha.coerceIn(0.7f, 1.0f)
+    }
+
+    private fun scaleImageView(centerX: Int, imageView: ImageView) {
+        val scale = -abs(imageCenter - centerX) / 4
+        val left = centerX - halfImageWidth - scale
+        val top = centerY - halfImageWidth - scale
+        val right = centerX + halfImageWidth + scale
+        val bottom = centerY + halfImageWidth + scale
+
+        // 只有当位置真正改变时才更新布局
+        if (imageView.left != left || imageView.top != top || imageView.right != right || imageView.bottom != bottom) {
+            imageView.layout(left, top, right, bottom)
+        }
     }
 
     private fun refreshAlbums() {
-        // 更新所有图片数据
-        for (i in imageViews.indices) {
-            val imageView = imageViews[i]
-            // 正确计算每个图片位置对应的专辑索引
-            // 中心位置的索引是 index + CENTER_OFFSET
-            // 其他位置的索引根据偏移量计算
-            val offset = i - CENTER_OFFSET
-            val albumIndex = index + CENTER_OFFSET + offset
-            if (albumIndex in 0 until albums.size) {
-                imageView.bindItem(albums[albumIndex])
-            } else {
-                imageView.bindItem(null)
-            }
-        }
-
+        // 使用新的 refreshAlbumsData 方法更新图片数据
+        refreshAlbumsData()
+        
         // 根据索引更新文本，确保文本与图片同步
-        updateCenterText()
+        refreshCenterText()
     }
 
     private fun refreshAlbumsWithoutResetRotation() {
@@ -451,37 +513,141 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
         }
     }
 
-    private fun setRotationY(imageView: ImageView) {
-        val centerX = imageView.centerX()
-        val temp = (imageCenter - centerX).toFloat()
-
-        // 只有当位置变化时才更新旋转和z轴
-        val lastCenterX = imageView.getTag(R.id.tag_last_center_x) as? Int
-        if (lastCenterX != centerX) {
-            imageView.setTag(R.id.tag_last_center_x, centerX)
-
-            if (temp == 0f) {
-                imageView.rotationY = 0f
-            } else {
-                val x = temp / width.toFloat()
-                val rotation = sgn(x) * min(abs(x) * 200f, 40f)
-                imageView.rotationY = rotation
+    private fun refreshCenterText() {
+        // 找到当前显示在中心位置的唱片
+        var closestImageView: ImageView? = null
+        var minDistance = Int.MAX_VALUE
+        
+        for (imageView in imageViews) {
+            val distance = abs(imageView.centerX() - imageCenter)
+            if (distance < minDistance) {
+                minDistance = distance
+                closestImageView = imageView
             }
-            imageView.z = -abs(temp)
+        }
+        
+        // 从当前显示在中心位置的唱片中获取对应的album对象
+        val album = closestImageView?.getTag(R.id.tag_album) as? MusicList
+        if (album != null) {
+            // 更新专辑名和艺术家名
+            this.album.text = album.title
+            this.artist.text = album.subtitle
+            
+            // 更新索引，确保下次进入时使用正确的索引
+            val albumIndex = albums.indexOfFirst { it.id == album.id }
+            if (albumIndex != -1) {
+                index = albumIndex - CENTER_OFFSET
+            }
+        } else {
+            // 如果没有找到对应的专辑，尝试根据index计算
+            val centerIndex = index + CENTER_OFFSET
+            if (centerIndex in 0 until albums.size) {
+                val centerAlbum = albums[centerIndex]
+                this.album.text = centerAlbum.title
+                this.artist.text = centerAlbum.subtitle
+            }
+        }
+    }
+    
+    private fun refreshAlbumsData() {
+        // 更新所有图片数据
+        for (i in imageViews.indices) {
+            val imageView = imageViews[i]
+            // 正确计算每个图片位置对应的专辑索引
+            val offset = i - CENTER_OFFSET
+            val albumIndex = index + CENTER_OFFSET + offset
+            if (albumIndex in 0 until albums.size) {
+                imageView.bindItem(albums[albumIndex])
+            } else {
+                imageView.bindItem(null)
+            }
         }
     }
 
-    private fun scaleImageView(centerX: Int, imageView: ImageView) {
-        val scale = -abs(imageCenter - centerX) / 4
-        val left = centerX - halfImageWidth - scale
-        val top = centerY - halfImageWidth - scale
-        val right = centerX + halfImageWidth + scale
-        val bottom = centerY + halfImageWidth + scale
-
-        // 只有当位置真正改变时才更新布局
-        if (imageView.left != left || imageView.top != top || imageView.right != right || imageView.bottom != bottom) {
-            imageView.layout(left, top, right, bottom)
+    private fun alignCoversToCenter() {
+        // 检查是否已经有动画在运行，如果有，就直接返回
+        if (animator?.isRunning == true) {
+            return
         }
+        
+        // 先刷新专辑名，确保与封面匹配
+        refreshCenterText()
+        
+        // 找到当前显示在中心位置的唱片
+        var closestImageView: ImageView? = null
+        var minDistance = Int.MAX_VALUE
+        var closestIndex = 0
+        
+        // 记录所有图片的初始位置
+        val initialPositions = IntArray(imageViews.size)
+        for ((i, imageView) in imageViews.withIndex()) {
+            val distance = abs(imageView.centerX() - imageCenter)
+            if (distance < minDistance) {
+                minDistance = distance
+                closestImageView = imageView
+                closestIndex = i
+            }
+            initialPositions[i] = imageView.centerX()
+        }
+        
+        // 计算需要调整的偏移量
+        val targetIndex = closestIndex - CENTER_OFFSET
+        val offset = targetIndex * imagePadding
+        
+        // 计算当前中心封面的旋转角度，用于自适应动画时间
+        val currentRotation = closestImageView?.rotationY ?: 0f
+        val rotationAngle = abs(currentRotation)
+        
+        // 如果旋转角度很小（小于5度），则认为已经接近对正，使用最小动画时间
+        val isAlmostAligned = rotationAngle < 5f
+        
+        // 计算自适应动画时间：根据旋转角度和移动距离，确保动画平滑
+        val baseDuration = if (isAlmostAligned) 200L else 300L // 基础动画时间，接近对正时使用更短时间
+        val rotationDuration = if (isAlmostAligned) 50L else (rotationAngle * 3).toLong() // 旋转角度越大，动画时间越长
+        val distanceDuration = (abs(offset) / imagePadding * 80).toLong() // 移动距离越长，动画时间越长
+        val totalDuration = max(baseDuration, min(rotationDuration + distanceDuration, 800L)) // 限制最大动画时间
+        
+        // 如果偏移量很小且已经接近对正，则不需要动画
+        if (abs(offset) < 10 && isAlmostAligned) {
+            // 直接设置为对正状态
+            closestImageView?.rotationY = 0f
+            closestImageView?.z = 0f
+            resetAnimationState()
+            return
+        }
+        
+        // 创建动画，让专辑封面对正屏幕
+        val alignAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = totalDuration
+            interpolator = DecelerateInterpolator(1.2f)
+            addUpdateListener { animation ->
+                val progress = animation.animatedValue as Float
+                for (i in imageViews.indices) {
+                    val imageView = imageViews[i]
+                    // 计算当前位置：从初始位置平滑过渡到目标位置
+                    val targetCenterX = imageCenter + (i - CENTER_OFFSET) * imagePadding - offset
+                    val currentCenterX = (initialPositions[i] + (targetCenterX - initialPositions[i]) * progress).toInt()
+                    updateImageViewPosition(currentCenterX, imageView)
+                }
+            }
+            addListener(object : Animator.AnimatorListener {
+                override fun onAnimationStart(animation: Animator?) {}
+                override fun onAnimationEnd(animation: Animator?) {
+                    // 动画结束后，确保中心封面完全对正屏幕
+                    closestImageView?.rotationY = 0f
+                    closestImageView?.z = 0f
+                    resetAnimationState()
+                }
+                override fun onAnimationCancel(animation: Animator?) {
+                    resetAnimationState()
+                }
+                override fun onAnimationRepeat(animation: Animator?) {}
+            })
+        }
+        
+        // 保存当前动画引用
+        animator = alignAnimator
+        alignAnimator.start()
     }
 
     private fun sgn(x: Float): Float {
@@ -539,9 +705,39 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
 
     // 界面交互
     override fun enter(): Boolean {
-        val centerIndex = index + CENTER_OFFSET
-        if (centerIndex in 0 until albums.size) {
-            Core.addView(MusicListView(context, albums[centerIndex]))
+        // 找到当前显示在中心位置的唱片
+        var closestImageView: ImageView? = null
+        var minDistance = Int.MAX_VALUE
+        
+        for (imageView in imageViews) {
+            val distance = abs(imageView.centerX() - imageCenter)
+            if (distance < minDistance) {
+                minDistance = distance
+                closestImageView = imageView
+            }
+        }
+        
+        // 从当前显示在中心位置的唱片中获取对应的album对象
+        var targetAlbum: MusicList? = closestImageView?.getTag(R.id.tag_album) as? MusicList
+        
+        // 如果没有找到对应的专辑，尝试根据index计算
+        if (targetAlbum == null) {
+            val centerIndex = index + CENTER_OFFSET
+            if (centerIndex in 0 until albums.size) {
+                targetAlbum = albums[centerIndex]
+            } else if (albums.isNotEmpty()) {
+                // 如果中心索引超出范围，使用最近的边界专辑
+                targetAlbum = if (centerIndex < 0) {
+                    albums.first()
+                } else {
+                    albums.last()
+                }
+            }
+        }
+        
+        // 进入这个album对应的歌单
+        if (targetAlbum != null) {
+            Core.addView(MusicListView(context, targetAlbum))
         }
         return true
     }
@@ -615,14 +811,12 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
                         // 恢复旋转角度
                         rotationY = currentRotationY
                         z = currentZ
-                        alpha = 0.8f
                     } else {
                         bitmap?.recycle()
                     }
                 }
             }
             threadPoolExecutor.execute(runnable)
-            alpha = 0.8f
         }
 
         private fun getReflectBitmap(bitmap: Bitmap): Bitmap {
