@@ -71,7 +71,10 @@ class FileView(context: Context, val file: File) : ListView(context), ScreenView
             if (musics.isEmpty()) {
                 musics.ensureCapacity(musicList.size)
                 for (file in musicList) {
-                    musics.add(MediaStoreUtil.getMusicFromFile(file.path))
+                    val music = MediaStoreUtil.getMusicFromFile(file.path)
+                    if (music != null) {
+                        musics.add(music)
+                    }
                 }
             } else {
                 val lastIndex = file.path.length
@@ -98,8 +101,11 @@ class FileView(context: Context, val file: File) : ListView(context), ScreenView
                 FileUtil.TYPE_VIDEO -> Core.addView(VideoView(context, file))
                 FileUtil.TYPE_IMAGE -> Core.addView(ImageView(context, arrayListOf(file), 0))
                 FileUtil.TYPE_AUDIO -> {
-                    MediaPresenter.set(MediaStoreUtil.getMusicFromFile(file.path))
-                    Core.addView(MusicPlayerView(context))
+                    val music = MediaStoreUtil.getMusicFromFile(file.path)
+                    if (music != null) {
+                        MediaPresenter.set(music)
+                        Core.addView(MusicPlayerView(context))
+                    }
                 }
                 FileUtil.TYPE_TEXT -> {
                     Core.addView(TxtView(context, file))
@@ -132,9 +138,12 @@ class FileView(context: Context, val file: File) : ListView(context), ScreenView
                 }
             }
         } else if (FileUtil.isAudio(file)) {
-            MusicTable.favourite.add(MediaStoreUtil.getMusicFromFile(file.path))
-            shake()
-            return true
+            val music = MediaStoreUtil.getMusicFromFile(file.path)
+            if (music != null) {
+                MusicTable.favourite.add(music)
+                shake()
+                return true
+            }
         }
         return false
     }

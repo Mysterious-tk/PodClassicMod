@@ -191,6 +191,12 @@ public class MediaMetadataUtil {
     }
 
     public static Music getMediaMetadata(String path) {
+        // 屏蔽录音文件
+        String lowerPath = path.toLowerCase();
+        if (lowerPath.contains("通话录音") || lowerPath.contains("录音") || lowerPath.contains("recorder") || lowerPath.contains("recordings") || lowerPath.contains("voice") || lowerPath.contains("audio") || (lowerPath.contains("call") && lowerPath.contains("record")) || lowerPath.contains("sound") || lowerPath.contains("note")) {
+            return null;
+        }
+        
         MediaMetadataRetriever mediaMetadataRetriever = new MediaMetadataRetriever();
         mediaMetadataRetriever.setDataSource(path);
         String title = mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE);

@@ -184,6 +184,26 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
         }
         resetTouchState()
     }
+    
+    private fun finishDrag(deltaX: Float, velocity: Float) {
+        val direction = if (deltaX > 0) -1 else 1
+        
+        // 根据速度调整动画持续时间，实现惯性减速效果
+        val velocityMagnitude = abs(velocity)
+        val minDuration = MIN_DURATION
+        val maxDuration = DEFAULT_DURATION
+        
+        // 速度越快，动画持续时间越短，实现惯性减速效果
+        duration = (maxDuration - min((velocityMagnitude / 10), (maxDuration - minDuration).toFloat())).toLong()
+        duration = duration.coerceIn(minDuration, maxDuration)
+        
+        // 检查边界，确保不会超出专辑列表范围
+        val newCenterIndex = index + CENTER_OFFSET + direction
+        if (newCenterIndex in 0 until albums.size) {
+            // 调用 slide 方法处理滑动，确保与其他滑动操作一致
+            slide(direction)
+        }
+    }
 
     private fun resetTouchState() {
         isTouching = false
@@ -213,22 +233,6 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
             val baseCenterX = imageCenter + (i - CENTER_OFFSET) * imagePadding
             updateImageViewPosition(baseCenterX + offset, imageView)
         }
-    }
-
-    private fun finishDrag(deltaX: Float, velocity: Float) {
-        val direction = if (deltaX > 0) -1 else 1
-        
-        // 根据速度调整动画持续时间，实现惯性减速效果
-        val velocityMagnitude = abs(velocity)
-        val minDuration = MIN_DURATION
-        val maxDuration = DEFAULT_DURATION
-        
-        // 速度越快，动画持续时间越短，实现惯性减速效果
-        duration = (maxDuration - min((velocityMagnitude / 10), (maxDuration - minDuration).toFloat())).toLong()
-        duration = duration.coerceIn(minDuration, maxDuration)
-        
-        // 只滑动一张唱片，避免滑动多张唱片导致的视觉不一致
-        slide(direction)
     }
 
     private fun snapBackToPosition() {
@@ -276,8 +280,29 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
         // 直接更新索引
         index += slideVal
         
-        // 直接更新图片数据（保持旋转角度）
-        refreshAlbumsData()
+        // 直接更新所有图片数据，包括屏幕范围外的图片
+        // 保存所有图片的当前旋转角度
+        val rotations = FloatArray(imageViews.size)
+        val zValues = FloatArray(imageViews.size)
+        for (i in imageViews.indices) {
+            rotations[i] = imageViews[i].rotationY
+            zValues[i] = imageViews[i].z
+        }
+        
+        // 更新专辑数据
+        for (i in imageViews.indices) {
+            val imageView = imageViews[i]
+            val offset = i - CENTER_OFFSET
+            val albumIndex = index + CENTER_OFFSET + offset
+            if (albumIndex in 0 until albums.size) {
+                imageView.bindItem(albums[albumIndex])
+                // 恢复旋转角度
+                imageView.rotationY = rotations[i]
+                imageView.z = zValues[i]
+            } else {
+                imageView.bindItem(null)
+            }
+        }
         
         // 刷新中心文本，确保专辑名与封面对应
         refreshCenterText()
@@ -301,8 +326,29 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
         // 直接更新索引
         index += slideVal
         
-        // 直接更新图片数据
-        refreshAlbumsData()
+        // 直接更新所有图片数据，包括屏幕范围外的图片
+        // 保存所有图片的当前旋转角度
+        val rotations = FloatArray(imageViews.size)
+        val zValues = FloatArray(imageViews.size)
+        for (i in imageViews.indices) {
+            rotations[i] = imageViews[i].rotationY
+            zValues[i] = imageViews[i].z
+        }
+        
+        // 更新专辑数据
+        for (i in imageViews.indices) {
+            val imageView = imageViews[i]
+            val offset = i - CENTER_OFFSET
+            val albumIndex = index + CENTER_OFFSET + offset
+            if (albumIndex in 0 until albums.size) {
+                imageView.bindItem(albums[albumIndex])
+                // 恢复旋转角度
+                imageView.rotationY = rotations[i]
+                imageView.z = zValues[i]
+            } else {
+                imageView.bindItem(null)
+            }
+        }
         
         // 刷新中心文本，确保专辑名与封面对应
         refreshCenterText()
@@ -389,8 +435,29 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
         // 直接更新索引
         index += direction * count
         
-        // 直接更新图片数据
-        refreshAlbumsData()
+        // 直接更新所有图片数据，包括屏幕范围外的图片
+        // 保存所有图片的当前旋转角度
+        val rotations = FloatArray(imageViews.size)
+        val zValues = FloatArray(imageViews.size)
+        for (i in imageViews.indices) {
+            rotations[i] = imageViews[i].rotationY
+            zValues[i] = imageViews[i].z
+        }
+        
+        // 更新专辑数据
+        for (i in imageViews.indices) {
+            val imageView = imageViews[i]
+            val offset = i - CENTER_OFFSET
+            val albumIndex = index + CENTER_OFFSET + offset
+            if (albumIndex in 0 until albums.size) {
+                imageView.bindItem(albums[albumIndex])
+                // 恢复旋转角度
+                imageView.rotationY = rotations[i]
+                imageView.z = zValues[i]
+            } else {
+                imageView.bindItem(null)
+            }
+        }
         
         // 刷新中心文本，确保专辑名与封面对应
         refreshCenterText()
@@ -570,16 +637,14 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
             return
         }
         
-        // 先刷新专辑名，确保与封面匹配
-        refreshCenterText()
-        
         // 找到当前显示在中心位置的唱片
         var closestImageView: ImageView? = null
         var minDistance = Int.MAX_VALUE
         var closestIndex = 0
         
-        // 记录所有图片的初始位置
+        // 记录所有图片的初始位置和当前绑定的专辑
         val initialPositions = IntArray(imageViews.size)
+        val currentAlbums = ArrayList<MusicList?>(imageViews.size)
         for ((i, imageView) in imageViews.withIndex()) {
             val distance = abs(imageView.centerX() - imageCenter)
             if (distance < minDistance) {
@@ -588,6 +653,7 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
                 closestIndex = i
             }
             initialPositions[i] = imageView.centerX()
+            currentAlbums.add(imageView.getTag(R.id.tag_album) as? MusicList)
         }
         
         // 计算需要调整的偏移量
@@ -636,6 +702,10 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
                     // 动画结束后，确保中心封面完全对正屏幕
                     closestImageView?.rotationY = 0f
                     closestImageView?.z = 0f
+                    
+                    // 刷新专辑名，确保与封面匹配
+                    refreshCenterText()
+                    
                     resetAnimationState()
                 }
                 override fun onAnimationCancel(animation: Animator?) {
@@ -670,13 +740,21 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
         halfImageWidth = imageWidth / 2
         imageBottom = measuredHeight / 2 + halfImageWidth
 
-        // 根据屏幕宽高比动态调整imagePadding
+        // 根据屏幕宽高比动态调整imagePadding，确保在横屏下也有合适的间距
         val screenRatio = measuredWidth.toFloat() / measuredHeight.toFloat()
         imagePadding = if (screenRatio > 1.5f) {
-            (measuredWidth - imageWidth) / 6
+            // 横屏模式，使用更大的间距
+            (measuredWidth - imageWidth) / 5
+        } else if (screenRatio > 1.0f) {
+            // 轻微横屏模式
+            (measuredWidth - imageWidth) / 4
         } else {
+            // 竖屏模式
             (measuredWidth - imageWidth) / 4
         }
+        
+        // 确保 imagePadding 至少为 50，避免间距过小导致的滑动问题
+        imagePadding = max(imagePadding, 50)
 
         imageCenter = measuredWidth / 2
         centerY = imageBottom - halfImageWidth
@@ -705,32 +783,51 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
 
     // 界面交互
     override fun enter(): Boolean {
-        // 找到当前显示在中心位置的唱片
-        var closestImageView: ImageView? = null
-        var minDistance = Int.MAX_VALUE
+        // 优先根据index计算要进入的歌单，确保与圆盘滚动方式一致
+        var targetAlbum: MusicList? = null
+        val centerIndex = index + CENTER_OFFSET
         
-        for (imageView in imageViews) {
-            val distance = abs(imageView.centerX() - imageCenter)
-            if (distance < minDistance) {
-                minDistance = distance
-                closestImageView = imageView
+        if (centerIndex in 0 until albums.size) {
+            targetAlbum = albums[centerIndex]
+        } else if (albums.isNotEmpty()) {
+            // 如果中心索引超出范围，使用最近的边界专辑
+            targetAlbum = if (centerIndex < 0) {
+                albums.first()
+            } else {
+                albums.last()
             }
         }
         
-        // 从当前显示在中心位置的唱片中获取对应的album对象
-        var targetAlbum: MusicList? = closestImageView?.getTag(R.id.tag_album) as? MusicList
-        
-        // 如果没有找到对应的专辑，尝试根据index计算
+        // 如果根据index没有找到对应的专辑，再尝试根据图片位置计算
         if (targetAlbum == null) {
-            val centerIndex = index + CENTER_OFFSET
-            if (centerIndex in 0 until albums.size) {
-                targetAlbum = albums[centerIndex]
-            } else if (albums.isNotEmpty()) {
-                // 如果中心索引超出范围，使用最近的边界专辑
-                targetAlbum = if (centerIndex < 0) {
-                    albums.first()
-                } else {
-                    albums.last()
+            // 找到当前显示在中心位置的唱片
+            var closestImageView: ImageView? = null
+            var minDistance = Int.MAX_VALUE
+            
+            for (imageView in imageViews) {
+                val distance = abs(imageView.centerX() - imageCenter)
+                if (distance < minDistance) {
+                    minDistance = distance
+                    closestImageView = imageView
+                }
+            }
+            
+            // 从当前显示在中心位置的唱片中获取对应的album对象
+            targetAlbum = closestImageView?.getTag(R.id.tag_album) as? MusicList
+            
+            // 如果没有找到对应的专辑，遍历所有可见的图片，找到最接近中心的且有专辑数据的图片
+            if (targetAlbum == null) {
+                var bestImageView: ImageView? = null
+                var bestDistance = Int.MAX_VALUE
+                
+                for (imageView in imageViews) {
+                    val distance = abs(imageView.centerX() - imageCenter)
+                    val album = imageView.getTag(R.id.tag_album) as? MusicList
+                    if (album != null && distance < bestDistance) {
+                        bestDistance = distance
+                        bestImageView = imageView
+                        targetAlbum = album
+                    }
                 }
             }
         }

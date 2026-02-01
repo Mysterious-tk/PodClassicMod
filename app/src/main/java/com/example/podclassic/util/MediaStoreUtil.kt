@@ -52,10 +52,10 @@ object MediaStoreUtil {
 
                 val lowerPath = data.lowercase()
 
-                // 屏蔽通话录音
-                if (lowerPath.contains("通话录音") || lowerPath.contains("Recorder") || lowerPath.contains("Recordings") || (lowerPath.contains(
+                // 屏蔽录音文件
+                if (lowerPath.contains("通话录音") || lowerPath.contains("录音") || lowerPath.contains("recorder") || lowerPath.contains("recordings") || lowerPath.contains("voice") || lowerPath.contains("audio") || (lowerPath.contains(
                         "call"
-                    ) && lowerPath.contains("record"))
+                    ) && lowerPath.contains("record")) || lowerPath.contains("sound") || lowerPath.contains("note")
                 ) {
                     continue
                 }
@@ -166,20 +166,27 @@ object MediaStoreUtil {
         return list[0]
     }
 
-    fun getMusicFromUri(uri: Uri): Music {
+    fun getMusicFromUri(uri: Uri): Music? {
         val path = FileUtil.uriToPath(uri)
         return if (path != null && path.isNotBlank()) {
             getMusicFromFile(path)
         } else {
-            MediaMetadataUtil.getMediaMetadata(uri)
+            val music = MediaMetadataUtil.getMediaMetadata(uri)
+            // 检查是否为录音文件
+            val lowerPath = path?.lowercase() ?: ""
+            if (lowerPath.contains("通话录音") || lowerPath.contains("录音") || lowerPath.contains("recorder") || lowerPath.contains("recordings") || lowerPath.contains("voice") || lowerPath.contains("audio") || (lowerPath.contains("call") && lowerPath.contains("record")) || lowerPath.contains("sound") || lowerPath.contains("note")) {
+                null
+            } else {
+                music
+            }
         }
     }
 
-    fun getMusicFromFile(file: File): Music {
+    fun getMusicFromFile(file: File): Music? {
         return getMusicFromFile(file.path)
     }
 
-    fun getMusicFromFile(path: String): Music {
+    fun getMusicFromFile(path: String): Music? {
         val cursor = BaseApplication.context.contentResolver.query(
             MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
             arrayOf(
@@ -195,14 +202,21 @@ object MediaStoreUtil {
             "${MediaStore.Audio.Media.DATA}=?",
             arrayOf(path),
             null
-        ) ?: return MediaMetadataUtil.getMediaMetadata(path)
+        )
 
-        val list = getMusicsFromCursor(cursor)
-        cursor.close()
-        return if (list.size == 0) {
-            MediaMetadataUtil.getMediaMetadata(path)
+        if (cursor != null) {
+            val list = getMusicsFromCursor(cursor)
+            cursor.close()
+            if (list.size > 0) {
+                return list[0]
+            }
+        }
+
+        val music = MediaMetadataUtil.getMediaMetadata(path)
+        return if (music != null) {
+            music
         } else {
-            list[0]
+            null
         }
     }
 

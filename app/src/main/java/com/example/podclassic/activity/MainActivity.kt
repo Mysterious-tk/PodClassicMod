@@ -36,9 +36,11 @@ class MainActivity : AppCompatActivity() {
         val uri = intent?.data
         if (uri != null) {
             val music = MediaStoreUtil.getMusicFromUri(uri)
-            MediaPresenter.set(music)
-            ThreadUtil.runOnUiThread {
-                Core.addView(MusicPlayerView(this))
+            if (music != null) {
+                MediaPresenter.set(music)
+                ThreadUtil.runOnUiThread {
+                    Core.addView(MusicPlayerView(this))
+                }
             }
         }
     }
