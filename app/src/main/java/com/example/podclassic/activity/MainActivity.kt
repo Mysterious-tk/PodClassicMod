@@ -235,16 +235,19 @@ class MainActivity : AppCompatActivity() {
         val slideController = findViewById<View>(R.id.slide_controller)
         val slideControllerParams = (slideController.layoutParams as LinearLayout.LayoutParams)
         
-        // 检查是否是横屏模式且当前显示的是CoverFlowView
+        // 检查是否是横屏模式且当前显示的是CoverFlowView或MainView
         val isLandscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-        val isCoverFlowView = try {
-            Core.getView()::class.java.simpleName == "CoverFlowView"
+        val currentViewName = try {
+            Core.getView()::class.java.simpleName
         } catch (e: Exception) {
-            false
+            ""
         }
+        val isCoverFlowView = currentViewName == "CoverFlowView"
+        val isMainView = currentViewName == "MainView"
+        val shouldFullScreen = isCoverFlowView || isMainView
         
-        if (isLandscape && isCoverFlowView) {
-            // 横屏且是CoverFlowView，全屏显示
+        if (isLandscape && shouldFullScreen) {
+            // 横屏且是CoverFlowView或MainView，全屏显示
             layoutParams.height = LinearLayout.LayoutParams.MATCH_PARENT
             layoutParams.topMargin = 0
             layoutParams.leftMargin = 0

@@ -1,6 +1,7 @@
 package com.example.podclassic.view
 
 import android.content.Context
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.os.Environment
 import android.os.Handler
@@ -79,8 +80,15 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
     }, true)
 
     init {
+        // 检查是否是横屏模式
+        val isLandscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+        
         // 设置图片容器（可见区域）
-        val containerWidth = (resources.displayMetrics.widthPixels * 0.65).toInt()
+        val containerWidth = if (isLandscape) {
+            (resources.displayMetrics.widthPixels * 0.5).toInt() // 横屏时占50%
+        } else {
+            (resources.displayMetrics.widthPixels * 0.65).toInt() // 竖屏时占65%
+        }
         val containerHeight = resources.displayMetrics.heightPixels
         val containerParams = LayoutParams(containerWidth, containerHeight)
         containerParams.addRule(RelativeLayout.ALIGN_PARENT_RIGHT)
@@ -90,10 +98,10 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
         coverContainer.setBackgroundColor(android.graphics.Color.BLACK)
 
         // 设置图片视图（比容器大，在容器内飘动，能看到图片的不同部分）
-        // 图片是容器的1.5倍，这样有足够空间飘动看到不同部分
+        // 图片是容器的1.2倍，这样有足够空间飘动看到不同部分，同时不会太大
         val imageParams = FrameLayout.LayoutParams(
-            (containerWidth * 1.5).toInt(),
-            (containerHeight * 1.5).toInt()
+            (containerWidth * 1.2).toInt(),
+            (containerHeight * 1.2).toInt()
         )
         coverImageView.layoutParams = imageParams
         coverImageView.scaleType = ImageView.ScaleType.CENTER_CROP
@@ -102,7 +110,11 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
         // 设置ListView
         val listParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
         listParams.addRule(RelativeLayout.ALIGN_PARENT_LEFT)
-        listParams.width = (resources.displayMetrics.widthPixels * 0.35).toInt() // 将ListView宽度设置为35%
+        listParams.width = if (isLandscape) {
+            (resources.displayMetrics.widthPixels * 0.5).toInt() // 横屏时占50%
+        } else {
+            (resources.displayMetrics.widthPixels * 0.35).toInt() // 竖屏时占35%
+        }
         // 设置ListView的z轴顺序，使其位于ImageView上方
         listParams.addRule(RelativeLayout.ABOVE, -1)
         addView(listView, listParams)
@@ -113,7 +125,11 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
         val dividerView = View(context)
         val dividerParams = LayoutParams(10, LayoutParams.MATCH_PARENT)
         dividerParams.addRule(RelativeLayout.ALIGN_PARENT_LEFT)
-        dividerParams.leftMargin = (resources.displayMetrics.widthPixels * 0.35).toInt() - 5 // 更新分割线位置到35%
+        dividerParams.leftMargin = if (isLandscape) {
+            (resources.displayMetrics.widthPixels * 0.5).toInt() - 5 // 横屏时分割线位置在50%
+        } else {
+            (resources.displayMetrics.widthPixels * 0.35).toInt() - 5 // 竖屏时分割线位置在35%
+        }
         dividerView.setBackgroundColor(android.graphics.Color.parseColor("#333333"))
         // 添加阴影效果
         dividerView.elevation = 5f
