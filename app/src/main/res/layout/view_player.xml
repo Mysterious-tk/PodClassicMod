@@ -154,12 +154,14 @@
         android:paddingEnd="8dp">
 
         <!-- 已播放时间 -->
-        <com.example.podclassic.widget.TextView
+        <androidx.appcompat.widget.AppCompatTextView
             android:id="@+id/tv_current_time"
-            android:layout_width="wrap_content"
+            android:layout_width="50dp"
             android:layout_height="wrap_content"
             android:textColor="@color/text"
-            android:textSize="14sp" />
+            android:textSize="14sp"
+            android:gravity="end"
+            android:padding="0dp" />
 
         <!-- 进度条 -->
         <com.example.podclassic.widget.ScreenLayout
@@ -171,12 +173,14 @@
             android:layout_weight="1" />
 
         <!-- 剩余时间 -->
-        <com.example.podclassic.widget.TextView
+        <androidx.appcompat.widget.AppCompatTextView
             android:id="@+id/tv_remaining_time"
-            android:layout_width="wrap_content"
+            android:layout_width="50dp"
             android:layout_height="wrap_content"
             android:textColor="@color/text"
-            android:textSize="14sp" />
+            android:textSize="14sp"
+            android:gravity="start"
+            android:padding="0dp" />
 
     </LinearLayout>
 
