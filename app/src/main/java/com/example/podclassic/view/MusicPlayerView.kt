@@ -107,7 +107,7 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
             gravity = Gravity.START
         }
         artist.apply {
-            setTextColor(Colors.main)
+            setTextColor(Colors.text)
             setPadding(0, 0, 0, 0)
             gravity = Gravity.START
         }

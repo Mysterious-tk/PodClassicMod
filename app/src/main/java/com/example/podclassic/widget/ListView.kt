@@ -7,6 +7,8 @@ import android.graphics.Shader
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.LayerDrawable
 import android.graphics.drawable.Drawable
+import android.util.Log
+import android.view.GestureDetector
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
@@ -45,6 +47,9 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
     private val scrollBar = ScrollBar(context)
 
     private val indexView = android.widget.TextView(context)
+
+    // 触摸起始位置
+    private var touchStartY = 0f
 
     init {
         linearLayout.orientation = VERTICAL
@@ -91,6 +96,47 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
         indexView.minWidth = DEFAULT_PADDING * 10
 
         addView(indexView)
+
+        // 确保 ListView 是可点击和可触摸的
+        isClickable = true
+        isFocusable = true
+        isFocusableInTouchMode = true
+
+        // 添加触摸事件监听器
+        setOnTouchListener { _, event ->
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    // 记录触摸起始位置
+                    touchStartY = event.y
+                    Log.d("ListView", "touch down: $touchStartY")
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    // 计算触摸移动的距离
+                    val deltaY = event.y - touchStartY
+                    Log.d("ListView", "touch move: deltaY=$deltaY")
+                    
+                    // 只要有滑动就处理，不需要等待达到阈值
+                    if (Math.abs(deltaY) > 10) {
+                        if (deltaY < 0) {
+                            // 向上滑动，选择下一个项目
+                            Log.d("ListView", "swipe up")
+                            onSlide(1)
+                        } else {
+                            // 向下滑动，选择上一个项目
+                            Log.d("ListView", "swipe down")
+                            onSlide(-1)
+                        }
+                        // 重置触摸起始位置，以便连续滑动
+                        touchStartY = event.y
+                    }
+                }
+                MotionEvent.ACTION_UP -> {
+                    Log.d("ListView", "touch up")
+                }
+            }
+            // 返回 true 表示事件已处理
+            true
+        }
     }
 
     override fun onAttachedToWindow() {
@@ -222,6 +268,42 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
         }
     }
 
+    // 重写onTouchEvent方法，确保触摸事件能够被正确处理
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        when (event.action) {
+            MotionEvent.ACTION_DOWN -> {
+                // 记录触摸起始位置
+                touchStartY = event.y
+                Log.d("ListView", "onTouchEvent down: $touchStartY")
+            }
+            MotionEvent.ACTION_MOVE -> {
+                // 计算触摸移动的距离
+                val deltaY = event.y - touchStartY
+                Log.d("ListView", "onTouchEvent move: deltaY=$deltaY")
+                
+                // 只要有滑动就处理，不需要等待达到阈值
+                if (Math.abs(deltaY) > 10) {
+                    if (deltaY < 0) {
+                        // 向上滑动，选择下一个项目
+                        Log.d("ListView", "swipe up")
+                        onSlide(1)
+                    } else {
+                        // 向下滑动，选择上一个项目
+                        Log.d("ListView", "swipe down")
+                        onSlide(-1)
+                    }
+                    // 重置触摸起始位置，以便连续滑动
+                    touchStartY = event.y
+                }
+            }
+            MotionEvent.ACTION_UP -> {
+                Log.d("ListView", "onTouchEvent up")
+            }
+        }
+        // 返回 true 表示事件已处理
+        return true
+    }
+
     open fun onItemCreated(index: Int, itemView: ItemView) {
         itemView.itemIndex = index
         itemView.onItemClickListener = object : ItemView.OnItemClickListener {
@@ -247,100 +329,41 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
     private var timer: Timer? = null
 
     fun onSlide(direction: Int): Boolean {
+        Log.d("ListView", "onSlide: direction=$direction, current index=$index, itemList size=${itemList.size}")
+        
         if (direction == 0 || itemList.isEmpty()) {
+            Log.d("ListView", "onSlide: no items or zero direction")
             return false
         }
 
+        // 检查边界条件
         if ((direction < 0 && index == 0) || (direction > 0 && index == itemList.size - 1)) {
+            Log.d("ListView", "onSlide: reached boundary")
             return false
         }
 
-        if (itemList.size >= QUICK_SLIDE) {
-            val currentMillis = System.currentTimeMillis()
-            if (sorted && indexView.visibility == VISIBLE) {
-                indexView.text =
-                    PinyinUtil.getPinyinChar(itemList[index].name[0])
-                        .toString()
-            }
-            when {
-                (currentMillis - prevSlideTime) > DELAY -> {
-                    slideCount = 0
-                }
-                abs(slideCount) >= MAX_SIZE * 2 -> {
-                    if (direction < 0 && position == index) {
-                        position -= MAX_SIZE
-                        index -= MAX_SIZE
-                        if (position < 0) {
-                            position = 0
-                            index = 0
-                        }
-                    } else if (direction > 0 && index == position + MAX_SIZE - 1) {
-                        position += MAX_SIZE
-                        index += MAX_SIZE
-                        if (index >= itemList.size) {
-                            index = itemList.size - 1
-                        }
-                        if (position >= itemList.size - MAX_SIZE + 1) {
-                            position = itemList.size - MAX_SIZE
-                        }
-                    }
-                    refreshList()
-                    if (sorted) {
-                        indexView.visibility = VISIBLE
-                        if (timer == null) {
-                            timer = Timer()
-                            timer!!.schedule(object : TimerTask() {
-                                override fun run() {
-                                    if (indexView.visibility == View.INVISIBLE) {
-                                        cancelTimer()
-                                    } else if ((System.currentTimeMillis() - prevSlideTime) > DELAY) {
-                                        cancelTimer()
-                                        ThreadUtil.runOnUiThread {
-                                            indexView.visibility = INVISIBLE
-                                        }
-                                    }
-                                }
-                            }, DELAY * 6L, DELAY * 12L)
-                        }
-                    }
-                    prevSlideTime = currentMillis
-                    return true
-                }
-                else -> {
-                    if (direction > 0) {
-                        if (slideCount < 0) {
-                            slideCount = 1
-                        } else {
-                            slideCount++
-                        }
-                    } else {
-                        if (slideCount > 0) {
-                            slideCount = -1
-                        } else {
-                            slideCount--
-                        }
-                    }
-                }
-            }
-            prevSlideTime = currentMillis
-        }
+        // 处理滑动逻辑
         if (direction < 0) {
+            // 向上滑动，选择上一个项目
             if (index > 0) {
-                if (position == index) {
+                if (position > 0 && index == position) {
                     position--
                 }
                 index--
+                Log.d("ListView", "onSlide: moved up to index=$index")
             }
         } else {
-            //direction > 0
+            // 向下滑动，选择下一个项目
             if (index < itemList.size - 1) {
                 if (itemList.size > MAX_SIZE && index == position + MAX_SIZE - 1) {
                     position++
                 }
                 index++
+                Log.d("ListView", "onSlide: moved down to index=$index")
             }
         }
         refreshList()
+        Log.d("ListView", "onSlide: completed, returning true")
         return true
     }
 
@@ -518,6 +541,10 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
         
         var onItemClickListener: OnItemClickListener? = null
         var itemIndex = -1
+        
+        // 触摸起始位置
+        private var touchStartX = 0f
+        private var touchStartY = 0f
 
         init {
 
@@ -535,10 +562,38 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
             addView(rightIcon, layoutParams3)
             
             // 添加触摸事件监听器
-            setOnTouchListener {_, event ->
+            setOnTouchListener { view, event ->
                 when (event.action) {
+                    MotionEvent.ACTION_DOWN -> {
+                        // 记录触摸起始位置
+                        touchStartX = event.x
+                        touchStartY = event.y
+                    }
+                    MotionEvent.ACTION_MOVE -> {
+                        // 计算触摸移动的距离
+                        val deltaX = event.x - touchStartX
+                        val deltaY = event.y - touchStartY
+                        val distance = Math.sqrt((deltaX * deltaX + deltaY * deltaY).toDouble()).toFloat()
+                        
+                        // 如果有明显的滑动，不拦截事件，让事件传递给父视图
+                        if (distance > 10) {
+                            return@setOnTouchListener false
+                        }
+                    }
                     MotionEvent.ACTION_UP -> {
-                        onItemClickListener?.onItemClick(itemIndex)
+                        // 计算触摸移动的距离
+                        val deltaX = event.x - touchStartX
+                        val deltaY = event.y - touchStartY
+                        val distance = Math.sqrt((deltaX * deltaX + deltaY * deltaY).toDouble()).toFloat()
+                        
+                        // 只有当移动距离很小时才触发点击事件
+                        if (distance < 20) {
+                            onItemClickListener?.onItemClick(itemIndex)
+                            return@setOnTouchListener true
+                        } else {
+                            // 如果有明显的滑动，不拦截事件
+                            return@setOnTouchListener false
+                        }
                     }
                 }
                 true

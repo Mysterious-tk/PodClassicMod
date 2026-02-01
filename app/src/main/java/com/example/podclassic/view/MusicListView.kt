@@ -10,6 +10,7 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.GradientDrawable
+import android.view.MotionEvent
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.ImageView
@@ -71,7 +72,9 @@ class MusicListView : FrameLayout, ScreenView {
         
         // 添加到FrameLayout中
         addView(backgroundImageView)
-        addView(listView)
+        // 为listView设置布局参数，确保它占据整个FrameLayout的空间
+        val listViewParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
+        addView(listView, listViewParams)
         
         init()
         listView.sorted = type == TYPE_NORMAL
@@ -88,7 +91,9 @@ class MusicListView : FrameLayout, ScreenView {
         
         // 添加到FrameLayout中
         addView(backgroundImageView)
-        addView(listView)
+        // 为listView设置布局参数，确保它占据整个FrameLayout的空间
+        val listViewParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
+        addView(listView, listViewParams)
         
         init()
         listView.sorted = musicList.type != MusicList.TYPE_ALBUM
@@ -243,5 +248,60 @@ class MusicListView : FrameLayout, ScreenView {
 
     override fun slide(slideVal: Int): Boolean {
         return listView.onSlide(slideVal)
+    }
+
+    private var touchStartY = 0f
+    
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        // 直接处理触摸事件，不依赖dispatchTouchEvent
+        // android.util.Log.d("MusicListView", "onTouchEvent called: action=${event.action}, x=${event.x}, y=${event.y}")
+        // 直接调用ListView的触摸事件监听器逻辑
+        when (event.action) {
+            MotionEvent.ACTION_DOWN -> {
+                // 记录触摸起始位置
+                touchStartY = event.y
+                // android.util.Log.d("MusicListView", "ACTION_DOWN: x=${event.x}, y=${event.y}, touchStartY=$touchStartY")
+            }
+            MotionEvent.ACTION_MOVE -> {
+                // 计算触摸移动的距离
+                val deltaY = event.y - touchStartY
+                // android.util.Log.d("MusicListView", "ACTION_MOVE: x=${event.x}, y=${event.y}, deltaY=$deltaY")
+                // 根据滑动的方向和距离调用listView的onSlide方法
+                if (Math.abs(deltaY) > 20) {
+                    if (deltaY < 0) {
+                        // 向上滑动，选择上一个项目
+                        // android.util.Log.d("MusicListView", "swipe up")
+                        listView.onSlide(-1)
+                    } else {
+                        // 向下滑动，选择下一个项目
+                        // android.util.Log.d("MusicListView", "swipe down")
+                        listView.onSlide(1)
+                    }
+                    // 重置触摸起始位置，以便连续滑动
+                    touchStartY = event.y
+                }
+            }
+            MotionEvent.ACTION_UP -> {
+                // android.util.Log.d("MusicListView", "ACTION_UP: x=${event.x}, y=${event.y}")
+            }
+        }
+        return true
+    }
+
+    override fun onInterceptTouchEvent(event: MotionEvent): Boolean {
+        // 拦截触摸事件，确保它能够被传递给onTouchEvent方法
+        // android.util.Log.d("MusicListView", "onInterceptTouchEvent called: action=${event.action}, x=${event.x}, y=${event.y}")
+        // 确保拦截ACTION_DOWN事件，这样后续的ACTION_MOVE和ACTION_UP事件也会被拦截
+        return true
+    }
+
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        // 确保触摸事件能够传递给子视图
+        // android.util.Log.d("MusicListView", "dispatchTouchEvent called: action=${event.action}, x=${event.x}, y=${event.y}")
+        // 直接调用onTouchEvent方法，确保触摸事件能够被正确处理
+        val handled = onTouchEvent(event)
+        // android.util.Log.d("MusicListView", "onTouchEvent handled: $handled")
+        // 即使onTouchEvent没有处理事件，也要返回true，确保事件能够被正确传递
+        return true
     }
 }
