@@ -167,11 +167,11 @@ class SlideController : View {
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(event: MotionEvent?): Boolean {
         if (event == null || !enable) {
-            android.util.Log.d("SlideController", "onTouchEvent called: event null or not enabled")
+            // android.util.Log.d("SlideController", "onTouchEvent called: event null or not enabled")
             return super.onTouchEvent(event)
         }
 
-        android.util.Log.d("SlideController", "onTouchEvent called: action=${event.action}, x=${event.x}, y=${event.y}")
+        // android.util.Log.d("SlideController", "onTouchEvent called: action=${event.action}, x=${event.x}, y=${event.y}")
 
         val curPoint = TouchPoint(
             event.x,
@@ -179,11 +179,11 @@ class SlideController : View {
             System.currentTimeMillis()
         )
 
-        android.util.Log.d("SlideController", "touch point: r=${curPoint.r}, maxR=$maxR")
+        // android.util.Log.d("SlideController", "touch point: r=${curPoint.r}, maxR=$maxR")
 
         if (curPoint.r > maxR) {
             // 如果触摸点不在圆盘区域内，不处理事件，让事件传递给下面的控件
-            android.util.Log.d("SlideController", "touch outside disc, passing event down")
+            // android.util.Log.d("SlideController", "touch outside disc, passing event down")
             return false
         }
         onTouch()
@@ -250,13 +250,13 @@ class SlideController : View {
 
     override fun dispatchTouchEvent(event: MotionEvent?): Boolean {
         if (event == null || !enable) {
-            android.util.Log.d("SlideController", "dispatchTouchEvent called: event null or not enabled")
+            // android.util.Log.d("SlideController", "dispatchTouchEvent called: event null or not enabled")
             return super.dispatchTouchEvent(event)
         }
 
-        android.util.Log.d("SlideController", "dispatchTouchEvent called: action=${event.action}, x=${event.x}, y=${event.y}")
+        // android.util.Log.d("SlideController", "dispatchTouchEvent called: action=${event.action}, x=${event.x}, y=${event.y}")
         val handled = super.dispatchTouchEvent(event)
-        android.util.Log.d("SlideController", "dispatchTouchEvent: $handled")
+        // android.util.Log.d("SlideController", "dispatchTouchEvent: $handled")
         return handled
     }
 

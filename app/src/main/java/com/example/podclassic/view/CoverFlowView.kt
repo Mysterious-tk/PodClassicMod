@@ -2,6 +2,7 @@ package com.example.podclassic.view
 
 import android.animation.Animator
 import android.animation.ValueAnimator
+import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.*
 import android.view.GestureDetector
@@ -26,7 +27,6 @@ import java.util.concurrent.TimeUnit
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
-import kotlin.math.sqrt
 
 class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
     companion object {
@@ -35,6 +35,7 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
         private const val DEFAULT_DURATION = 300L
         private const val MIN_DURATION = 10L
         private const val SWIPE_THRESHOLD = 60f
+        @Suppress("unused")
         private const val FLING_VELOCITY_THRESHOLD = 300f
 
         private val threadPoolExecutor = 
@@ -78,7 +79,7 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
 
     private fun initViews() {
         // 初始化图片视图
-        for (i in 0 until MAX_SIZE) {
+        repeat(MAX_SIZE) {
             val imageView = CoverImageView(context)
             imageViews.add(imageView)
             addView(imageView)
@@ -120,6 +121,7 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
         })
     }
 
+    @SuppressLint("ClickableViewAccessibility")
     private fun initTouchListener() {
         setOnTouchListener { _, event ->
             gestureDetector.onTouchEvent(event)
@@ -129,6 +131,7 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
     }
 
     // 触摸操作处理
+    @Suppress("SameReturnValue")
     private fun handleTouchEvent(event: MotionEvent): Boolean {
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
@@ -252,16 +255,38 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
             return false
         }
 
+        // 记录滑动前的中心索引，用于动画过程中计算正确的专辑索引
+        val oldCenterIndex = currentCenterAlbumIndex
+        
         // 更新中心索引
         currentCenterAlbumIndex = newCenterIndex
         
-        // 开始动画
-        startSlideAnimation(slideVal)
+        // 开始动画，传入滑动前的中心索引
+        startSlideAnimation(slideVal, oldCenterIndex)
         
         return true
     }
 
-    private fun startSlideAnimation(slideVal: Int) {
+    private fun startSlideAnimation(slideVal: Int, oldCenterIndex: Int) {
+        // 预绑定动画过程中需要显示的图片数据
+        // 只绑定可见范围内的ImageView（中心前后3个），减少图片加载数量
+        val visibleRange = 3
+        for (i in imageViews.indices) {
+            val relativeIndex = i - CENTER_INDEX
+            // 只绑定可见范围内的ImageView
+            if (relativeIndex in -visibleRange..visibleRange) {
+                val imageView = imageViews[i]
+                // 使用滑动前的中心索引计算专辑索引
+                val albumIndex = oldCenterIndex + relativeIndex
+                // 只绑定数据，不更新位置
+                if (albumIndex in 0 until albums.size) {
+                    imageView.bindItem(albums[albumIndex])
+                } else {
+                    imageView.bindItem(null)
+                }
+            }
+        }
+        
         // 创建动画
         animator = ValueAnimator.ofInt(0, -slideVal * imagePadding).apply {
             duration = animationDuration
@@ -271,17 +296,17 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
                 for (i in imageViews.indices) {
                     val imageView = imageViews[i]
                     val relativeIndex = i - CENTER_INDEX
-                    val albumIndex = currentCenterAlbumIndex + relativeIndex
                     val baseCenterX = imageCenterX + relativeIndex * imagePadding
-                    updateImageViewPosition(baseCenterX + currentValue, imageView, albumIndex)
+                    // 只更新位置，不更新数据绑定
+                    updateImageViewPosition(baseCenterX + currentValue, imageView, 0)
                 }
             }
             addListener(object : Animator.AnimatorListener {
                 override fun onAnimationStart(animation: Animator?) {}
                 override fun onAnimationEnd(animation: Animator?) {
-                    // 动画结束后，确保所有数据同步
+                    // 动画结束后，不需要更新ImageView位置，动画已经把它们带到了正确位置
+                    // 只需要更新中心文本（唱片名）
                     currentDragOffset = 0
-                    updateAllImageViews()
                     updateCenterText()
                     animator = null
                 }
@@ -294,7 +319,7 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
         animator?.start()
     }
 
-    private fun updateImageViewPosition(centerX: Int, imageView: CoverImageView, albumIndex: Int) {
+    private fun updateImageViewPosition(centerX: Int, imageView: CoverImageView, @Suppress("UNUSED_PARAMETER") albumIndex: Int) {
         // 计算与中心的距离，用于确定层级和透明度
         val distance = abs(imageCenterX - centerX)
         
@@ -327,6 +352,11 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
         val maxDistance = imagePadding * 3
         val alpha = 1.0f - (distance.toFloat() / maxDistance) * 0.3f
         imageView.alpha = alpha.coerceIn(0.7f, 1.0f)
+    }
+    
+    private fun updateImageViewPositionAndData(centerX: Int, imageView: CoverImageView, albumIndex: Int) {
+        // 更新位置
+        updateImageViewPosition(centerX, imageView, albumIndex)
         
         // 更新ImageView的数据
         if (albumIndex in 0 until albums.size) {
@@ -343,7 +373,7 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
             val relativeIndex = i - CENTER_INDEX
             val albumIndex = currentCenterAlbumIndex + relativeIndex
             val baseCenterX = imageCenterX + relativeIndex * imagePadding
-            updateImageViewPosition(baseCenterX, imageView, albumIndex)
+            updateImageViewPositionAndData(baseCenterX, imageView, albumIndex)
         }
     }
 
@@ -445,33 +475,36 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
             setTag(R.id.tag_album, album)
             
             // 如果专辑对象相同，直接返回，避免不必要的加载
-            if (album != null && album == this.album) {
+            if (album == this.album) {
                 return
             }
+            
+            // 更新当前专辑
             this.album = album
 
             if (album == null) {
-                // 清空图片
-                setImageBitmap(null)
+                // 使用默认图片而不是 null，避免 BitmapDrawable created with null Bitmap
+                setImageBitmap(defaultBitmap)
                 return
             }
 
             // 移除旧任务，避免线程池中有多个任务处理同一ImageView
-            if (runnable != null) {
-                threadPoolExecutor.remove(runnable)
+            runnable?.let {
+                threadPoolExecutor.remove(it)
                 runnable = null
             }
 
             // 加载图片
+            val currentAlbum = album
             runnable = Runnable {
-                val bitmap = MediaUtil.getAlbumImage(album.id ?: 0L)
+                val bitmap = MediaUtil.getAlbumImage(currentAlbum.id ?: 0L)
                 if (Thread.currentThread().isInterrupted) {
                     bitmap?.recycle()
                     return@Runnable
                 }
                 ThreadUtil.runOnUiThread {
                     // 再次检查专辑是否仍然相同，避免UI线程处理过时的任务
-                    if (album == this@CoverImageView.album) {
+                    if (currentAlbum == this@CoverImageView.album) {
                         // 保存当前的旋转角度和z值
                         val currentRotationY = rotationY
                         val currentZ = z
@@ -494,14 +527,17 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
             threadPoolExecutor.execute(runnable)
         }
 
+        @Suppress("DEPRECATION")
         private fun getReflectBitmap(bitmap: Bitmap): Bitmap {
             val reflectionGap = 0
             val width = bitmap.width
             val height = bitmap.height
             val matrix = Matrix()
             matrix.preScale(1f, -1f)
+            @Suppress("DEPRECATION", "UseKtx")
             val reflectionImage = 
                 Bitmap.createBitmap(bitmap, 0, height / 2, width, height / 2, matrix, false)
+            @Suppress("DEPRECATION", "UseKtx")
             val bitmap4Reflection = 
                 Bitmap.createBitmap(width, height + height / 2, Bitmap.Config.ARGB_8888)
             val canvasRef = Canvas(bitmap4Reflection)
