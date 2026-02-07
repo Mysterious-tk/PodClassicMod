@@ -35,7 +35,7 @@ class Brick constructor(context: Context) : FrameLayout(context), ScreenView {
 
             private val paint = Paint()
 
-            override fun onDraw(canvas: Canvas?) {
+            override fun onDraw(canvas: Canvas) {
                 val cx = width / 2f
                 val cy = height / 2f
                 paint.shader = Colors.getShader(
@@ -46,7 +46,7 @@ class Brick constructor(context: Context) : FrameLayout(context), ScreenView {
                     Colors.ball_1,
                     Colors.ball_2
                 )
-                canvas?.drawCircle(cx, cy, cx, paint)
+                canvas.drawCircle(cx, cy, cx, paint)
             }
         }
 
@@ -58,10 +58,10 @@ class Brick constructor(context: Context) : FrameLayout(context), ScreenView {
 
             private val paint = Paint()
 
-            override fun onDraw(canvas: Canvas?) {
+            override fun onDraw(canvas: Canvas) {
                 super.onDraw(canvas)
                 paint.shader = null
-                canvas?.drawRoundRect(
+                canvas.drawRoundRect(
                     0f,
                     0f,
                     width.toFloat(),
@@ -91,7 +91,7 @@ class Brick constructor(context: Context) : FrameLayout(context), ScreenView {
 
             private val paint = Paint()
 
-            override fun onDraw(canvas: Canvas?) {
+            override fun onDraw(canvas: Canvas) {
                 super.onDraw(canvas)
                 paint.shader = Colors.getShader(
                     width / 2f,
@@ -101,7 +101,7 @@ class Brick constructor(context: Context) : FrameLayout(context), ScreenView {
                     Colors.line,
                     Colors.line
                 )
-                canvas?.drawRoundRect(
+                canvas.drawRoundRect(
                     PADDING,
                     PADDING,
                     width - PADDING,

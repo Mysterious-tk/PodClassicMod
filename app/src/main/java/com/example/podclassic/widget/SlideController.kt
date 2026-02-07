@@ -83,36 +83,36 @@ class SlideController : View {
         setMeasuredDimension(x, y)
     }
 
-    override fun onDraw(canvas: Canvas?) {
+    override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
 
         paint.isAntiAlias = true
         paint.color = colorController//Colors.controller
-        canvas?.drawCircle(centerX, centerY, maxR, paint)
+        canvas.drawCircle(centerX, centerY, maxR, paint)
         paint.color = colorButton//Colors.color_primary
-        canvas?.drawCircle(centerX, centerY, minR, paint)
+        canvas.drawCircle(centerX, centerY, minR, paint)
 
         val r = (minR + maxR) / 2
 
-        canvas?.drawBitmap(
+        canvas.drawBitmap(
             MENU.bitmap,
             centerX - MENU.width / 2,
             centerY - r - PAUSE.height - MENU.height / 2,
             paint
         )
-        canvas?.drawBitmap(
+        canvas.drawBitmap(
             PREV.bitmap,
             (centerX - r) - PREV.width / 2 * 3,
             centerY - PREV.height / 2,
             paint
         )
-        canvas?.drawBitmap(
+        canvas.drawBitmap(
             NEXT.bitmap,
             (centerX + r) + NEXT.width / 2,
             centerY - NEXT.height / 2,
             paint
         )
-        canvas?.drawBitmap(
+        canvas.drawBitmap(
             PAUSE.bitmap,
             centerX - PAUSE.width / 2,
             centerY + r + PAUSE.height / 2,

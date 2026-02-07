@@ -40,7 +40,7 @@ class SeekBar(context: Context) : LinearLayout(context) {
         val rect = RectF()
         var seekMode = false
 
-        override fun onDraw(canvas: Canvas?) {
+        override fun onDraw(canvas: Canvas) {
             // Draw background
             if (backPaint.shader == null) {
                 backPaint.shader = Colors.getShader(
@@ -52,7 +52,7 @@ class SeekBar(context: Context) : LinearLayout(context) {
                     Colors.background_dark_2
                 )
             }
-            canvas?.drawRect(0f, 0f, width.toFloat(), height.toFloat(), backPaint)
+            canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), backPaint)
             
             // Draw progress bar with Mac OS X style
             if (paint.shader == null) {

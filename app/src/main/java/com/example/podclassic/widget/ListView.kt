@@ -490,15 +490,15 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
             setMeasuredDimension(DEFAULT_PADDING, MeasureSpec.getSize(heightMeasureSpec))
         }
 
-        override fun onDraw(canvas: Canvas?) {
+        override fun onDraw(canvas: Canvas) {
             super.onDraw(canvas)
 
             paint.shader = shader
-            canvas?.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
+            canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
 
             paint.shader = null
             paint.color = Colors.line
-            canvas?.drawRect(0f, 0f, Values.LINE_WIDTH.toFloat(), measuredHeight.toFloat(), paint)
+            canvas.drawRect(0f, 0f, Values.LINE_WIDTH.toFloat(), measuredHeight.toFloat(), paint)
         }
 
         private val bar = object : View(context) {
@@ -506,7 +506,7 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
                 Paint().apply { shader = null }
             }
 
-            override fun onDraw(canvas: Canvas?) {
+            override fun onDraw(canvas: Canvas) {
                 if (paint.shader == null) {
                     paint.shader = Colors.getShader(
                         width / 2f,
@@ -518,7 +518,7 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
                         Shader.TileMode.MIRROR
                     )
                 }
-                canvas?.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
+                canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
             }
         }
 

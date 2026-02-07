@@ -1,6 +1,7 @@
 package com.example.podclassic.view
 
 import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
 import android.annotation.SuppressLint
 import android.content.Context
@@ -8,7 +9,9 @@ import android.graphics.*
 import android.view.GestureDetector
 import android.view.Gravity
 import android.view.MotionEvent
+import android.view.animation.AccelerateDecelerateInterpolator
 import android.view.animation.DecelerateInterpolator
+import android.view.animation.LinearInterpolator
 import android.view.animation.OvershootInterpolator
 import android.widget.FrameLayout
 import com.example.podclassic.R
@@ -202,26 +205,27 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
 
     private fun snapBackToPosition() {
         // 创建回弹动画
-        val startOffset = currentDragOffset
-        val snapAnimator = ValueAnimator.ofInt(startOffset, 0).apply {
+        val startOffset = currentDragOffset.toFloat()
+        animator = ValueAnimator.ofFloat(startOffset, 0f).apply {
             duration = 250
             interpolator = OvershootInterpolator(0.3f)
             addUpdateListener { animation ->
-                val offset = animation.animatedValue as Int
-                updatePositionByDrag(offset.toFloat())
+                val offset = animation.animatedValue as Float
+                updatePositionByDrag(offset)
             }
-            addListener(object : Animator.AnimatorListener {
-                override fun onAnimationStart(animation: Animator?) {}
-                override fun onAnimationEnd(animation: Animator?) {
+            addListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator) {
                     // 回弹动画结束后，确保数据同步
                     updateAllImageViews()
                     updateCenterText()
+                    animator = null
                 }
-                override fun onAnimationCancel(animation: Animator?) {}
-                override fun onAnimationRepeat(animation: Animator?) {}
+                override fun onAnimationCancel(animation: Animator) {
+                    animator = null
+                }
             })
         }
-        snapAnimator.start()
+        animator?.start()
     }
 
     private fun handleCenterClick() {
@@ -287,33 +291,69 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
             }
         }
         
-        // 创建动画
-        animator = ValueAnimator.ofInt(0, -slideVal * imagePadding).apply {
+        // 找到中心ImageView
+        val centerImageView = imageViews[CENTER_INDEX]
+        
+        // 记录中心ImageView的初始状态
+        val initialScale = centerImageView.scaleX
+        val initialAlpha = centerImageView.alpha
+        
+        // 使用 ValueAnimator 实现动画，与 snapBackToPosition 保持一致
+        val targetValue = -slideVal * imagePadding
+        
+        animator = ValueAnimator.ofFloat(0f, targetValue.toFloat()).apply {
             duration = animationDuration
-            interpolator = this@CoverFlowView.interpolator
+            // 使用线性插值器，让动画更流畅
+            interpolator = LinearInterpolator()
             addUpdateListener { animation ->
-                val currentValue = animation.animatedValue as Int
+                val currentValue = animation.animatedValue as Float
+                val progress = currentValue / targetValue
+                
+                // 更新所有图片位置
                 for (i in imageViews.indices) {
                     val imageView = imageViews[i]
                     val relativeIndex = i - CENTER_INDEX
                     val baseCenterX = imageCenterX + relativeIndex * imagePadding
-                    // 只更新位置，不更新数据绑定
-                    updateImageViewPosition(baseCenterX + currentValue, imageView, 0)
+                    val currentCenterX = baseCenterX + currentValue.toInt()
+                    
+                    // 为中心ImageView添加特殊动画效果
+                    if (i == CENTER_INDEX) {
+                        // 中心唱片的幻灯片效果
+                        val scaleProgress = if (progress < 0.5f) {
+                            1.0f - progress * 0.4f // 缩小
+                        } else {
+                            0.6f + (progress - 0.5f) * 0.8f // 放大
+                        }
+                        val alphaProgress = if (progress < 0.5f) {
+                            1.0f - progress * 0.8f // 淡出
+                        } else {
+                            0.2f + (progress - 0.5f) * 1.6f // 淡入
+                        }
+                        
+                        imageView.scaleX = scaleProgress
+                        imageView.scaleY = scaleProgress
+                        imageView.alpha = alphaProgress
+                    }
+                    
+                    updateImageViewPosition(currentCenterX, imageView, 0)
                 }
             }
-            addListener(object : Animator.AnimatorListener {
-                override fun onAnimationStart(animation: Animator?) {}
-                override fun onAnimationEnd(animation: Animator?) {
-                    // 动画结束后，不需要更新ImageView位置，动画已经把它们带到了正确位置
-                    // 只需要更新中心文本（唱片名）
+            addListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator) {
+                    // 动画结束后，更新中心文本（唱片名）
                     currentDragOffset = 0
                     updateCenterText()
+                    
+                    // 重置中心ImageView的状态
+                    centerImageView.scaleX = 1.0f
+                    centerImageView.scaleY = 1.0f
+                    centerImageView.alpha = 1.0f
+                    
                     animator = null
                 }
-                override fun onAnimationCancel(animation: Animator?) {
+                override fun onAnimationCancel(animation: Animator) {
                     animator = null
                 }
-                override fun onAnimationRepeat(animation: Animator?) {}
             })
         }
         animator?.start()
@@ -322,36 +362,67 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
     private fun updateImageViewPosition(centerX: Int, imageView: CoverImageView, @Suppress("UNUSED_PARAMETER") albumIndex: Int) {
         // 计算与中心的距离，用于确定层级和透明度
         val distance = abs(imageCenterX - centerX)
+        val direction = if (centerX < imageCenterX) -1 else if (centerX > imageCenterX) 1 else 0
         
-        // 先设置缩放和位置
-        val scale = -distance / 4
-        val left = centerX - halfImageWidth - scale
-        val top = imageCenterY - halfImageWidth - scale
-        val right = centerX + halfImageWidth + scale
-        val bottom = imageCenterY + halfImageWidth + scale
+        // 添加尺寸渐变效果
+        val scale = if (distance > 0) {
+            val minScale = 0.8f
+            val scaleFactor = min(distance.toFloat() / imagePadding, 1.0f)
+            1.0f - (1.0f - minScale) * scaleFactor
+        } else {
+            1.0f
+        }
+        
+        // 调整旋转效果：保持明显但不过度
+        val rotationAngle = if (distance > 0) {
+            val maxRotation = 75f
+        val rotationFactor = min(distance.toFloat() / imagePadding, 1.0f)
+        -direction * maxRotation * rotationFactor
+        } else {
+            0f
+        }
+        
+        // 计算透明度：距离中心越近，透明度越高
+        val alphaRange = imagePadding * 2
+        val alpha = if (alphaRange > 0) {
+            (1.0f - (distance.toFloat() / alphaRange) * 0.6f).coerceIn(0.3f, 1.0f)
+        } else {
+            1.0f
+        }
+        
+        // 添加透视效果：远离中心的专辑封面添加X轴平移
+        val perspectiveOffset = if (distance > 0) {
+            val perspectiveFactor = min(distance.toFloat() / (imagePadding * 1.5f), 1.0f)
+            direction * halfImageWidth * 0.3f * perspectiveFactor // 减小透视偏移
+        } else {
+            0f
+        }
+        
+        // 计算布局位置（考虑透视效果）
+        val actualHalfWidth = max(1, halfImageWidth)
+        val scaledHalfWidth = actualHalfWidth * scale
+        val left = centerX + perspectiveOffset - scaledHalfWidth
+        val top = imageCenterY - scaledHalfWidth
+        val right = centerX + perspectiveOffset + scaledHalfWidth
+        val bottom = imageCenterY + scaledHalfWidth
         
         // 只在位置真正改变时才更新布局
-        if (imageView.left != left || imageView.top != top || imageView.right != right || imageView.bottom != bottom) {
-            imageView.layout(left, top, right, bottom)
+        val leftInt = left.toInt()
+        val topInt = top.toInt()
+        val rightInt = right.toInt()
+        val bottomInt = bottom.toInt()
+        
+        if (imageView.left != leftInt || imageView.top != topInt || imageView.right != rightInt || imageView.bottom != bottomInt) {
+            imageView.layout(leftInt, topInt, rightInt, bottomInt)
         }
         
-        // 计算旋转角度
-        val temp = (imageCenterX - centerX).toFloat()
-        if (temp == 0f) {
-            imageView.rotationY = 0f
-        } else {
-            val x = temp / width.toFloat()
-            val rotation = sgn(x) * min(abs(x) * 200f, 40f)
-            imageView.rotationY = rotation
-        }
-        
-        // 设置 z 轴顺序，距离中心越近，z 值越大，显示在前面
-        imageView.z = -distance.toFloat()
-        
-        // 设置透明度，距离中心越远，透明度越低
-        val maxDistance = imagePadding * 3
-        val alpha = 1.0f - (distance.toFloat() / maxDistance) * 0.3f
-        imageView.alpha = alpha.coerceIn(0.7f, 1.0f)
+        // 设置其他属性
+        imageView.scaleX = scale
+        imageView.scaleY = scale
+        imageView.rotationY = rotationAngle
+        // 调整Z轴深度差异
+        imageView.z = -distance.toFloat() * 2
+        imageView.alpha = alpha
     }
     
     private fun updateImageViewPositionAndData(centerX: Int, imageView: CoverImageView, albumIndex: Int) {
@@ -404,14 +475,11 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
         // 根据屏幕宽高比动态调整imagePadding，确保在横屏下也有合适的间距
         val screenRatio = measuredWidth.toFloat() / measuredHeight.toFloat()
         imagePadding = if (screenRatio > 1.5f) {
-            // 横屏模式，使用更大的间距
-            (measuredWidth - imageWidth) / 5
+            (measuredWidth - imageWidth) / 7
         } else if (screenRatio > 1.0f) {
-            // 轻微横屏模式
-            (measuredWidth - imageWidth) / 4
+            (measuredWidth - imageWidth) / 6
         } else {
-            // 竖屏模式
-            (measuredWidth - imageWidth) / 4
+            (measuredWidth - imageWidth) / 6
         }
         
         // 确保 imagePadding 至少为 50，避免间距过小导致的滑动问题

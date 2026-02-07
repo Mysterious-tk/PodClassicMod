@@ -1,6 +1,7 @@
 package com.example.podclassic.widget
 
 import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
 import android.content.Context
 import android.util.AttributeSet
@@ -174,9 +175,8 @@ open class ScreenLayout : ViewGroup {
                 currChild.layout(curr, 0, curr + width, height)
                 child.layout(curr - width, 0, curr, height)
             }
-            addListener(object : Animator.AnimatorListener {
-                override fun onAnimationStart(animation: Animator?) {}
-                override fun onAnimationEnd(animation: Animator?) {
+            addListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator) {
                     if (childCount > 1) {
                         onViewRemove(currChild)
                         onViewDelete(currChild)
@@ -185,11 +185,9 @@ open class ScreenLayout : ViewGroup {
                     //onViewAdd(child)
                 }
 
-                override fun onAnimationCancel(animation: Animator?) {
+                override fun onAnimationCancel(animation: Animator) {
                     child.layout(0, 0, width, height)
                 }
-
-                override fun onAnimationRepeat(animation: Animator?) {}
             })
             setTarget(child)
             start()
@@ -239,20 +237,17 @@ open class ScreenLayout : ViewGroup {
 
             }
 
-            addListener(object : Animator.AnimatorListener {
-                override fun onAnimationStart(animation: Animator?) {}
-                override fun onAnimationEnd(animation: Animator?) {
+            addListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator) {
                     super@ScreenLayout.removeView(currChild)
                     viewStack.push(currChild)
                     onViewRemove(currChild)
 
                 }
 
-                override fun onAnimationCancel(animation: Animator?) {
+                override fun onAnimationCancel(animation: Animator) {
                     view.layout(0, 0, width, height)
                 }
-
-                override fun onAnimationRepeat(animation: Animator?) {}
             })
             start()
         }

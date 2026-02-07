@@ -137,7 +137,7 @@ class TitleBar : FrameLayout {
         MediaPresenter.playState.removeObserver(observer)
     }
 
-    override fun onDraw(canvas: Canvas?) {
+    override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         // iPod Classic 风格：银色金属质感渐变
         paint.shader = Colors.getShader(
@@ -148,18 +148,18 @@ class TitleBar : FrameLayout {
             Colors.background_light,  // 顶部亮银
             Colors.background_dark_1  // 底部稍暗
         )
-        canvas?.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
+        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
         paint.shader = null
         
         // 顶部高光线
         paint.color = Colors.white
-        canvas?.drawRect(0f, 0f, width.toFloat(), 1f, paint)
+        canvas.drawRect(0f, 0f, width.toFloat(), 1f, paint)
         
         // 底部分隔线 - iPod Classic 风格的双线
         paint.color = Colors.background_dark_2
-        canvas?.drawRect(0f, height - 2f, width.toFloat(), height - 1f, paint)
+        canvas.drawRect(0f, height - 2f, width.toFloat(), height - 1f, paint)
         paint.color = Colors.divider_light
-        canvas?.drawRect(0f, height - 1f, width.toFloat(), height.toFloat(), paint)
+        canvas.drawRect(0f, height - 1f, width.toFloat(), height.toFloat(), paint)
     }
 
     private fun registerBatteryBroadcastReceiver() {
@@ -225,7 +225,7 @@ class TitleBar : FrameLayout {
         var isCharging = false
         var batteryLevel = 100
 
-        override fun onDraw(canvas: Canvas?) {
+        override fun onDraw(canvas: Canvas) {
             super.onDraw(canvas)
 
             val padding = height / 5f
@@ -235,8 +235,8 @@ class TitleBar : FrameLayout {
                 null//Colors.getShader(width / 2f, 0f, width / 2f, height.toFloat(), Colors.line, Colors.line)
 
 
-            canvas?.drawRoundRect(0f, padding, width - padding * 3, height - padding, 4f, 4f, paint)
-            canvas?.drawRoundRect(
+            canvas.drawRoundRect(0f, padding, width - padding * 3, height - padding, 4f, 4f, paint)
+            canvas.drawRoundRect(
                 width - padding * 3 - 2f,
                 padding * 1.5f,
                 width - padding * 2.5f + 2f,
@@ -275,7 +275,7 @@ class TitleBar : FrameLayout {
                     Colors.battery_green
                 )
             }
-            canvas?.drawRoundRect(
+            canvas.drawRoundRect(
                 2f,
                 padding + 2,
                 batteryWidth - 2,

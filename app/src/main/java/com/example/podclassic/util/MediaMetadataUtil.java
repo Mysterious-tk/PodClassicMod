@@ -198,43 +198,53 @@ public class MediaMetadataUtil {
         }
         
         MediaMetadataRetriever mediaMetadataRetriever = new MediaMetadataRetriever();
-        mediaMetadataRetriever.setDataSource(path);
-        String title = mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE);
-        String artist = mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST);
-        String album = mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM);
-        long duration = Long.parseLong(mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION));
-        mediaMetadataRetriever.release();
-        if (title == null) {
-            // 从文件名中提取标题
-            File file = new File(path);
-            String fileName = file.getName();
-            if (fileName.contains(".")) {
-                title = fileName.substring(0, fileName.lastIndexOf('.'));
-            } else {
-                title = fileName;
+        try {
+            mediaMetadataRetriever.setDataSource(path);
+            String title = mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE);
+            String artist = mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST);
+            String album = mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM);
+            long duration = Long.parseLong(mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION));
+            mediaMetadataRetriever.release();
+            
+            if (title == null) {
+                // 从文件名中提取标题
+                File file = new File(path);
+                String fileName = file.getName();
+                if (fileName.contains(".")) {
+                    title = fileName.substring(0, fileName.lastIndexOf('.'));
+                } else {
+                    title = fileName;
+                }
             }
-        }
-        if (artist == null) {
-            artist = Strings.INSTANCE.getEMPTY();
-        }
-        if (album == null) {
-            album = Strings.INSTANCE.getEMPTY();
-        }
+            if (artist == null) {
+                artist = Strings.INSTANCE.getEMPTY();
+            }
+            if (album == null) {
+                album = Strings.INSTANCE.getEMPTY();
+            }
 
-
-        return new Music(title, 0L, artist, album, 0L, duration, path, null);
+            return new Music(title, 0L, artist, album, 0L, duration, path, null);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
     }
 
     public static Music getMediaMetadata(Uri uri) {
         MediaMetadataRetriever mediaMetadataRetriever = new MediaMetadataRetriever();
-        mediaMetadataRetriever.setDataSource(BaseApplication.context, uri);
-        Music.Builder builder = new Music.Builder();
-        builder.setAlbum(mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM));
-        builder.setTitle(mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE));
-        builder.setArtist(mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST));
+        try {
+            mediaMetadataRetriever.setDataSource(BaseApplication.context, uri);
+            Music.Builder builder = new Music.Builder();
+            builder.setAlbum(mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM));
+            builder.setTitle(mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE));
+            builder.setArtist(mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST));
 
-        mediaMetadataRetriever.release();
-        return builder.build();
+            mediaMetadataRetriever.release();
+            return builder.build();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
     }
 
     public static Music getMediaMetadata(File file) {

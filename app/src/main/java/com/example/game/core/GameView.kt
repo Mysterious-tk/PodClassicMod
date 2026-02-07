@@ -168,7 +168,7 @@ class GameView : ViewGroup {
 
     val paint = Paint()
 
-    override fun onDraw(canvas: Canvas?) {
+    override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         paint.shader = Colors.getShader(
             width / 2f,
@@ -178,7 +178,7 @@ class GameView : ViewGroup {
             Colors.background_1,
             Colors.background_2
         )
-        canvas?.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
+        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
     }
 
     interface GameChecker {
