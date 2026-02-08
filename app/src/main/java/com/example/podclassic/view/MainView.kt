@@ -411,11 +411,11 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
     }
 
     private fun resetCoverPosition() {
-        // 使用保存的尺寸，避免测量问题
-        val containerWidth = savedContainerWidth
-        val containerHeight = savedContainerHeight
-        val imageWidth = savedImageWidth
-        val imageHeight = savedImageHeight
+        // 使用实际测量的视图尺寸
+        val containerWidth = if (coverContainer.width > 0) coverContainer.width else savedContainerWidth
+        val containerHeight = if (coverContainer.height > 0) coverContainer.height else savedContainerHeight
+        val imageWidth = if (coverImageView.width > 0) coverImageView.width else savedImageWidth
+        val imageHeight = if (coverImageView.height > 0) coverImageView.height else savedImageHeight
         android.util.Log.d("MainView", "resetCoverPosition() - container: ${containerWidth}x${containerHeight}, image: ${imageWidth}x${imageHeight}")
 
         if (containerWidth == 0 || containerHeight == 0 || imageWidth == 0 || imageHeight == 0) {
