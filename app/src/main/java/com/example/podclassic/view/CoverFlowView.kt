@@ -343,15 +343,21 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
                     // 动画结束后，更新中心文本（唱片名）
                     currentDragOffset = 0
                     updateCenterText()
-                    
+
                     // 重置中心ImageView的状态
                     centerImageView.scaleX = 1.0f
                     centerImageView.scaleY = 1.0f
                     centerImageView.alpha = 1.0f
-                    
+
+                    // 更新边界外的图片视图数据（visibleRange范围外的），避免显示旧图片
+                    updateBoundaryImageViews()
+
                     animator = null
                 }
                 override fun onAnimationCancel(animation: Animator) {
+                    // 动画取消时也需要更新边界图片
+                    currentDragOffset = 0
+                    updateBoundaryImageViews()
                     animator = null
                 }
             })
@@ -383,11 +389,16 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
         }
         
         // 计算透明度：距离中心越近，透明度越高
-        val alphaRange = imagePadding * 2
-        val alpha = if (alphaRange > 0) {
-            (1.0f - (distance.toFloat() / alphaRange) * 0.6f).coerceIn(0.3f, 1.0f)
+        // 主唱片透明度0.9，其他唱片最高0.7，最低0.6
+        val alpha = if (distance == 0) {
+            0.9f
         } else {
-            1.0f
+            val alphaRange = imagePadding * 2
+            if (alphaRange > 0) {
+                (0.7f - (distance.toFloat() / alphaRange) * 0.1f).coerceIn(0.6f, 0.7f)
+            } else {
+                0.7f
+            }
         }
         
         // 添加透视效果：远离中心的专辑封面添加X轴平移
@@ -457,6 +468,25 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
         }
     }
 
+    private fun updateBoundaryImageViews() {
+        // 只更新visibleRange范围外的图片视图数据，避免显示旧图片
+        val visibleRange = 3
+        for (i in imageViews.indices) {
+            val relativeIndex = i - CENTER_INDEX
+            // 只处理visibleRange范围外的ImageView
+            if (relativeIndex !in -visibleRange..visibleRange) {
+                val imageView = imageViews[i]
+                val albumIndex = currentCenterAlbumIndex + relativeIndex
+                // 只绑定数据，不更新位置（避免闪烁）
+                if (albumIndex in 0 until albums.size) {
+                    imageView.bindItem(albums[albumIndex])
+                } else {
+                    imageView.bindItem(null)
+                }
+            }
+        }
+    }
+
     private fun sgn(x: Float): Float {
         return when {
             x < 0f -> -1f
@@ -523,6 +553,11 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
 
     override fun getTitle(): String {
         return Strings.COVER_FLOW
+    }
+
+    override fun onViewAdd() {
+        // 首次进入时确保所有图片视图数据正确绑定
+        updateAllImageViews()
     }
 
     override fun onViewDelete() {

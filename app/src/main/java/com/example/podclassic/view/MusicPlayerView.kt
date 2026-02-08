@@ -306,6 +306,9 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
         Log.d("MusicPlayerView", "onMusicChange() called")
         onPlayStateChange()
         Log.d("MusicPlayerView", "onPlayStateChange() called")
+        // 更新当前时间显示，确保暂停状态下也能正确显示当前播放时间
+        onProgress(MediaPresenter.getProgress())
+        Log.d("MusicPlayerView", "onProgress() called to update time display")
 
     }
 
