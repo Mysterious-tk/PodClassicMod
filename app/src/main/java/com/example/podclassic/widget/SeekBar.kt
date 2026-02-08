@@ -41,80 +41,92 @@ class SeekBar(context: Context) : LinearLayout(context) {
         var seekMode = false
 
         override fun onDraw(canvas: Canvas) {
-            // Draw background
-            if (backPaint.shader == null) {
-                backPaint.shader = Colors.getShader(
-                    0f,
-                    0f,
-                    0f,
-                    height.toFloat(),
-                    Colors.background_dark_1,
-                    Colors.background_dark_2
-                )
-            }
-            canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), backPaint)
+            // Draw background with glassmorphism effect
+            val backgroundColor = Color.parseColor("#202020")
+            backPaint.color = backgroundColor
+            backPaint.alpha = 150 // Reduced opacity for more transparency
+            canvas.drawRoundRect(0f, 0f, width.toFloat(), height.toFloat(), height.toFloat() / 2, height.toFloat() / 2, backPaint)
             
-            // Draw progress bar with Mac OS X style
-            if (paint.shader == null) {
-                // Create a blue color for Mac OS X style
-                val blueColor = Color.parseColor("#4A90E2")
-                
-                // Create a linear gradient shader with blue color
-                paint.shader = LinearGradient(
-                    0f,
-                    0f,
-                    100f,
-                    0f,
-                    intArrayOf(blueColor, blueColor, Color.WHITE, blueColor, blueColor),
-                    floatArrayOf(0f, 0.3f, 0.5f, 0.7f, 1.0f),
-                    Shader.TileMode.REPEAT
-                )
-            }
-            if (seekMode) {
-                // Calculate marker position based on current progress
-                val markerPosition = width * current / max.toFloat()
-                
-                // Draw a diamond-shaped marker at the current progress position
-                val markerSize = height * 2
-                val halfMarkerSize = markerSize / 2
-                
-                // Save canvas state
-                canvas?.save()
-                
-                // Translate to marker position
-                canvas?.translate(markerPosition, height / 2f)
-                
-                // Rotate canvas to draw diamond
-                canvas?.rotate(45f)
-                
-                // Draw diamond
-                rect.set(-halfMarkerSize.toFloat(), -halfMarkerSize.toFloat(), halfMarkerSize.toFloat(), halfMarkerSize.toFloat())
-                canvas?.drawRect(rect, paint)
-                
-                // Restore canvas state
-                canvas?.restore()
-            } else {
-                // Draw progress bar with Mac OS X style including glass highlight
-                val progressWidth = width * current / max.toFloat()
+            // Add subtle border to background
+            val borderPaint = Paint()
+            borderPaint.color = Color.WHITE
+            borderPaint.alpha = 20 // Reduced opacity for more transparency
+            borderPaint.style = Paint.Style.STROKE
+            borderPaint.strokeWidth = 1f
+            canvas.drawRoundRect(0f, 0f, width.toFloat(), height.toFloat(), height.toFloat() / 2, height.toFloat() / 2, borderPaint)
+            
+            // Draw progress bar with glassmorphism effect
+            val progressWidth = width * current / max.toFloat()
+            
+            if (progressWidth > 0) {
+                // Create blue glassmorphism effect for progress
+                val glassPaint = Paint()
+                val blueColor = Color.parseColor("#4A90D9")
+                glassPaint.color = blueColor
+                glassPaint.alpha = 140 // Reduced opacity for more transparency
                 
                 // Draw main progress bar
                 rect.set(0f, 0f, progressWidth, height.toFloat())
-                canvas?.drawRect(rect, paint)
+                canvas.drawRoundRect(rect, height.toFloat() / 2, height.toFloat() / 2, glassPaint)
+                
+                // Add inner border to progress bar
+                val progressBorderPaint = Paint()
+                progressBorderPaint.color = Color.WHITE
+                progressBorderPaint.alpha = 40 // Reduced opacity for more transparency
+                progressBorderPaint.style = Paint.Style.STROKE
+                progressBorderPaint.strokeWidth = 1f
+                canvas.drawRoundRect(rect, height.toFloat() / 2, height.toFloat() / 2, progressBorderPaint)
                 
                 // Add glass highlight effect
                 val highlightPaint = Paint()
                 highlightPaint.color = Color.WHITE
-                highlightPaint.alpha = 60
+                highlightPaint.alpha = 60 // Reduced opacity for more transparency
                 
-                // Draw diagonal highlight
-                val highlightPath = Path()
-                val heightFloat = height.toFloat()
-                highlightPath.moveTo(0f, 0f)
-                highlightPath.lineTo(progressWidth + heightFloat, -heightFloat)
-                highlightPath.lineTo(progressWidth + heightFloat, heightFloat)
-                highlightPath.lineTo(0f, 2 * heightFloat)
-                highlightPath.close()
-                canvas?.drawPath(highlightPath, highlightPaint)
+                // Draw top highlight
+                val highlightRect = RectF(0f, 0f, progressWidth, height.toFloat() / 2)
+                canvas.drawRoundRect(highlightRect, height.toFloat() / 2, height.toFloat() / 2, highlightPaint)
+                
+                // Draw subtle gradient overlay for depth
+                val gradientPaint = Paint()
+                gradientPaint.shader = LinearGradient(
+                    0f,
+                    0f,
+                    0f,
+                    height.toFloat(),
+                    Color.parseColor("#30FFFFFF"), // Reduced opacity for more transparency
+                    Color.parseColor("#00FFFFFF"),
+                    Shader.TileMode.CLAMP
+                )
+                canvas.drawRoundRect(rect, height.toFloat() / 2, height.toFloat() / 2, gradientPaint)
+            }
+            
+            if (seekMode) {
+                // Calculate marker position based on current progress
+                val markerPosition = width * current / max.toFloat()
+                
+                // Draw a circular marker at the current progress position
+                val markerSize = height * 1.5f
+                val halfMarkerSize = markerSize / 2
+                
+                // Draw marker background
+                val markerPaint = Paint()
+                markerPaint.color = Color.parseColor("#4A90D9")
+                markerPaint.alpha = 160 // Reduced opacity for more transparency
+                canvas.drawCircle(markerPosition, height / 2f, halfMarkerSize, markerPaint)
+                
+                // Draw marker border
+                val markerBorderPaint = Paint()
+                markerBorderPaint.color = Color.WHITE
+                markerBorderPaint.alpha = 120 // Reduced opacity for more transparency
+                markerBorderPaint.style = Paint.Style.STROKE
+                markerBorderPaint.strokeWidth = 2f
+                canvas.drawCircle(markerPosition, height / 2f, halfMarkerSize - 1, markerBorderPaint)
+                
+                // Draw marker highlight
+                val markerHighlightPaint = Paint()
+                markerHighlightPaint.color = Color.WHITE
+                markerHighlightPaint.alpha = 80 // Reduced opacity for more transparency
+                canvas.drawCircle(markerPosition - halfMarkerSize / 3, height / 2f - halfMarkerSize / 3, halfMarkerSize / 4, markerHighlightPaint)
             }
         }
     }
