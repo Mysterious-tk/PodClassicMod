@@ -64,10 +64,9 @@ class TextView : androidx.appcompat.widget.AppCompatTextView {
             if (value == field) {
                 return
             }
-            ellipsize = if (value) {
-                TextUtils.TruncateAt.MARQUEE
-            } else {
-                TextUtils.TruncateAt.END
+            // 只在启用跑马灯时设置 MARQUEE，不启用时不改变 ellipsize（保持 null 不显示省略号）
+            if (value) {
+                ellipsize = TextUtils.TruncateAt.MARQUEE
             }
             field = value
         }

@@ -557,6 +557,8 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
             rightIcon.scaleType = ImageView.ScaleType.CENTER
             leftText.setSingleLine()
             rightText.setSingleLine()
+            // 左侧文本不显示省略号，填不下就直接截断
+            leftText.ellipsize = null
             addView(leftText, layoutParams1)
             addView(rightText, layoutParams2)
             addView(rightIcon, layoutParams3)
@@ -683,7 +685,7 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
             }
             // 根据是否需要为右侧时间预留空间来设置左侧文本的右侧内边距
             if (reserveSpaceForTime) {
-                leftText.paddingRight = DEFAULT_PADDING * 8
+                leftText.paddingRight = DEFAULT_PADDING * 10
             } else {
                 leftText.paddingRight = DEFAULT_PADDING
             }

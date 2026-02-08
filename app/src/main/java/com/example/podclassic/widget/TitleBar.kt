@@ -298,7 +298,8 @@ class TitleBar : FrameLayout {
                 else -> setMeasuredDimension(Values.screenWidth, height)
             }
              */
-            setMeasuredDimension((Values.screenWidth / 10), height)
+            // 使用固定宽度，避免横屏时被拉长
+            setMeasuredDimension((height * 1.8f).toInt(), height)
         }
 
         fun refreshBattery() {
