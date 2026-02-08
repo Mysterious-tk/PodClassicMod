@@ -52,14 +52,36 @@ class SlideController3rd : View {
         val x = MeasureSpec.getSize(widthMeasureSpec)
         val y = MeasureSpec.getSize(heightMeasureSpec)
         centerX = x / 2f
-        centerY = y / 2f
+        centerY = y * 0.6f // 转盘位置再往上一点，移到屏幕60%高度处
 
         val center = min(centerX, centerY)
 
-        maxR = center * (center / (center + abs(centerX - centerY) + Values.screenWidth / 12))
+        // 增大转盘大小，调整计算比例
+        maxR = center * (center / (center + abs(centerX - centerY) + Values.screenWidth / 16))
 
         minR = maxR / 16 * 5
 
+    }
+
+    // 将白色图标转换为橙色图标
+    private fun getOrangeBitmap(bitmap: Bitmap): Bitmap {
+        val orangeBitmap = bitmap.copy(Bitmap.Config.ARGB_8888, true)
+        val width = orangeBitmap.width
+        val height = orangeBitmap.height
+        val pixels = IntArray(width * height)
+        orangeBitmap.getPixels(pixels, 0, width, 0, 0, width, height)
+        
+        for (i in pixels.indices) {
+            val pixel = pixels[i]
+            val alpha = (pixel shr 24) and 0xff
+            if (alpha > 0) {
+                // 将非透明像素改为橙色
+                pixels[i] = (alpha shl 24) or (0xff shl 16) or (0x99 shl 8) or 0x00
+            }
+        }
+        
+        orangeBitmap.setPixels(pixels, 0, width, 0, 0, width, height)
+        return orangeBitmap
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -81,27 +103,27 @@ class SlideController3rd : View {
         val button3X = buttonSpacing * 3
         val button4X = buttonSpacing * 4
 
-        // 绘制四个按钮
+        // 绘制四个橙色按钮
         canvas.drawBitmap(
-            Icons.PREV.bitmap,
+            getOrangeBitmap(Icons.PREV.bitmap),
             button1X - Icons.PREV.width / 2,
             buttonRowY - Icons.PREV.height / 2,
             paint
         )
         canvas.drawBitmap(
-            Icons.MENU.bitmap,
+            getOrangeBitmap(Icons.MENU.bitmap),
             button2X - Icons.MENU.width / 2,
             buttonRowY - Icons.MENU.height / 2,
             paint
         )
         canvas.drawBitmap(
-            Icons.PAUSE.bitmap,
+            getOrangeBitmap(Icons.PAUSE.bitmap),
             button3X - Icons.PAUSE.width / 2,
             buttonRowY - Icons.PAUSE.height / 2,
             paint
         )
         canvas.drawBitmap(
-            Icons.NEXT.bitmap,
+            getOrangeBitmap(Icons.NEXT.bitmap),
             button4X - Icons.NEXT.width / 2,
             buttonRowY - Icons.NEXT.height / 2,
             paint
