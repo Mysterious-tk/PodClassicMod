@@ -72,6 +72,7 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
     private val lyric: com.example.podclassic.widget.TextView?
     private val icon1: androidx.appcompat.widget.AppCompatImageView
     private val icon2: androidx.appcompat.widget.AppCompatImageView
+    private val icon3: androidx.appcompat.widget.AppCompatImageView
     private var imageCenter = 0;
 
     private val progressTimer =
@@ -138,6 +139,7 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
         screenLayout = (view.findViewById(R.id.seek_bar) as ScreenLayout).apply { add(progressBar) }
         icon1 = view.findViewById(R.id.ic_play_mode)
         icon2 = view.findViewById(R.id.ic_repeat_mode)
+        icon3 = view.findViewById(R.id.ic_stop_time)
         stopTime = view.findViewById<androidx.appcompat.widget.AppCompatTextView>(R.id.tv_stop_time).apply {
             setTextColor(Colors.text)
         }
@@ -249,8 +251,10 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
         val time = MediaPresenter.getStopTime()
         if (time == 0) {
             stopTime?.visibility = View.GONE
+            icon3.visibility = View.GONE
         } else {
             stopTime?.visibility = View.VISIBLE
+            icon3.visibility = View.VISIBLE
             stopTime?.text = "${time}分钟"
         }
     }
@@ -329,6 +333,9 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
             progress += slideVal * 2000
             progress = progress.coerceAtLeast(0).coerceAtMost(duration)
             progressBar.setCurrent(progress)
+            // 拖动进度条时也更新时间显示
+            currentTime.text = formatTime(progress)
+            remainingTime.text = "-" + formatTime(duration - progress)
             return true
         } else {
             val currentTime = System.currentTimeMillis()

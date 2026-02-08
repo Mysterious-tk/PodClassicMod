@@ -36,6 +36,14 @@
                 android:layout_height="@dimen/icon_size"
                 android:layout_marginEnd="8dp" />
 
+            <!-- 睡眠倒计时图标 -->
+            <androidx.appcompat.widget.AppCompatImageView
+                android:id="@+id/ic_stop_time"
+                android:layout_width="@dimen/icon_size"
+                android:layout_height="@dimen/icon_size"
+                android:src="@drawable/ic_access_time_grey_600_18dp"
+                android:visibility="gone" />
+
             <!-- 睡眠倒计时 -->
             <androidx.appcompat.widget.AppCompatTextView
                 android:id="@+id/tv_stop_time"
@@ -54,7 +62,7 @@
         android:id="@+id/container"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_margin="@dimen/padding_0"
+        android:layout_margin="0dp"
         android:layout_weight="5"
         android:gravity="start|center_vertical"
         android:orientation="horizontal"
@@ -67,17 +75,19 @@
             android:id="@+id/image"
             android:layout_width="160dp"
             android:layout_height="200dp"
-            android:layout_marginStart="0dp"
+            android:layout_marginStart="6dp"
             android:layout_marginTop="20dp"
-            android:layout_marginEnd="12dp"
+            android:layout_marginEnd="8dp"
             android:scaleType="centerCrop" />
 
-        <!-- 歌曲信息区域 -->
+        <!-- 歌曲信息区域 - 占满剩余空间 -->
         <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
             android:gravity="start|center_vertical"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:layout_marginEnd="6dp">
 
             <!-- 歌曲标题 -->
             <androidx.appcompat.widget.AppCompatTextView
