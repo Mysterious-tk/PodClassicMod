@@ -8,6 +8,7 @@ import android.graphics.*
 import android.os.Bundle
 import android.view.*
 import android.widget.FrameLayout
+import android.widget.LinearLayout
 import androidx.appcompat.app.AppCompatActivity
 import com.example.podclassic.R
 import com.example.podclassic.base.Core
@@ -192,33 +193,7 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
     }
     override fun onMeasure(widthMeasureSec: Int, heightMeasureSpec: Int) {
         super.onMeasure(widthMeasureSec, heightMeasureSpec)
-        val imageWidth = measuredHeight / 4 * 3
-        val halfImageWidth = imageWidth / 2
-        val imageBottom = measuredHeight / 2 + halfImageWidth
-        val centerX = (image.left + image.right) / 2
-        val centerY = imageBottom - halfImageWidth
-
         imageCenter = measuredWidth / 2
-        val scale = -abs(imageCenter - centerX) / 4
-        // 不缩放，保持原始大小
-        image.scaleX = 1f
-        image.scaleY = 1f
-
-        // 添加 15 度旋转效果
-        image.rotationY = 15f
-        val temp = (imageCenter - (image.left + image.right) / 2).toFloat()
-        image.z = abs(temp * 3)
-/*
-        val viewOutlineProvider: ViewOutlineProvider = object : ViewOutlineProvider() {
-            override fun getOutline(View : View?, outline: Outline) {
-                outline.setRoundRect(0, 0, image.getWidth(), image.getHeight(), 5f)
-            }
-        }
-        image.setOutlineProvider(viewOutlineProvider)
-        image.setClipToOutline(true)
-*/
-
-
     }
 
     override fun enter(): Boolean {
@@ -298,17 +273,66 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
     private val intentFilter = IntentFilter("android.media.VOLUME_CHANGED_ACTION")
 
     override fun onViewAdd() {
-        Log.d("MusicPlayerView", "onViewAdd() started")
+        Log.d("MusicPlayerView", "========== onViewAdd() started ==========")
+        Log.d("MusicPlayerView", "MusicPlayerView width=$width, height=$height")
+        Log.d("MusicPlayerView", "MusicPlayerView measuredWidth=$measuredWidth, measuredHeight=$measuredHeight")
+        Log.d("MusicPlayerView", "Parent=${parent?.javaClass?.simpleName}, Parent size=${(parent as? ViewGroup)?.width}x${(parent as? ViewGroup)?.height}")
+        
         if (!broadcastReceiverRegistered) {
             context.registerReceiver(volumeBroadcastReceiver, intentFilter)
             broadcastReceiverRegistered = true
             Log.d("MusicPlayerView", "Broadcast receiver registered")
         }
-        onMusicChange()
-        Log.d("MusicPlayerView", "onMusicChange() called")
-        onPlayStateChange()
-        Log.d("MusicPlayerView", "onPlayStateChange() called")
-        // 更新当前时间显示，确保暂停状态下也能正确显示当前播放时间
+        
+        // 获取根视图并记录其状态
+        val rootView = getChildAt(0)
+        Log.d("MusicPlayerView", "RootView=$rootView, RootView type=${rootView?.javaClass?.simpleName}")
+        Log.d("MusicPlayerView", "RootView width=${rootView?.width}, height=${rootView?.height}")
+        Log.d("MusicPlayerView", "RootView measuredWidth=${rootView?.measuredWidth}, measuredHeight=${rootView?.measuredHeight}")
+        Log.d("MusicPlayerView", "RootView paddingTop=${rootView?.paddingTop}, paddingBottom=${rootView?.paddingBottom}")
+        Log.d("MusicPlayerView", "RootView layoutParams=${rootView?.layoutParams}")
+        
+        // 记录container状态
+        Log.d("MusicPlayerView", "Container width=${container.width}, height=${container.height}")
+        Log.d("MusicPlayerView", "Container measuredWidth=${container.measuredWidth}, measuredHeight=${container.measuredHeight}")
+        Log.d("MusicPlayerView", "Container layoutParams=${container.layoutParams}")
+        
+        // 记录图片状态
+        Log.d("MusicPlayerView", "Image width=${image.width}, height=${image.height}")
+        Log.d("MusicPlayerView", "Image y=${image.y}, top=${image.top}, bottom=${image.bottom}")
+        
+        // 重置专辑封面状态
+        image.apply {
+            scaleX = 1f
+            scaleY = 1f
+            rotationY = 15f
+            z = 0f
+            visibility = VISIBLE
+            alpha = 1f
+        }
+        
+        // 重置所有文本视图的状态
+        listOf(title, artist, album, index, currentTime, remainingTime).forEach {
+            it.alpha = 1f
+            it.visibility = VISIBLE
+        }
+        
+        // 延迟执行布局检查
+        post {
+            Log.d("MusicPlayerView", "---------- post() callback ----------")
+            val postRootView = getChildAt(0) as? LinearLayout
+            Log.d("MusicPlayerView", "After post - RootView width=${postRootView?.width}, height=${postRootView?.height}")
+            Log.d("MusicPlayerView", "After post - RootView paddingTop=${postRootView?.paddingTop}, paddingBottom=${postRootView?.paddingBottom}")
+            Log.d("MusicPlayerView", "After post - MusicPlayerView width=$width, height=$height")
+            Log.d("MusicPlayerView", "After post - Container width=${container.width}, height=${container.height}")
+            Log.d("MusicPlayerView", "After post - Container top=${container.top}, y=${container.y}")
+            Log.d("MusicPlayerView", "After post - Image y=${image.y}, top=${image.top}")
+            Log.d("MusicPlayerView", "---------- post() end ----------")
+        }
+        
+        // 注意：onMusicChange() 和 onPlayStateChange() 会通过 Observer.onViewAdd() -> LiveData.onStart() 自动调用
+        // 这里不需要手动调用，避免重复执行
+        // 只需要更新进度显示
         onProgress(MediaPresenter.getProgress())
         Log.d("MusicPlayerView", "onProgress() called to update time display")
 

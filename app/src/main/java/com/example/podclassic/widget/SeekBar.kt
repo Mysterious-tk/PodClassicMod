@@ -166,13 +166,6 @@ class SeekBar(context: Context) : LinearLayout(context) {
         progressView.layoutParams = progressParams
         
         rightTime.layoutParams = LinearLayout.LayoutParams(180, ViewGroup.LayoutParams.MATCH_PARENT)
-        
-        // Add top margin to the entire SeekBar to move everything down
-        val layoutParams = this.layoutParams as? ViewGroup.MarginLayoutParams
-        if (layoutParams != null) {
-            layoutParams.topMargin = 20 // Move the entire SeekBar down
-            this.layoutParams = layoutParams
-        }
     }
 
     var textVisibility = View.VISIBLE

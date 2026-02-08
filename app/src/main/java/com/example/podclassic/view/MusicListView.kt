@@ -226,7 +226,12 @@ class MusicListView : FrameLayout, ScreenView {
                 MediaPresenter.setPlaylist(musicList, index)
             }
 
-            Core.addView(MusicPlayerView(context))
+            // 根据主题选择使用哪个播放器视图
+            if (SPManager.getInt(SPManager.Theme.SP_NAME) == SPManager.Theme.IPOD_3RD.id) {
+                Core.addView(MusicPlayerView3rd(context))
+            } else {
+                Core.addView(MusicPlayerView(context))
+            }
             true
         } else {
             false
