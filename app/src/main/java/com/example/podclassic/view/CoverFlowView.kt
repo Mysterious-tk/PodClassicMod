@@ -81,18 +81,22 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
     }
 
     private fun initViews() {
-        // 初始化图片视图
+        // 禁用裁剪，确保旋转后的图片能完整显示
+        setClipChildren(false)
+        setClipToPadding(false)
+
+        // 初始化文本视图（先添加，确保在底层）
+        albumTitle.gravity = Gravity.CENTER_HORIZONTAL
+        artistName.gravity = Gravity.CENTER_HORIZONTAL
+        addView(albumTitle)
+        addView(artistName)
+
+        // 初始化图片视图（后添加，确保在上层，不会被文本挡住）
         repeat(MAX_SIZE) {
             val imageView = CoverImageView(context)
             imageViews.add(imageView)
             addView(imageView)
         }
-
-        // 初始化文本视图
-        albumTitle.gravity = Gravity.CENTER_HORIZONTAL
-        artistName.gravity = Gravity.CENTER_HORIZONTAL
-        addView(albumTitle)
-        addView(artistName)
 
         // 允许点击和获取焦点
         isClickable = true
@@ -387,7 +391,7 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
         
         // 调整旋转效果：保持明显但不过度
         val rotationAngle = if (distance > 0) {
-            val maxRotation = 75f
+            val maxRotation = 45f
         val rotationFactor = min(distance.toFloat() / imagePadding, 1.0f)
         -direction * maxRotation * rotationFactor
         } else {
@@ -491,7 +495,7 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
 
         // 只更新旋转和Z轴，不更新缩放和透明度（由动画控制）
         val rotationAngle = if (distance > 0) {
-            val maxRotation = 75f
+            val maxRotation = 45f
             val rotationFactor = min(distance.toFloat() / imagePadding, 1.0f)
             -direction * maxRotation * rotationFactor
         } else {
@@ -634,9 +638,8 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
         androidx.appcompat.widget.AppCompatImageView(context) {
 
         init {
-            // 使用 CENTER_CROP 实现「先缩放，后裁剪」的效果
-            // 保持宽高比并填满正方形显示区域（类似 iOS 的 UIViewContentModeScaleAspectFill）
-            scaleType = ScaleType.CENTER_CROP
+            // 使用 FIT_CENTER 保持原始比例展示专辑封面
+            scaleType = ScaleType.FIT_CENTER
         }
 
         private var album: MusicList? = null
@@ -703,54 +706,40 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
         @Suppress("DEPRECATION")
         private fun getReflectBitmap(bitmap: Bitmap): Bitmap {
             val reflectionGap = 0
+            val width = bitmap.width
+            val height = bitmap.height
 
-            // 先将原图裁剪为正方形（居中裁剪）
-            val size = min(bitmap.width, bitmap.height)
-            val x = (bitmap.width - size) / 2
-            val y = (bitmap.height - size) / 2
-            @Suppress("DEPRECATION", "UseKtx")
-            val squareBitmap = Bitmap.createBitmap(bitmap, x, y, size, size)
-
-            // 创建 Bitmap：宽度为 size，高度为 size + 倒影高度（size/2）
-            // 专辑封面显示为完整的 1:1 正方形，倒影是额外附加的部分
-            val reflectionHeight = size / 2
-            val totalHeight = size + reflectionHeight + reflectionGap
             val matrix = Matrix()
             matrix.preScale(1f, -1f)
             @Suppress("DEPRECATION", "UseKtx")
             val reflectionImage =
-                Bitmap.createBitmap(squareBitmap, 0, size / 2, size, size / 2, matrix, false)
+                Bitmap.createBitmap(bitmap, 0, height / 2, width, height / 2, matrix, false)
             @Suppress("DEPRECATION", "UseKtx")
             val bitmap4Reflection =
-                Bitmap.createBitmap(size, totalHeight, Bitmap.Config.ARGB_8888)
+                Bitmap.createBitmap(width, height + height / 2 + reflectionGap, Bitmap.Config.ARGB_8888)
             val canvasRef = Canvas(bitmap4Reflection)
 
-            // 绘制专辑封面（完整的 1:1 正方形，占满上方区域）
-            canvasRef.drawBitmap(squareBitmap, 0f, 0f, null)
+            // 绘制专辑封面（保持原始比例）
+            canvasRef.drawBitmap(bitmap, 0f, 0f, null)
 
             // 绘制倒影（附加在专辑封面下方）
             canvasRef.drawRect(
                 0f,
-                size.toFloat(),
-                size.toFloat(),
-                (size + reflectionGap).toFloat(),
+                height.toFloat(),
+                width.toFloat(),
+                (height + reflectionGap).toFloat(),
                 Paint().apply { isAntiAlias = true }
             )
-            canvasRef.drawBitmap(reflectionImage, 0f, (size + reflectionGap).toFloat(), null)
-
-            // 回收临时创建的 squareBitmap
-            if (squareBitmap !== bitmap) {
-                squareBitmap.recycle()
-            }
+            canvasRef.drawBitmap(reflectionImage, 0f, (height + reflectionGap).toFloat(), null)
             reflectionImage.recycle()
 
             // 为倒影添加渐变透明度
             val paint = Paint()
             val shader = LinearGradient(
                 0f,
-                (size + reflectionGap).toFloat(),
+                (height + reflectionGap).toFloat(),
                 0f,
-                totalHeight.toFloat(),
+                bitmap4Reflection.height.toFloat(),
                 0x70ffffff,
                 0x00ffffff,
                 Shader.TileMode.CLAMP
@@ -759,9 +748,9 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
             paint.xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN)
             canvasRef.drawRect(
                 0f,
-                (size + reflectionGap).toFloat(),
-                size.toFloat(),
-                totalHeight.toFloat(),
+                height.toFloat(),
+                width.toFloat(),
+                bitmap4Reflection.height.toFloat(),
                 paint
             )
 

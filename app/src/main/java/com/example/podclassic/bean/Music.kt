@@ -61,7 +61,7 @@ data class Music(
         val reflectionImage =
             Bitmap.createBitmap(bitmap, 0, height / 2, width, height / 2, matrix, false)
         val bitmap4Reflection =
-            Bitmap.createBitmap(width, height + height / 2, Bitmap.Config.ARGB_8888)
+            Bitmap.createBitmap(width, height + height / 2 + reflectionGap, Bitmap.Config.ARGB_8888)
         val canvasRef = Canvas(bitmap4Reflection)
 
         canvasRef.drawBitmap(bitmap, 0f, 0f, null)
@@ -93,6 +93,7 @@ data class Music(
             (bitmap4Reflection.height + reflectionGap).toFloat(),
             paint
         )
+        reflectionImage.recycle()
         return bitmap4Reflection
     }
 

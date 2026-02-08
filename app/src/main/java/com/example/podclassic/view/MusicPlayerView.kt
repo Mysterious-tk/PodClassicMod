@@ -198,15 +198,13 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
 
         imageCenter = measuredWidth / 2
         val scale = -abs(imageCenter - centerX) / 4
-        image.animate().scaleX(0.8f).scaleY(0.9f)
+        // 不缩放，保持原始大小
+        image.scaleX = 1f
+        image.scaleY = 1f
 
+        // 添加 15 度旋转效果
+        image.rotationY = 15f
         val temp = (imageCenter - (image.left + image.right) / 2).toFloat()
-        if (temp == 0f) {
-            image.rotationY = 0f
-        } else {
-            val x = temp / width.toFloat()
-            image.rotationY = sgn(x) * (1f / (1f + 3f.pow(-18f * abs(x))) - 0.5f) * 40f
-        }
         image.z = abs(temp * 3)
 /*
         val viewOutlineProvider: ViewOutlineProvider = object : ViewOutlineProvider() {

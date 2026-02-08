@@ -4,7 +4,9 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:padding="@dimen/padding_1"
-    android:background="@color/background">
+    android:background="@color/background"
+    android:clipChildren="false"
+    android:clipToPadding="false">
 
     <!-- 顶部标题栏 - iPod Classic 风格：状态图标右边 -->
     <FrameLayout
@@ -54,17 +56,21 @@
         android:layout_height="0dp"
         android:layout_margin="@dimen/padding_0"
         android:layout_weight="5"
-        android:gravity="center_vertical"
+        android:gravity="start|center_vertical"
         android:orientation="horizontal"
-        android:padding="0dp">
+        android:padding="0dp"
+        android:clipChildren="false"
+        android:clipToPadding="false">
 
-        <!-- 专辑封面 - 调整尺寸，留出更多空间给歌曲信息 -->
+        <!-- 专辑封面 - 靠左上显示，使用带倒影的图片 -->
         <com.example.podclassic.widget.ImageView
             android:id="@+id/image"
-            android:layout_width="120dp"
-            android:layout_height="120dp"
-            android:layout_marginEnd="6dp"
-            android:scaleType="fitXY" />
+            android:layout_width="160dp"
+            android:layout_height="200dp"
+            android:layout_marginStart="0dp"
+            android:layout_marginTop="20dp"
+            android:layout_marginEnd="12dp"
+            android:scaleType="centerCrop" />
 
         <!-- 歌曲信息区域 -->
         <LinearLayout
