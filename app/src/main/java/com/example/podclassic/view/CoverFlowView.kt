@@ -307,35 +307,25 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
             interpolator = LinearInterpolator()
             addUpdateListener { animation ->
                 val currentValue = animation.animatedValue as Float
-                val progress = currentValue / targetValue
-                
+
                 // 更新所有图片位置
                 for (i in imageViews.indices) {
                     val imageView = imageViews[i]
                     val relativeIndex = i - CENTER_INDEX
                     val baseCenterX = imageCenterX + relativeIndex * imagePadding
                     val currentCenterX = baseCenterX + currentValue.toInt()
-                    
-                    // 为中心ImageView添加特殊动画效果
+
                     if (i == CENTER_INDEX) {
-                        // 中心唱片的幻灯片效果
-                        val scaleProgress = if (progress < 0.5f) {
-                            1.0f - progress * 0.4f // 缩小
-                        } else {
-                            0.6f + (progress - 0.5f) * 0.8f // 放大
-                        }
-                        val alphaProgress = if (progress < 0.5f) {
-                            1.0f - progress * 0.8f // 淡出
-                        } else {
-                            0.2f + (progress - 0.5f) * 1.6f // 淡入
-                        }
-                        
-                        imageView.scaleX = scaleProgress
-                        imageView.scaleY = scaleProgress
-                        imageView.alpha = alphaProgress
+                        // 中心专辑：只更新位置，不更新缩放（保持 0.7f）
+                        updateImageViewPositionForAnim(currentCenterX, imageView)
+                        // 滚动过程中主专辑保持缩小状态（0.7f），丝滑滚动
+                        imageView.scaleX = 0.7f
+                        imageView.scaleY = 0.7f
+                        imageView.alpha = 0.9f
+                    } else {
+                        // 其他专辑：正常更新位置和缩放
+                        updateImageViewPosition(currentCenterX, imageView, 0)
                     }
-                    
-                    updateImageViewPosition(currentCenterX, imageView, 0)
                 }
             }
             addListener(object : AnimatorListenerAdapter() {
@@ -344,10 +334,31 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
                     currentDragOffset = 0
                     updateCenterText()
 
-                    // 重置中心ImageView的状态
-                    centerImageView.scaleX = 1.0f
-                    centerImageView.scaleY = 1.0f
-                    centerImageView.alpha = 1.0f
+                    // 找到实际在中心位置的 ImageView（根据当前绑定的专辑数据）
+                    val centerAlbum = albums.getOrNull(currentCenterAlbumIndex)
+                    var actualCenterImageView: CoverImageView? = null
+
+                    // 确保所有专辑先重置为 0.7f
+                    for (imageView in imageViews) {
+                        imageView.animate().cancel()
+                        imageView.scaleX = 0.7f
+                        imageView.scaleY = 0.7f
+                        imageView.alpha = 0.9f
+
+                        // 检查是否是当前中心专辑
+                        if (imageView.getTag(R.id.tag_album) == centerAlbum) {
+                            actualCenterImageView = imageView
+                        }
+                    }
+
+                    // 主专辑从 0.7 放大到 1.0
+                    actualCenterImageView?.animate()
+                        ?.scaleX(1.0f)
+                        ?.scaleY(1.0f)
+                        ?.alpha(1.0f)
+                        ?.setDuration(200)
+                        ?.setInterpolator(DecelerateInterpolator())
+                        ?.start()
 
                     // 更新边界外的图片视图数据（visibleRange范围外的），避免显示旧图片
                     updateBoundaryImageViews()
@@ -371,13 +382,8 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
         val direction = if (centerX < imageCenterX) -1 else if (centerX > imageCenterX) 1 else 0
         
         // 添加尺寸渐变效果
-        val scale = if (distance > 0) {
-            val minScale = 0.8f
-            val scaleFactor = min(distance.toFloat() / imagePadding, 1.0f)
-            1.0f - (1.0f - minScale) * scaleFactor
-        } else {
-            1.0f
-        }
+        // 主专辑旁边的所有专辑统一使用 0.7f 缩放系数
+        val scale = if (distance > 0) 0.7f else 1.0f
         
         // 调整旋转效果：保持明显但不过度
         val rotationAngle = if (distance > 0) {
@@ -439,7 +445,7 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
     private fun updateImageViewPositionAndData(centerX: Int, imageView: CoverImageView, albumIndex: Int) {
         // 更新位置
         updateImageViewPosition(centerX, imageView, albumIndex)
-        
+
         // 更新ImageView的数据
         if (albumIndex in 0 until albums.size) {
             imageView.bindItem(albums[albumIndex])
@@ -448,13 +454,70 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
         }
     }
 
+    /**
+     * 动画过程中使用：只更新位置，不更新缩放和透明度
+     * 用于中心专辑在滚动动画中保持固定缩放
+     */
+    private fun updateImageViewPositionForAnim(centerX: Int, imageView: CoverImageView) {
+        // 计算与中心的距离，用于确定层级
+        val distance = abs(imageCenterX - centerX)
+        val direction = if (centerX < imageCenterX) -1 else if (centerX > imageCenterX) 1 else 0
+
+        // 添加透视效果：远离中心的专辑封面添加X轴平移
+        val perspectiveOffset = if (distance > 0) {
+            val perspectiveFactor = min(distance.toFloat() / (imagePadding * 1.5f), 1.0f)
+            direction * halfImageWidth * 0.3f * perspectiveFactor
+        } else {
+            0f
+        }
+
+        // 计算布局位置（使用固定缩放 0.7f 计算）
+        val actualHalfWidth = max(1, halfImageWidth)
+        val scaledHalfWidth = actualHalfWidth * 0.7f
+        val left = centerX + perspectiveOffset - scaledHalfWidth
+        val top = imageCenterY - scaledHalfWidth
+        val right = centerX + perspectiveOffset + scaledHalfWidth
+        val bottom = imageCenterY + scaledHalfWidth
+
+        // 只在位置真正改变时才更新布局
+        val leftInt = left.toInt()
+        val topInt = top.toInt()
+        val rightInt = right.toInt()
+        val bottomInt = bottom.toInt()
+
+        if (imageView.left != leftInt || imageView.top != topInt || imageView.right != rightInt || imageView.bottom != bottomInt) {
+            imageView.layout(leftInt, topInt, rightInt, bottomInt)
+        }
+
+        // 只更新旋转和Z轴，不更新缩放和透明度（由动画控制）
+        val rotationAngle = if (distance > 0) {
+            val maxRotation = 75f
+            val rotationFactor = min(distance.toFloat() / imagePadding, 1.0f)
+            -direction * maxRotation * rotationFactor
+        } else {
+            0f
+        }
+        imageView.rotationY = rotationAngle
+        imageView.z = -distance.toFloat() * 2
+    }
+
     private fun updateAllImageViews() {
         // 更新所有图片数据和位置
+        // 主专辑与两边专辑的间距更大，两边专辑之间更紧密
+        val centerGap = (imagePadding * 1.3f).toInt()  // 主专辑与旁边专辑的间距
         for (i in imageViews.indices) {
             val imageView = imageViews[i]
             val relativeIndex = i - CENTER_INDEX
             val albumIndex = currentCenterAlbumIndex + relativeIndex
-            val baseCenterX = imageCenterX + relativeIndex * imagePadding
+            // 计算位置：主专辑旁边的使用更大的间距，其他的使用标准间距
+            val baseCenterX = when (relativeIndex) {
+                0 -> imageCenterX
+                1, -1 -> imageCenterX + relativeIndex * centerGap
+                else -> {
+                    val direction = if (relativeIndex > 0) 1 else -1
+                    imageCenterX + direction * centerGap + (relativeIndex - direction) * imagePadding
+                }
+            }
             updateImageViewPositionAndData(baseCenterX, imageView, albumIndex)
         }
     }
@@ -505,11 +568,12 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
         // 根据屏幕宽高比动态调整imagePadding，确保在横屏下也有合适的间距
         val screenRatio = measuredWidth.toFloat() / measuredHeight.toFloat()
         imagePadding = if (screenRatio > 1.5f) {
-            (measuredWidth - imageWidth) / 7
+            (measuredWidth - imageWidth) / 5
         } else if (screenRatio > 1.0f) {
-            (measuredWidth - imageWidth) / 6
+            (measuredWidth - imageWidth) / 4
         } else {
-            (measuredWidth - imageWidth) / 6
+            // 竖屏：增大间距，让主专辑与两边专辑之间留出更多空隙
+            (measuredWidth - imageWidth) / 3
         }
         
         // 确保 imagePadding 至少为 50，避免间距过小导致的滑动问题
@@ -566,8 +630,14 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
     }
 
     // 内部CoverImageView类
-    private class CoverImageView(context: Context) : 
+    private class CoverImageView(context: Context) :
         androidx.appcompat.widget.AppCompatImageView(context) {
+
+        init {
+            // 使用 CENTER_CROP 实现「先缩放，后裁剪」的效果
+            // 保持宽高比并填满正方形显示区域（类似 iOS 的 UIViewContentModeScaleAspectFill）
+            scaleType = ScaleType.CENTER_CROP
+        }
 
         private var album: MusicList? = null
         private val defaultBitmap by lazy { getReflectBitmap(Icons.DEFAULT.bitmap) }
@@ -633,33 +703,54 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
         @Suppress("DEPRECATION")
         private fun getReflectBitmap(bitmap: Bitmap): Bitmap {
             val reflectionGap = 0
-            val width = bitmap.width
-            val height = bitmap.height
+
+            // 先将原图裁剪为正方形（居中裁剪）
+            val size = min(bitmap.width, bitmap.height)
+            val x = (bitmap.width - size) / 2
+            val y = (bitmap.height - size) / 2
+            @Suppress("DEPRECATION", "UseKtx")
+            val squareBitmap = Bitmap.createBitmap(bitmap, x, y, size, size)
+
+            // 创建 Bitmap：宽度为 size，高度为 size + 倒影高度（size/2）
+            // 专辑封面显示为完整的 1:1 正方形，倒影是额外附加的部分
+            val reflectionHeight = size / 2
+            val totalHeight = size + reflectionHeight + reflectionGap
             val matrix = Matrix()
             matrix.preScale(1f, -1f)
             @Suppress("DEPRECATION", "UseKtx")
-            val reflectionImage = 
-                Bitmap.createBitmap(bitmap, 0, height / 2, width, height / 2, matrix, false)
+            val reflectionImage =
+                Bitmap.createBitmap(squareBitmap, 0, size / 2, size, size / 2, matrix, false)
             @Suppress("DEPRECATION", "UseKtx")
-            val bitmap4Reflection = 
-                Bitmap.createBitmap(width, height + height / 2, Bitmap.Config.ARGB_8888)
+            val bitmap4Reflection =
+                Bitmap.createBitmap(size, totalHeight, Bitmap.Config.ARGB_8888)
             val canvasRef = Canvas(bitmap4Reflection)
 
-            canvasRef.drawBitmap(bitmap, 0f, 0f, null)
+            // 绘制专辑封面（完整的 1:1 正方形，占满上方区域）
+            canvasRef.drawBitmap(squareBitmap, 0f, 0f, null)
+
+            // 绘制倒影（附加在专辑封面下方）
             canvasRef.drawRect(
                 0f,
-                height.toFloat(),
-                width.toFloat(),
-                height + reflectionGap.toFloat(),
+                size.toFloat(),
+                size.toFloat(),
+                (size + reflectionGap).toFloat(),
                 Paint().apply { isAntiAlias = true }
             )
-            canvasRef.drawBitmap(reflectionImage, 0f, height + reflectionGap.toFloat(), null)
+            canvasRef.drawBitmap(reflectionImage, 0f, (size + reflectionGap).toFloat(), null)
+
+            // 回收临时创建的 squareBitmap
+            if (squareBitmap !== bitmap) {
+                squareBitmap.recycle()
+            }
+            reflectionImage.recycle()
+
+            // 为倒影添加渐变透明度
             val paint = Paint()
             val shader = LinearGradient(
                 0f,
-                bitmap.height.toFloat(),
+                (size + reflectionGap).toFloat(),
                 0f,
-                bitmap4Reflection.height.toFloat() + reflectionGap,
+                totalHeight.toFloat(),
                 0x70ffffff,
                 0x00ffffff,
                 Shader.TileMode.CLAMP
@@ -668,11 +759,12 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
             paint.xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN)
             canvasRef.drawRect(
                 0f,
-                height.toFloat(),
-                width.toFloat(),
-                (bitmap4Reflection.height + reflectionGap).toFloat(),
+                (size + reflectionGap).toFloat(),
+                size.toFloat(),
+                totalHeight.toFloat(),
                 paint
             )
+
             return bitmap4Reflection
         }
     }
