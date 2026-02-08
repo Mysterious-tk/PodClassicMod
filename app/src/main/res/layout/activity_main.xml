@@ -37,6 +37,12 @@
             android:id="@+id/slide_controller"
             android:layout_width="match_parent"
             android:layout_height="match_parent" />
+        
+        <com.example.podclassic.widget.SlideController3rd
+            android:id="@+id/slide_controller_3rd"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" 
+            android:visibility="gone" />
     </LinearLayout>
 
     <View

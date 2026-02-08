@@ -5,6 +5,7 @@ import android.os.Build
 import android.os.Environment
 import android.os.StatFs
 import android.util.Base64
+import com.example.podclassic.activity.MainActivity
 import com.example.podclassic.base.Core
 import com.example.podclassic.base.ScreenView
 import com.example.podclassic.media.PlayMode
@@ -322,11 +323,14 @@ class SettingsView(context: Context) : ListView(context), ScreenView {
                             (themeId + 1) % SPManager.Theme.values
                         )
                         Core.refresh()
+                        // 重新绑定控制器，确保主题切换后控制器仍然可以触摸
+                        (context as? MainActivity)?.rebindController()
                         listView.getCurrentItem().rightText =
                             when (SPManager.getInt(SPManager.Theme.SP_NAME)) {
                                 SPManager.Theme.RED.id -> SPManager.Theme.RED.title
                                 SPManager.Theme.BLACK.id -> SPManager.Theme.BLACK.title
                                 SPManager.Theme.WHITE.id -> SPManager.Theme.WHITE.title
+                                SPManager.Theme.IPOD_3RD.id -> SPManager.Theme.IPOD_3RD.title
                                 else -> ""
                             }
                         return true
@@ -335,6 +339,7 @@ class SettingsView(context: Context) : ListView(context), ScreenView {
                     SPManager.Theme.RED.id -> SPManager.Theme.RED.title
                     SPManager.Theme.BLACK.id -> SPManager.Theme.BLACK.title
                     SPManager.Theme.WHITE.id -> SPManager.Theme.WHITE.title
+                    SPManager.Theme.IPOD_3RD.id -> SPManager.Theme.IPOD_3RD.title
                     else -> ""
                 }
             ),

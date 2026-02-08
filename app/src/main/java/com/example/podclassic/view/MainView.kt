@@ -20,6 +20,7 @@ import com.example.podclassic.storage.SPManager
 import com.example.podclassic.util.FileUtil
 import com.example.podclassic.util.MediaStoreUtil
 import com.example.podclassic.values.Strings
+import com.example.podclassic.view.MusicPlayerView3rd
 import com.example.podclassic.widget.ListView
 import java.io.File
 import java.util.*
@@ -70,7 +71,11 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
 
     val item = ListView.Item(Strings.NOW_PLAYING, object : ListView.OnItemClickListener {
         override fun onItemClick(index: Int, listView: ListView): Boolean {
-            Core.addView(MusicPlayerView(context))
+            if (SPManager.getInt(SPManager.Theme.SP_NAME) == SPManager.Theme.IPOD_3RD.id) {
+                Core.addView(MusicPlayerView3rd(context))
+            } else {
+                Core.addView(MusicPlayerView(context))
+            }
             return true
         }
 

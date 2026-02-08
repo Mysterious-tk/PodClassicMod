@@ -54,8 +54,15 @@ class MainActivity : AppCompatActivity() {
             SPManager.setBoolean(SPManager.SP_STARTED, true)
             SPManager.reset()
         }
+        // 根据当前选择的主题来决定绑定哪个SlideController到Core
+        val isIpod3rdTheme = SPManager.getInt(SPManager.Theme.SP_NAME) == SPManager.Theme.IPOD_3RD.id
+        
         Core.bindActivity(
-            findViewById(R.id.slide_controller),
+            if (isIpod3rdTheme) {
+                findViewById<View>(R.id.slide_controller_3rd)
+            } else {
+                findViewById<View>(R.id.slide_controller)
+            },
             findViewById(R.id.screen),
             findViewById(R.id.dark_mode),
             this
@@ -235,7 +242,11 @@ class MainActivity : AppCompatActivity() {
         val linearLayout = findViewById<ViewGroup>(R.id.layout_rectangle)
         val layoutParams = (linearLayout.layoutParams as LinearLayout.LayoutParams)
         val slideController = findViewById<View>(R.id.slide_controller)
+        val slideController3rd = findViewById<View>(R.id.slide_controller_3rd)
         val slideControllerParams = (slideController.layoutParams as LinearLayout.LayoutParams)
+        
+        // 检查是否选择了iPod 3rd主题
+        val isIpod3rdTheme = SPManager.getInt(SPManager.Theme.SP_NAME) == SPManager.Theme.IPOD_3RD.id
         
         // 检查是否是横屏模式且当前显示的是CoverFlowView、MainView或MusicListView
         val isLandscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -249,6 +260,15 @@ class MainActivity : AppCompatActivity() {
         val isMusicListView = currentViewName == "MusicListView"
         val shouldFullScreen = isCoverFlowView || isMainView || isMusicListView
         
+        // 根据主题显示或隐藏对应的SlideController
+        if (isIpod3rdTheme) {
+            slideController.visibility = View.GONE
+            slideController3rd.visibility = View.VISIBLE
+        } else {
+            slideController.visibility = View.VISIBLE
+            slideController3rd.visibility = View.GONE
+        }
+        
         if (isLandscape && shouldFullScreen) {
             // 横屏且是CoverFlowView、MainView或MusicListView，全屏显示
             layoutParams.height = LinearLayout.LayoutParams.MATCH_PARENT
@@ -256,6 +276,7 @@ class MainActivity : AppCompatActivity() {
             layoutParams.leftMargin = 0
             layoutParams.rightMargin = 0
             slideControllerParams.height = 0
+            slideController3rd.layoutParams.height = 0
         } else {
             // 其他情况，保持默认布局
             // 使用dp单位设置高度，确保在不同分辨率屏幕上显示一致
@@ -265,6 +286,7 @@ class MainActivity : AppCompatActivity() {
             layoutParams.leftMargin = resources.getDimensionPixelSize(R.dimen.padding_1)
             layoutParams.rightMargin = resources.getDimensionPixelSize(R.dimen.padding_1)
             slideControllerParams.height = LinearLayout.LayoutParams.MATCH_PARENT
+            slideController3rd.layoutParams.height = LinearLayout.LayoutParams.MATCH_PARENT
         }
 
         //linearLayout.clipToOutline = true
@@ -278,6 +300,23 @@ class MainActivity : AppCompatActivity() {
         window.statusBarColor = color
         window.navigationBarColor = color
         findViewById<View>(R.id.main_layout)?.setBackgroundColor(color)
+    }
+
+    // 重新绑定控制器，确保主题切换后控制器仍然可以触摸
+    fun rebindController() {
+        val isIpod3rdTheme = SPManager.getInt(SPManager.Theme.SP_NAME) == SPManager.Theme.IPOD_3RD.id
+        val controllerView = if (isIpod3rdTheme) {
+            findViewById<View>(R.id.slide_controller_3rd)
+        } else {
+            findViewById<View>(R.id.slide_controller)
+        }
+        
+        Core.bindActivity(
+            controllerView,
+            findViewById(R.id.screen),
+            findViewById(R.id.dark_mode),
+            this
+        )
     }
 
     private fun checkPermission() {

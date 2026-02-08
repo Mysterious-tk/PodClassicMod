@@ -99,16 +99,17 @@ object SPManager {
     }
 
     enum class Theme(val id: Int, private val titleId: Int) {
-        WHITE(2, R.string.theme_white), BLACK(1, R.string.theme_black), RED(0, R.string.theme_red);
+        WHITE(2, R.string.theme_white), BLACK(1, R.string.theme_black), RED(0, R.string.theme_red), IPOD_3RD(3, R.string.theme_ipod_3rd);
 
         companion object {
             const val SP_NAME = "theme_color"
-            const val values = 3
+            const val values = 4
             fun getTitle(id: Int): String {
                 return when (id) {
                     WHITE.id -> WHITE.title
                     BLACK.id -> BLACK.title
                     RED.id -> RED.title
+                    IPOD_3RD.id -> IPOD_3RD.title
                     else -> BLACK.title
                 }
             }

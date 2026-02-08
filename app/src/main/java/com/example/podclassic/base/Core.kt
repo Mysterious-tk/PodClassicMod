@@ -20,19 +20,20 @@ import com.example.podclassic.values.Values
 import com.example.podclassic.view.MusicPlayerView
 import com.example.podclassic.widget.Screen
 import com.example.podclassic.widget.SlideController
+import com.example.podclassic.widget.SlideController3rd
 import java.util.*
 import kotlin.system.exitProcess
 
 
 @SuppressLint("StaticFieldLeak")
 object Core {
-    private lateinit var controller: SlideController
+    private lateinit var controller: View
     private lateinit var screen: Screen
     private lateinit var nightMode: View
     private var activity: MainActivity? = null
 
     fun bindActivity(
-        controller: SlideController,
+        controller: View,
         screen: Screen,
         darkMode: View,
         context: MainActivity
@@ -41,59 +42,130 @@ object Core {
         this.screen = screen
         activity = context
         nightMode = darkMode
-        controller.onTouchListener = object : SlideController.OnTouchListener {
-            override fun onEnterClick(): Boolean {
-                return screen.get().enter()
+        setupTouchListener()
+        // 只更新颜色和状态，不调用refresh()避免无限递归
+        when (val ctrl = controller) {
+            is SlideController -> {
+                ctrl.colorController = Colors.controller
+                ctrl.colorButton = Colors.button
+                ctrl.invalidate()
             }
-
-            override fun onEnterLongClick(): Boolean {
-                return screen.get().enterLongClick()
-            }
-
-            override fun onTouch() {
-                wake()
-            }
-
-            override fun onSlide(slideVal: Int): Boolean {
-                return screen.get().slide(slideVal)
-            }
-
-
-            override fun onMenuClick(): Boolean {
-                return removeView()
-            }
-
-            override fun onMenuLongClick(): Boolean {
-                home()
-                return true
-            }
-
-            override fun onNextClick(): Boolean {
-                MediaPresenter.next()
-                return true
-            }
-
-            override fun onNextLongClick(): Boolean {
-                return MediaPresenter.forward()
-            }
-
-            override fun onPauseClick(): Boolean {
-                MediaPresenter.playPause()
-                return true
-            }
-
-            override fun onPrevClick(): Boolean {
-                MediaPresenter.prev()
-                return true
-            }
-
-            override fun onPrevLongClick(): Boolean {
-                return MediaPresenter.backward()
+            is SlideController3rd -> {
+                ctrl.colorController = Colors.controller
+                ctrl.colorButton = Colors.button
+                ctrl.invalidate()
             }
         }
-        refresh()
+        activity?.setColor(Colors.screen)
         wake()
 
+    }
+
+    private fun setupTouchListener() {
+        when (val ctrl = controller) {
+            is SlideController -> {
+                ctrl.onTouchListener = object : SlideController.OnTouchListener {
+                    override fun onEnterClick(): Boolean {
+                        return screen.get().enter()
+                    }
+
+                    override fun onEnterLongClick(): Boolean {
+                        return screen.get().enterLongClick()
+                    }
+
+                    override fun onTouch() {
+                        wake()
+                    }
+
+                    override fun onSlide(slideVal: Int): Boolean {
+                        return screen.get().slide(slideVal)
+                    }
+
+                    override fun onMenuClick(): Boolean {
+                        return removeView()
+                    }
+
+                    override fun onMenuLongClick(): Boolean {
+                        home()
+                        return true
+                    }
+
+                    override fun onNextClick(): Boolean {
+                        MediaPresenter.next()
+                        return true
+                    }
+
+                    override fun onNextLongClick(): Boolean {
+                        return MediaPresenter.forward()
+                    }
+
+                    override fun onPauseClick(): Boolean {
+                        MediaPresenter.playPause()
+                        return true
+                    }
+
+                    override fun onPrevClick(): Boolean {
+                        MediaPresenter.prev()
+                        return true
+                    }
+
+                    override fun onPrevLongClick(): Boolean {
+                        return MediaPresenter.backward()
+                    }
+                }
+            }
+            is SlideController3rd -> {
+                ctrl.onTouchListener = object : SlideController3rd.OnTouchListener {
+                    override fun onEnterClick(): Boolean {
+                        return screen.get().enter()
+                    }
+
+                    override fun onEnterLongClick(): Boolean {
+                        return screen.get().enterLongClick()
+                    }
+
+                    override fun onTouch() {
+                        wake()
+                    }
+
+                    override fun onSlide(slideVal: Int): Boolean {
+                        return screen.get().slide(slideVal)
+                    }
+
+                    override fun onMenuClick(): Boolean {
+                        return removeView()
+                    }
+
+                    override fun onMenuLongClick(): Boolean {
+                        home()
+                        return true
+                    }
+
+                    override fun onNextClick(): Boolean {
+                        MediaPresenter.next()
+                        return true
+                    }
+
+                    override fun onNextLongClick(): Boolean {
+                        return MediaPresenter.forward()
+                    }
+
+                    override fun onPauseClick(): Boolean {
+                        MediaPresenter.playPause()
+                        return true
+                    }
+
+                    override fun onPrevClick(): Boolean {
+                        MediaPresenter.prev()
+                        return true
+                    }
+
+                    override fun onPrevLongClick(): Boolean {
+                        return MediaPresenter.backward()
+                    }
+                }
+            }
+        }
     }
 
     var lock = false
@@ -101,7 +173,14 @@ object Core {
 
     fun lock(lock: Boolean) {
         this.lock = lock
-        controller.enable = !lock
+        when (val ctrl = controller) {
+            is SlideController -> {
+                ctrl.enable = !lock
+            }
+            is SlideController3rd -> {
+                ctrl.enable = !lock
+            }
+        }
     }
 
     fun addView(view: ScreenView) {
@@ -121,9 +200,21 @@ object Core {
     }
 
     fun refresh() {
-        controller.colorController = Colors.controller
-        controller.colorButton = Colors.button
-        controller.invalidate()
+        // 重新初始化视图，确保主题切换时SlideController的显示状态正确更新
+        activity?.initView()
+        // 更新控制器颜色和状态
+        when (val ctrl = controller) {
+            is SlideController -> {
+                ctrl.colorController = Colors.controller
+                ctrl.colorButton = Colors.button
+                ctrl.invalidate()
+            }
+            is SlideController3rd -> {
+                ctrl.colorController = Colors.controller
+                ctrl.colorButton = Colors.button
+                ctrl.invalidate()
+            }
+        }
         activity?.setColor(Colors.screen)
     }
 
@@ -170,9 +261,13 @@ object Core {
     private const val DELAY = 10000L
 
     private var timer = com.example.podclassic.util.Timer(DELAY) {
-        if (MediaPresenter.isPlaying() && screen.currentView !is MusicPlayerView && activity != null) {
+        if (MediaPresenter.isPlaying() && screen.currentView !is com.example.podclassic.view.MusicPlayerView && screen.currentView !is com.example.podclassic.view.MusicPlayerView3rd && activity != null) {
             ThreadUtil.runOnUiThread {
-                addView(MusicPlayerView(activity!!))
+                if (SPManager.getInt(SPManager.Theme.SP_NAME) == SPManager.Theme.IPOD_3RD.id) {
+                    addView(com.example.podclassic.view.MusicPlayerView3rd(activity!!))
+                } else {
+                    addView(com.example.podclassic.view.MusicPlayerView(activity!!))
+                }
             }
         }
     }
