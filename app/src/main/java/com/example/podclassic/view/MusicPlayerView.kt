@@ -202,7 +202,11 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
         if (seekMode) {
             setSeekBar(progressBar)
         } else {
-            MediaPresenter.seekTo(progressBar.getProgress())
+            val seekProgress = progressBar.getProgress()
+            MediaPresenter.seekTo(seekProgress)
+            // 确认快进后立即更新时间显示，避免显示旧时间
+            currentTime.text = formatTime(seekProgress)
+            remainingTime.text = "-" + formatTime(progressBar.getMax() - seekProgress)
         }
         return true
     }
@@ -439,9 +443,10 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
 
         index.text = "${(MediaPresenter.getIndex() + 1)}/${MediaPresenter.getPlaylist().size}"
 
-        // 初始化时间显示
-        currentTime.text = formatTime(0)
-        remainingTime.text = "-" + formatTime(duration)
+        // 初始化时间显示 - 使用当前实际进度，避免显示00:00
+        val currentProgress = MediaPresenter.getProgress()
+        currentTime.text = formatTime(currentProgress)
+        remainingTime.text = "-" + formatTime(duration - currentProgress)
 
         // 确保图片可见
         image.apply {
@@ -531,13 +536,12 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
     private fun onProgress(progress: Int) {
         if (!seekMode) {
             progressBar.setCurrent(progress)
+            // 只在非拖动模式下更新时间显示，保持拖动后的时间显示方便确认
+            val duration = MediaPresenter.getDuration()
+            currentTime.text = formatTime(progress)
+            remainingTime.text = "-" + formatTime(duration - progress)
         }
         lyric?.setBufferedText(MediaPresenter.getCurrent()?.lyric?.getLyric(progress))
-
-        // 更新底部时间显示（iPod Classic 风格）
-        val duration = MediaPresenter.getDuration()
-        currentTime.text = formatTime(progress)
-        remainingTime.text = "-" + formatTime(duration - progress)
     }
     
     // 格式化时间为 mm:ss 格式
