@@ -559,6 +559,8 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
             rightText.setSingleLine()
             // 左侧文本不显示省略号，填不下就直接截断
             leftText.ellipsize = null
+            // 右侧文本（时长）也不显示省略号，避免秒钟被截断成...
+            rightText.ellipsize = null
             addView(leftText, layoutParams1)
             addView(rightText, layoutParams2)
             addView(rightIcon, layoutParams3)
