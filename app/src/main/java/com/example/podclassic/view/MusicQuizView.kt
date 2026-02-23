@@ -38,7 +38,7 @@ class MusicQuizView(context: Context) : LinearLayout(context), ScreenView,
         AudioFocusManager(context, object : AudioFocusManager.OnAudioFocusChangeListener {
             override fun onAudioFocusGain() {}
 
-            override fun onAudioFocusLoss() {
+            override fun onAudioFocusLoss(permanent: Boolean, pausedByDuck: Boolean) {
                 pause()
             }
         })

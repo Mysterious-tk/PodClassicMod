@@ -34,7 +34,7 @@
                 <action android:name="android.intent.action.MEDIA_BUTTON" />
                 <action android:name="android.bluetooth.device.action.ACL_CONNECTED" />
                 <action android:name="android.bluetooth.device.action.ACL_DISCONNECTED" />
-                <action android:name="AudioManager.ACTION_AUDIO_BECOMING_NOISY" />
+                <action android:name="android.media.AUDIO_BECOMING_NOISY" />
             </intent-filter>
         </receiver>
 

@@ -5,6 +5,7 @@ import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.os.Build
+import android.util.Log
 
 class AudioFocusManager(
     context: Context,
@@ -24,6 +25,7 @@ class AudioFocusManager(
             .Builder(AudioManager.AUDIOFOCUS_GAIN)
             .setOnAudioFocusChangeListener(this)
             .setAudioAttributes(audioAttributes)
+            .setWillPauseWhenDucked(false)
             .build()
         else null
 
@@ -51,18 +53,25 @@ class AudioFocusManager(
 
     override fun onAudioFocusChange(focusChange: Int) {
         onAudioFocusChangeListener ?: return
+        Log.d("AudioFocusManager", "onAudioFocusChange: $focusChange")
         when (focusChange) {
             AudioManager.AUDIOFOCUS_GAIN -> {
                 onAudioFocusChangeListener.onAudioFocusGain()
             }
-            AudioManager.AUDIOFOCUS_LOSS, AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
-                onAudioFocusChangeListener.onAudioFocusLoss()
+            AudioManager.AUDIOFOCUS_LOSS -> {
+                onAudioFocusChangeListener.onAudioFocusLoss(permanent = true, pausedByDuck = false)
+            }
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
+                onAudioFocusChangeListener.onAudioFocusLoss(permanent = false, pausedByDuck = false)
+            }
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
+                onAudioFocusChangeListener.onAudioFocusLoss(permanent = false, pausedByDuck = true)
             }
         }
     }
 
     interface OnAudioFocusChangeListener {
         fun onAudioFocusGain()
-        fun onAudioFocusLoss()
+        fun onAudioFocusLoss(permanent: Boolean, pausedByDuck: Boolean = false)
     }
 }

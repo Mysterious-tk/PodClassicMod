@@ -19,7 +19,7 @@ class VideoView(context: Context, val file: File) : FrameLayout(context), Screen
         AudioFocusManager(context, object : AudioFocusManager.OnAudioFocusChangeListener {
             override fun onAudioFocusGain() {}
 
-            override fun onAudioFocusLoss() {
+            override fun onAudioFocusLoss(permanent: Boolean, pausedByDuck: Boolean) {
                 if (videoView.isPlaying) {
                     videoView.pause()
                 }

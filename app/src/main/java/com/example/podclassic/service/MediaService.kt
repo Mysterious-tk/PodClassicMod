@@ -113,7 +113,11 @@ class MediaService : Service() {
         }
 
         override fun onPause() {
-            if (mediaPlayer.isPlaying) mediaPlayer.pause()
+            android.util.Log.d("MediaService", "MediaSession onPause() called, isPlaying=${mediaPlayer.isPlaying}")
+            if (mediaPlayer.isPlaying) {
+                android.util.Log.d("MediaService", "Calling mediaPlayer.pause()")
+                mediaPlayer.pause()
+            }
         }
 
         override fun onPlay() {
@@ -517,7 +521,7 @@ class MediaService : Service() {
     }
 
     private fun updateAudioFocus() {
-        mediaPlayer.enableAudioFocus = SPManager.getBoolean(SPManager.SP_AUDIO_FOCUS)
+        mediaPlayer.enableAudioFocus = SPManager.getBoolean(SPManager.SP_AUDIO_FOCUS, true)
     }
 
     private fun updateAgcEnabled() {

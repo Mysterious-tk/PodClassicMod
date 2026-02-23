@@ -30,8 +30,8 @@ object SPManager {
     private val sharedPreferences =
         PreferenceManager.getDefaultSharedPreferences(BaseApplication.context)
 
-    fun getBoolean(sp: String?): Boolean {
-        return sharedPreferences.getBoolean(sp, false)
+    fun getBoolean(sp: String?, defaultValue: Boolean = false): Boolean {
+        return sharedPreferences.getBoolean(sp, defaultValue)
     }
 
     fun setBoolean(sp: String?, value: Boolean) {

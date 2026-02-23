@@ -12,6 +12,8 @@ import android.media.audiofx.AcousticEchoCanceler
 import android.media.audiofx.AutomaticGainControl
 import android.media.audiofx.Equalizer
 import android.media.audiofx.NoiseSuppressor
+import android.os.Handler
+import android.os.Looper
 import java.util.*
 import kotlin.math.max
 import kotlin.math.min
@@ -43,6 +45,9 @@ class MediaPlayer<E>(context: Context, private val mediaAdapter: MediaAdapter<E>
         }
 
     private val audioFocusManager: AudioFocusManager
+    
+    // 用于区分用户手动暂停和音频焦点丢失导致的暂停
+    private var pausedByUser: Boolean = false
 
     private val mediaPlayer: MediaPlayer
 
@@ -268,6 +273,7 @@ class MediaPlayer<E>(context: Context, private val mediaAdapter: MediaAdapter<E>
     }
 
     fun stop() {
+        android.util.Log.d("MediaPlayer", "stop() called")
         if (mediaPlayer.isPlaying) {
             mediaPlayer.pause()
         }
@@ -353,6 +359,8 @@ class MediaPlayer<E>(context: Context, private val mediaAdapter: MediaAdapter<E>
 
     fun play() {
         if (playState != PlayState.STATE_PLAYING) {
+            // 重置用户暂停标志
+            pausedByUser = false
             if (playState == PlayState.STATE_PAUSE) {
                 mediaPlayer.start()
                 playState = PlayState.STATE_PLAYING
@@ -370,6 +378,20 @@ class MediaPlayer<E>(context: Context, private val mediaAdapter: MediaAdapter<E>
 
     fun pause() {
         if (playState == PlayState.STATE_PLAYING) {
+            android.util.Log.d("MediaPlayer", "pause() called by user")
+            pausedByUser = true
+            abandonAudioFocus()
+            playState = PlayState.STATE_PAUSE
+            mediaPlayer.pause()
+            tomSteadyProcessor?.reset()
+            onPlayStateChange()
+        }
+    }
+    
+    // 由音频焦点管理器调用，不设置 pausedByUser 标志
+    private fun pauseByAudioFocus() {
+        if (playState == PlayState.STATE_PLAYING) {
+            android.util.Log.d("MediaPlayer", "pauseByAudioFocus() called")
             abandonAudioFocus()
             playState = PlayState.STATE_PAUSE
             mediaPlayer.pause()
@@ -601,22 +623,109 @@ class MediaPlayer<E>(context: Context, private val mediaAdapter: MediaAdapter<E>
         this.audioFocusManager =
             AudioFocusManager(context, object : AudioFocusManager.OnAudioFocusChangeListener {
                 private var wasPlaying = false
+                private var isTemporaryLoss = false
+                private var lossTime: Long = 0
+                private var isDucked: Boolean = false
+                private var resumeAttempts: Int = 0
+                private val maxResumeAttempts = 5
+                private val resumeInterval = 2000L // 2秒
+
+                private val resumeRunnable = Runnable {
+                    attemptResume()
+                }
+
+                private fun attemptResume() {
+                    if (!enableAudioFocus || pausedByUser) {
+                        android.util.Log.d("MediaPlayer", "Resume aborted: enableAudioFocus=$enableAudioFocus, pausedByUser=$pausedByUser")
+                        return
+                    }
+                    
+                    val currentTime = System.currentTimeMillis()
+                    val lossDuration = currentTime - lossTime
+                    
+                    android.util.Log.d("MediaPlayer", "Attempting resume, wasPlaying=$wasPlaying, isTemporaryLoss=$isTemporaryLoss, lossDuration=$lossDuration, attempts=$resumeAttempts")
+                    
+                    // 如果丢失时间超过30秒，放弃恢复
+                    if (lossDuration > 30000) {
+                        android.util.Log.d("MediaPlayer", "Giving up resume after 30 seconds")
+                        resetState()
+                        return
+                    }
+                    
+                    // 尝试重新请求音频焦点
+                    if (wasPlaying && playState != PlayState.STATE_PLAYING) {
+                        resumeAttempts++
+                        android.util.Log.d("MediaPlayer", "Requesting audio focus, attempt $resumeAttempts")
+                        requestAudioFocus()
+                        
+                        // 如果还没有收到焦点恢复，继续尝试
+                        if (resumeAttempts < maxResumeAttempts && isTemporaryLoss) {
+                            Handler(Looper.getMainLooper()).postDelayed(resumeRunnable, resumeInterval)
+                        }
+                    }
+                }
+
+                private fun resetState() {
+                    isTemporaryLoss = false
+                    wasPlaying = false
+                    pausedByUser = false
+                    lossTime = 0
+                    resumeAttempts = 0
+                }
+
                 override fun onAudioFocusGain() {
                     if (!enableAudioFocus) {
                         return
                     }
-                    if (wasPlaying && playState != PlayState.STATE_PLAYING) {
+                    val currentTime = System.currentTimeMillis()
+                    val lossDuration = currentTime - lossTime
+                    android.util.Log.d("MediaPlayer", "Audio focus gained, wasPlaying=$wasPlaying, isTemporaryLoss=$isTemporaryLoss, pausedByUser=$pausedByUser, lossDuration=$lossDuration")
+                    
+                    // 取消任何待定的恢复尝试
+                    Handler(Looper.getMainLooper()).removeCallbacks(resumeRunnable)
+                    
+                    // 恢复音量（如果是被duck的情况）
+                    if (isDucked) {
+                        mediaPlayer.setVolume(1.0f, 1.0f)
+                        isDucked = false
+                    }
+                    
+                    // 只有不是用户手动暂停的情况下才自动恢复
+                    // 临时丢失后恢复，或者丢失时间较短（小于30秒），自动继续播放
+                    val shouldResume = wasPlaying && !pausedByUser && playState != PlayState.STATE_PLAYING && 
+                        (isTemporaryLoss || lossDuration < 30000)
+                    
+                    if (shouldResume) {
+                        android.util.Log.d("MediaPlayer", "Resuming playback after audio focus gain")
                         play()
                     }
+                    // 重置标志
+                    resetState()
                 }
-
-                override fun onAudioFocusLoss() {
+                
+                override fun onAudioFocusLoss(permanent: Boolean, pausedByDuck: Boolean) {
                     if (!enableAudioFocus) {
                         return
                     }
+                    lossTime = System.currentTimeMillis()
+                    // 只要不是永久丢失，都认为是临时丢失
+                    isTemporaryLoss = !permanent
+                    resumeAttempts = 0
+                    android.util.Log.d("MediaPlayer", "Audio focus lost, permanent=$permanent, pausedByDuck=$pausedByDuck, isTemporaryLoss=$isTemporaryLoss")
                     if (playState == PlayState.STATE_PLAYING) {
                         wasPlaying = true
-                        pause()
+                        if (pausedByDuck) {
+                            // 降低音量继续播放
+                            isDucked = true
+                            mediaPlayer.setVolume(0.1f, 0.1f)
+                        } else {
+                            pauseByAudioFocus()
+                        }
+                        
+                        // 启动恢复尝试定时器（针对高德地图等不释放焦点的应用）
+                        if (!permanent) {
+                            Handler(Looper.getMainLooper()).postDelayed(resumeRunnable, resumeInterval)
+                        }
                     } else {
                         wasPlaying = false
                     }
