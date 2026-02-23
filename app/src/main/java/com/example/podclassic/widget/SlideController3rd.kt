@@ -134,13 +134,17 @@ class SlideController3rd : View {
     private var startPoint: TouchPoint = TouchPoint.emptyTouchPoint()
     private var prevPoint: TouchPoint = TouchPoint.emptyTouchPoint()
     private var touchTimer: Timer? = null
+    
+    // 用于记录顶部按钮区域的长按状态
+    private var buttonLongClickState: Int = -1 // -1: 无, 0: PREV, 1: MENU, 2: PAUSE, 3: NEXT
 
     private fun cancelTimer() {
         touchTimer?.cancel()
         touchTimer = null
+        buttonLongClickState = -1
     }
 
-    private fun setTimer(curPoint: TouchPoint) {
+    private fun setTimer(curPoint: TouchPoint, buttonIndex: Int = -1) {
         if (!enable) {
             return
         }
@@ -151,22 +155,27 @@ class SlideController3rd : View {
                     if (startPoint.slided) {
                         return@Runnable
                     }
+                    // 优先处理顶部按钮区域的长按
+                    if (buttonIndex >= 0 && buttonLongClickState == buttonIndex) {
+                        when (buttonIndex) {
+                            0 -> onPrevLongClick()
+                            1 -> onMenuLongClick()
+                            2 -> onPauseLongClick()
+                            3 -> onNextLongClick()
+                        }
+                        cancelTimer()
+                        return@Runnable
+                    }
                     if (startPoint.inCenter && curPoint.inCenter && (prevPoint.isEmpty() || prevPoint.inCenter)) {
                         onEnterLongClick()
                         cancelTimer()
-                    } else if (startPoint.inCircle && curPoint.inCircle && (prevPoint.isEmpty() || prevPoint.inCircle)) {
-                        when (startPoint.deg) {
-                            in 45..135 -> onMenuLongClick()
-                            in 135..225 -> onPrevLongClick()
-                            in 225..315 -> onPauseLongClick()
-                            in 315..360 -> onNextLongClick()
-                            in 0..45 -> onNextLongClick()
-                        }
                     }
+                    // 圆盘区域长按不再触发任何功能，只能通过顶部按钮区域触发
                 })
             }
         }
         cancelTimer()
+        buttonLongClickState = buttonIndex
         touchTimer = Timer().apply {
             schedule(timerTask, 500, 600)
         }
@@ -203,22 +212,34 @@ class SlideController3rd : View {
             val button4X = buttonSpacing * 4
             val buttonWidth = maxOf(Icons.MENU.width, Icons.PREV.width, Icons.PAUSE.width, Icons.NEXT.width).toFloat()
             
+            // 判断触摸的是哪个按钮
+            val touchedButtonIndex = when {
+                x >= button1X - buttonWidth/2 && x <= button1X + buttonWidth/2 -> 0 // PREV
+                x >= button2X - buttonWidth/2 && x <= button2X + buttonWidth/2 -> 1 // MENU
+                x >= button3X - buttonWidth/2 && x <= button3X + buttonWidth/2 -> 2 // PAUSE
+                x >= button4X - buttonWidth/2 && x <= button4X + buttonWidth/2 -> 3 // NEXT
+                else -> -1
+            }
+            
             when (event.action) {
-                MotionEvent.ACTION_UP -> {
-                    // 检查具体是哪个按钮被点击
-                    if (x >= button1X - buttonWidth/2 && x <= button1X + buttonWidth/2) {
-                        // 上一首按钮
-                        onPrevClick()
-                    } else if (x >= button2X - buttonWidth/2 && x <= button2X + buttonWidth/2) {
-                        // 菜单按钮
-                        onMenuClick()
-                    } else if (x >= button3X - buttonWidth/2 && x <= button3X + buttonWidth/2) {
-                        // 播放/暂停按钮
-                        onPauseClick()
-                    } else if (x >= button4X - buttonWidth/2 && x <= button4X + buttonWidth/2) {
-                        // 下一首按钮
-                        onNextClick()
+                MotionEvent.ACTION_DOWN -> {
+                    if (touchedButtonIndex >= 0) {
+                        buttonLongClickState = touchedButtonIndex
+                        setTimer(curPoint, touchedButtonIndex)
                     }
+                }
+                MotionEvent.ACTION_UP -> {
+                    cancelTimer()
+                    // 检查具体是哪个按钮被点击（短按）
+                    when (touchedButtonIndex) {
+                        0 -> onPrevClick()
+                        1 -> onMenuClick()
+                        2 -> onPauseClick()
+                        3 -> onNextClick()
+                    }
+                }
+                MotionEvent.ACTION_CANCEL -> {
+                    cancelTimer()
                 }
             }
             return true
