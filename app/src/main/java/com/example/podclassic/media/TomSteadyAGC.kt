@@ -11,10 +11,19 @@ class TomSteadyAGC {
     
     // 内部状态
     private var currentGain: Float = 0.0f // 当前增益 (dB)
-    private var peakLevel: Float = 0.0f // 峰值电平
-    private var isInitialPhase: Boolean = true // 是否处于初始阶段
-    private var initialPhaseCounter: Int = 0 // 初始阶段计数器
-    private val INITIAL_PHASE_SAMPLES: Int = 661500 // 初始阶段样本数 (约15秒)
+    private var referenceLevel: Float = 0.0f // 参考电平（固定）
+    private var hasReferenceLevel: Boolean = false // 是否已有参考电平
+    
+    // 预计算相关
+    private val levelSamples: MutableList<Float> = mutableListOf() // 电平样本
+    private var totalSamples: Long = 0 // 音乐总样本数
+    private var preAnalysisCounter: Long = 0 // 预计算计数器
+    private val SKIP_DURATION_MS: Int = 20000 // 跳过开头20秒
+    private val NUM_SAMPLE_SEGMENTS: Int = 30 // 采集段数
+    private val SAMPLE_DURATION_MS: Int = 100 // 每段采样时长100ms
+    private var sampleInterval: Long = 0 // 采样间隔（根据总时长计算）
+    private var currentSegment: Int = 0 // 当前采集段
+    private var segmentSampleCounter: Int = 0 // 段内采样计数器
     
     // 计算攻击和释放系数
     private val attackCoeff: Float
@@ -22,6 +31,23 @@ class TomSteadyAGC {
     
     private val releaseCoeff: Float
         get() = calculateCoeff(releaseTime)
+    
+    /**
+     * 设置音乐总时长（播放前调用）
+     * @param durationMs 音乐总时长（毫秒）
+     */
+    fun setDuration(durationMs: Long) {
+        // 计算总样本数（假设44.1kHz采样率）
+        totalSamples = durationMs * 44100 / 1000
+        // 计算采样间隔（跳过开头20秒后，均匀分布采集点）
+        val skipSamples = SKIP_DURATION_MS * 44100L / 1000
+        val availableSamples = totalSamples - skipSamples
+        sampleInterval = if (availableSamples > 0) {
+            availableSamples / NUM_SAMPLE_SEGMENTS
+        } else {
+            0
+        }
+    }
     
     /**
      * 处理音频数据
@@ -40,55 +66,18 @@ class TomSteadyAGC {
         val maxShort = Short.MAX_VALUE.toInt()
         
         for (i in 0 until size) {
-            // 计算当前样本的绝对值
             val sample = buffer[i].toFloat()
-            val absSample = kotlin.math.abs(sample)
             
-            // 更新初始阶段状态
-            if (isInitialPhase) {
-                initialPhaseCounter++
-                if (initialPhaseCounter >= INITIAL_PHASE_SAMPLES) {
-                    isInitialPhase = false
-                    // 初始阶段结束，重置状态重新计算，避免开头脏数据影响后续
-                    peakLevel = 0.0f
-                    currentGain = 0.0f
-                }
-            }
-            
-            // 更新峰值电平
-            updatePeakLevel(absSample)
-            
-            // 计算目标增益
+            // 计算目标增益（基于固定参考电平）
             val targetGain = calculateTargetGain()
             
             // 平滑调整增益
-            // 对于初始阶段或突然大声，使用更保守的增益调整
-            val isLoud = absSample > maxSample * 0.5f // 检测大声
-            val adjustedAttackTime = if (isInitialPhase || isLoud) 5.0f else attackTime
-            val adjustedAttackCoeff = calculateCoeff(adjustedAttackTime)
-            
-            val coeff = if (targetGain > currentGain) {
-                adjustedAttackCoeff // 更快的攻击速度
-            } else {
-                releaseCoeff
-            }
+            val coeff = if (targetGain > currentGain) attackCoeff else releaseCoeff
             currentGain += (targetGain - currentGain) * coeff
             
             // 应用增益
             val gainFactor = dbToLinear(currentGain)
             var processedSample = (sample * gainFactor)
-            
-            // 初始阶段硬性限幅：将输出限制在 targetLevel 以内
-            if (isInitialPhase) {
-                val normalizedOutput = processedSample / maxSample
-                if (kotlin.math.abs(normalizedOutput) > targetLevel) {
-                    processedSample = if (normalizedOutput > 0) {
-                        targetLevel * maxSample
-                    } else {
-                        -targetLevel * maxSample
-                    }
-                }
-            }
             
             // 限制输出范围
             outputBuffer[i] = kotlin.math.max(minShort, 
@@ -99,71 +88,124 @@ class TomSteadyAGC {
     }
     
     /**
-     * 更新峰值电平
+     * 预分析音频数据（播放前调用）
+     * @param buffer 音频数据缓冲区
+     * @param size 数据大小
+     * @return 是否完成预分析
      */
-    private fun updatePeakLevel(sample: Float) {
-        val maxSample = Short.MAX_VALUE.toFloat()
-        val normalizedSample = sample / maxSample
+    fun preAnalyzeAudio(buffer: ShortArray, size: Int): Boolean {
+        if (!enabled || size == 0 || totalSamples == 0L) {
+            return false
+        }
         
-        // 使用峰值检测器
-        if (normalizedSample > peakLevel) {
-            peakLevel = normalizedSample
-        } else {
-            // 峰值衰减
-            peakLevel *= 0.99f
-            if (peakLevel < 0.001f) {
-                peakLevel = 0.0f
+        val maxSample = Short.MAX_VALUE.toFloat()
+        val skipSamples = SKIP_DURATION_MS * 44100L / 1000
+        
+        for (i in 0 until size) {
+            preAnalysisCounter++
+            
+            // 跳过开头20秒
+            if (preAnalysisCounter < skipSamples) {
+                continue
+            }
+            
+            // 检查是否到达下一个采样点
+            val expectedSamplePos = skipSamples + currentSegment * sampleInterval
+            
+            if (preAnalysisCounter >= expectedSamplePos && currentSegment < NUM_SAMPLE_SEGMENTS) {
+                segmentSampleCounter++
+                
+                // 在当前位置采样100ms
+                if (segmentSampleCounter <= SAMPLE_DURATION_MS * 44100 / 1000) {
+                    val sample = buffer[i].toFloat()
+                    val absSample = kotlin.math.abs(sample) / maxSample
+                    
+                    // 避免无声部分
+                    if (absSample > 0.01f) {
+                        levelSamples.add(absSample)
+                    }
+                } else {
+                    // 完成当前段，进入下一段
+                    currentSegment++
+                    segmentSampleCounter = 0
+                }
+            }
+            
+            // 完成所有段采集
+            if (currentSegment >= NUM_SAMPLE_SEGMENTS) {
+                referenceLevel = calculateReferenceLevel()
+                hasReferenceLevel = true
+                return true
             }
         }
+        
+        return hasReferenceLevel
+    }
+    
+    /**
+     * 设置参考电平（外部计算后设置）
+     * @param level 参考电平
+     */
+    fun setReferenceLevel(level: Float) {
+        referenceLevel = level
+        hasReferenceLevel = true
+    }
+    
+    /**
+     * 计算参考电平
+     */
+    private fun calculateReferenceLevel(): Float {
+        if (levelSamples.isEmpty()) {
+            return 0.1f // 默认参考电平
+        }
+        
+        // 排序样本
+        val sortedSamples = levelSamples.sorted()
+        
+        // 移除最大声和最小声（各10%）
+        val startIndex = (sortedSamples.size * 0.1f).toInt()
+        val endIndex = (sortedSamples.size * 0.9f).toInt()
+        
+        if (startIndex >= endIndex || startIndex >= sortedSamples.size) {
+            return sortedSamples.average().toFloat()
+        }
+        
+        val filteredSamples = sortedSamples.subList(startIndex, endIndex)
+        
+        if (filteredSamples.isEmpty()) {
+            return 0.1f // 默认参考电平
+        }
+        
+        // 计算平均值
+        return filteredSamples.average().toFloat()
     }
     
     /**
      * 计算目标增益
      */
     private fun calculateTargetGain(): Float {
-        if (peakLevel < 0.001f) {
-            // 对于极低的峰值电平，使用较小的正增益
-            return 0.0f // 零增益，确保开头不会过大但也不会过小
+        val levelToUse = if (hasReferenceLevel && referenceLevel > 0.0f) {
+            referenceLevel
+        } else {
+            // 没有参考电平时使用默认电平
+            0.1f
+        }
+        
+        if (levelToUse < 0.001f) {
+            return 0.0f
         }
         
         // 计算所需增益
-        val desiredGain = 20.0f * kotlin.math.log10(targetLevel / peakLevel)
+        val desiredGain = 20.0f * kotlin.math.log10(targetLevel / levelToUse)
         
         // 限制增益范围
-        var limitedGain = kotlin.math.max(minGain, kotlin.math.min(maxGain, desiredGain))
-        
-        // 对于初始阶段，使用适度的增益限制
-        if (isInitialPhase) {
-            // 初始阶段使用适度的增益限制，不再过度降低声音
-            limitedGain = kotlin.math.max(minGain, kotlin.math.min(0.0f, limitedGain))
-        } else {
-            // 非初始阶段，使用更合理的增益限制
-            limitedGain = kotlin.math.max(minGain, kotlin.math.min(15.0f, limitedGain))
-        }
-        
-        // 对于突然大声，进一步限制增益
-        val isLoud = peakLevel > 0.85f // 检测大声
-        if (isLoud) {
-            // 大声时使用负增益或更小的增益
-            limitedGain = kotlin.math.max(minGain, kotlin.math.min(2.0f, limitedGain))
-        }
-        
-        return limitedGain
-    }
-    
-    /**
-     * 平滑更新当前增益
-     */
-    private fun updateCurrentGain(targetGain: Float) {
-        val coeff = if (targetGain > currentGain) attackCoeff else releaseCoeff
-        currentGain += (targetGain - currentGain) * coeff
+        return kotlin.math.max(minGain, kotlin.math.min(maxGain, desiredGain))
     }
     
     /**
      * 计算时间常数对应的系数
      */
     private fun calculateCoeff(timeMs: Float): Float {
-        // 假设采样率为44100Hz
         val sampleRate = 44100.0f
         val timeConstant = timeMs / 1000.0f
         return 1.0f - kotlin.math.exp(-1.0f / (timeConstant * sampleRate))
@@ -181,9 +223,14 @@ class TomSteadyAGC {
      */
     fun reset() {
         currentGain = 0.0f
-        peakLevel = 0.0f
-        isInitialPhase = true
-        initialPhaseCounter = 0
+        referenceLevel = 0.0f
+        hasReferenceLevel = false
+        levelSamples.clear()
+        preAnalysisCounter = 0
+        currentSegment = 0
+        segmentSampleCounter = 0
+        totalSamples = 0
+        sampleInterval = 0
     }
     
     /**
@@ -194,9 +241,23 @@ class TomSteadyAGC {
     }
     
     /**
-     * 获取当前峰值电平
+     * 获取参考电平
      */
-    fun getCurrentPeakLevel(): Float {
-        return peakLevel
+    fun getReferenceLevel(): Float {
+        return referenceLevel
+    }
+    
+    /**
+     * 检查是否已有参考电平
+     */
+    fun hasReferenceLevel(): Boolean {
+        return hasReferenceLevel
+    }
+    
+    /**
+     * 检查预分析是否完成
+     */
+    fun isPreAnalysisComplete(): Boolean {
+        return hasReferenceLevel
     }
 }

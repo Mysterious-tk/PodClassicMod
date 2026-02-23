@@ -16,7 +16,7 @@ import java.util.*
 import kotlin.math.max
 import kotlin.math.min
 
-class MediaPlayer<E>(context: Context, mediaAdapter: MediaAdapter<E>) :
+class MediaPlayer<E>(context: Context, private val mediaAdapter: MediaAdapter<E>) :
     MediaPlayer.OnCompletionListener, MediaPlayer.OnErrorListener, MediaPlayer.OnPreparedListener {
 
     private val playlist: Playlist<E> = Playlist(mediaAdapter)
@@ -119,6 +119,48 @@ class MediaPlayer<E>(context: Context, mediaAdapter: MediaAdapter<E>) :
 
     fun getTomSteadyAGC(): TomSteadyAGC? {
         return tomSteadyProcessor?.getTomSteadyAGC()
+    }
+
+    /**
+     * 检查TomSteady预分析是否完成
+     */
+    fun isTomSteadyPreAnalysisComplete(): Boolean {
+        return tomSteadyProcessor?.isPreAnalysisComplete() ?: false
+    }
+
+    /**
+     * 获取TomSteady参考电平
+     */
+    fun getTomSteadyReferenceLevel(): Float {
+        return tomSteadyProcessor?.getReferenceLevel() ?: 0.0f
+    }
+
+    /**
+     * 预分析TomSteady音频数据
+     * @param buffer 音频数据缓冲区
+     * @param size 数据大小
+     * @return 是否完成预分析
+     */
+    fun preAnalyzeTomSteadyAudio(buffer: ShortArray, size: Int): Boolean {
+        return tomSteadyProcessor?.preAnalyzeAudio(buffer, size) ?: false
+    }
+
+    /**
+     * 设置TomSteady音乐时长（用于分段采样）
+     * @param durationMs 音乐总时长（毫秒）
+     */
+    fun setTomSteadyDuration(durationMs: Long) {
+        tomSteadyProcessor?.setDuration(durationMs)
+    }
+
+    /**
+     * 从文件路径预分析TomSteady音频（后台线程调用）
+     * @param filePath 音频文件路径
+     * @param durationMs 音乐总时长（毫秒）
+     * @return 是否成功完成预分析
+     */
+    fun preAnalyzeTomSteadyFromFile(filePath: String, durationMs: Long): Boolean {
+        return tomSteadyProcessor?.preAnalyzeFromFile(filePath, durationMs) ?: false
     }
 
     // 模拟音频处理方法，实际项目中需要根据具体实现调整
@@ -249,6 +291,30 @@ class MediaPlayer<E>(context: Context, mediaAdapter: MediaAdapter<E>) :
 
         playState = PlayState.STATE_STOP
         mediaPlayer.reset()
+
+        // 如果启用了TomSteady，先进行预分析
+        if (tomSteadyEnabled && tomSteadyProcessor?.isPreAnalysisComplete() != true) {
+            val currentMedia = playlist.getCurrent()
+            if (currentMedia != null) {
+                val filePath = mediaAdapter.getFilePath(currentMedia)
+                val duration = getDuration()
+                if (filePath != null && duration > 0) {
+                    // 在后台线程进行预分析
+                    Thread {
+                        val success = preAnalyzeTomSteadyFromFile(filePath, duration.toLong())
+                        if (success) {
+                            // 预分析完成，开始播放
+                            mediaPlayer.start()
+                        }
+                    }.start()
+                    // 先准备播放器
+                    if (playlist.play(mediaPlayer)) {
+                        mediaPlayer.prepareAsync()
+                    }
+                    return
+                }
+            }
+        }
 
         if (playlist.play(mediaPlayer)) {
             mediaPlayer.prepareAsync()
@@ -527,6 +593,7 @@ class MediaPlayer<E>(context: Context, mediaAdapter: MediaAdapter<E>) :
 
     interface MediaAdapter<E> {
         fun onLoadMedia(e: E, mediaPlayer: MediaPlayer): Boolean
+        fun getFilePath(e: E): String? = null
     }
 
 
