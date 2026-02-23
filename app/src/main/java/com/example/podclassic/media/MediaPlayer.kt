@@ -1,8 +1,17 @@
 package com.example.podclassic.media
 
 import android.content.Context
+import android.media.AudioFormat
+import android.media.AudioManager
+import android.media.AudioTrack
+import android.media.MediaExtractor
+import android.media.MediaFormat
 import android.media.MediaPlayer
+import android.media.MediaCodec
+import android.media.audiofx.AcousticEchoCanceler
+import android.media.audiofx.AutomaticGainControl
 import android.media.audiofx.Equalizer
+import android.media.audiofx.NoiseSuppressor
 import java.util.*
 import kotlin.math.max
 import kotlin.math.min
@@ -38,6 +47,14 @@ class MediaPlayer<E>(context: Context, mediaAdapter: MediaAdapter<E>) :
     private val mediaPlayer: MediaPlayer
 
     private var equalizer: Equalizer? = null
+    private var automaticGainControl: AutomaticGainControl? = null
+    private var tomSteadyProcessor: TomSteadyProcessor? = null
+    
+    // 音量控制相关
+    private var isInitialVolumePhase: Boolean = false
+    private var initialVolumeCounter: Int = 0
+    private val INITIAL_VOLUME_SECONDS: Int = 3 // 初始音量阶段秒数 (3秒)
+    private val initialVolumeIncrement: Float = 0.9f / INITIAL_VOLUME_SECONDS // 音量增量
 
     var equalizerId: Int = 0
         set(value) {
@@ -50,6 +67,65 @@ class MediaPlayer<E>(context: Context, mediaAdapter: MediaAdapter<E>) :
             onDataChangeListener?.onEqualizerChange()
         }
 
+    var agcEnabled: Boolean = false
+        set(value) {
+            automaticGainControl?.let {
+                it.enabled = value
+            }
+            field = value
+            onDataChangeListener?.onAgcChange()
+        }
+
+    fun isAgcAvailable(): Boolean {
+        return AutomaticGainControl.isAvailable()
+    }
+
+    var tomSteadyEnabled: Boolean = false
+        set(value) {
+            // 确保TomSteadyProcessor已初始化
+            if (tomSteadyProcessor == null) {
+                initTomSteadyProcessor()
+            }
+            tomSteadyProcessor?.setParameters(enabled = value)
+            field = value
+            onDataChangeListener?.onTomSteadyChange()
+        }
+
+    fun initTomSteadyProcessor() {
+        tomSteadyProcessor = TomSteadyProcessor(mediaPlayer.audioSessionId)
+        tomSteadyProcessor?.init()
+    }
+
+    fun setTomSteadyParameters(
+        targetLevel: Float? = null,
+        maxGain: Float? = null,
+        minGain: Float? = null,
+        attackTime: Float? = null,
+        releaseTime: Float? = null
+    ) {
+        tomSteadyProcessor?.setParameters(
+            targetLevel = targetLevel,
+            maxGain = maxGain,
+            minGain = minGain,
+            attackTime = attackTime,
+            releaseTime = releaseTime
+        )
+        onDataChangeListener?.onTomSteadyChange()
+    }
+
+    fun isTomSteadyAvailable(): Boolean {
+        return tomSteadyProcessor?.isAvailable() ?: false
+    }
+
+    fun getTomSteadyAGC(): TomSteadyAGC? {
+        return tomSteadyProcessor?.getTomSteadyAGC()
+    }
+
+    // 模拟音频处理方法，实际项目中需要根据具体实现调整
+    fun processAudio(buffer: ShortArray, size: Int): ShortArray {
+        return tomSteadyProcessor?.processAudio(buffer, size) ?: buffer
+    }
+
     private var presetList: Array<String?> = arrayOf()
 
     fun getPresetList(): Array<String?> {
@@ -61,6 +137,8 @@ class MediaPlayer<E>(context: Context, mediaAdapter: MediaAdapter<E>) :
         fun onPlayModeChange() {}
         fun onRepeatModeChange() {}
         fun onEqualizerChange() {}
+        fun onAgcChange() {}
+        fun onTomSteadyChange() {}
         fun onAudioManagerChange() {}
         fun onStopTimeChange() {}
 
@@ -143,6 +221,8 @@ class MediaPlayer<E>(context: Context, mediaAdapter: MediaAdapter<E>) :
         mediaPlayer.release()
         onMediaChangeListeners.clear()
         equalizer?.release()
+        automaticGainControl?.release()
+        tomSteadyProcessor?.release()
     }
 
     fun stop() {
@@ -153,6 +233,7 @@ class MediaPlayer<E>(context: Context, mediaAdapter: MediaAdapter<E>) :
         mediaPlayer.reset()
         abandonAudioFocus()
         playlist.clear()
+        tomSteadyProcessor?.reset()
         playState = PlayState.STATE_STOP
 
         onPlayStateChange()
@@ -210,8 +291,12 @@ class MediaPlayer<E>(context: Context, mediaAdapter: MediaAdapter<E>) :
                 mediaPlayer.start()
                 playState = PlayState.STATE_PLAYING
                 requestAudioFocus()
+                tomSteadyProcessor?.reset()
                 onPlayStateChange()
             } else {
+                // 开始新的播放，启用初始音量控制阶段
+                isInitialVolumePhase = true
+                initialVolumeCounter = 0
                 startMediaPlayer()
             }
         }
@@ -222,6 +307,7 @@ class MediaPlayer<E>(context: Context, mediaAdapter: MediaAdapter<E>) :
             abandonAudioFocus()
             playState = PlayState.STATE_PAUSE
             mediaPlayer.pause()
+            tomSteadyProcessor?.reset()
             onPlayStateChange()
         }
     }
@@ -381,9 +467,41 @@ class MediaPlayer<E>(context: Context, mediaAdapter: MediaAdapter<E>) :
     }
 
     override fun onPrepared(mp: MediaPlayer?) {
+        // 只有在TomSteady启用时才设置较低的初始音量
+        if (tomSteadyEnabled) {
+            mediaPlayer.setVolume(0.5f, 0.5f)
+        } else {
+            // 否则设置正常音量
+            mediaPlayer.setVolume(1.0f, 1.0f)
+        }
+        
         mediaPlayer.start()
         playState = PlayState.STATE_PLAYING
         requestAudioFocus()
+        tomSteadyProcessor?.reset()
+        
+        // 启动音量逐渐增加的定时器（仅在TomSteady启用时）
+        if (isInitialVolumePhase && tomSteadyEnabled) {
+            val volumeTimer = Timer()
+            volumeTimer.schedule(object : TimerTask() {
+                override fun run() {
+                    if (isInitialVolumePhase && tomSteadyEnabled) {
+                        initialVolumeCounter++
+                        val currentVolume = 0.5f + (initialVolumeCounter * initialVolumeIncrement * 0.5f)
+                        if (initialVolumeCounter < INITIAL_VOLUME_SECONDS) {
+                            mediaPlayer.setVolume(currentVolume, currentVolume)
+                        } else {
+                            mediaPlayer.setVolume(1.0f, 1.0f)
+                            isInitialVolumePhase = false
+                            volumeTimer.cancel()
+                        }
+                    } else {
+                        volumeTimer.cancel()
+                    }
+                }
+            }, 0, 1000) // 每秒执行一次
+        }
+        
         //onMediaMetadataChange()
         onPlayStateChange()
     }
@@ -459,6 +577,17 @@ class MediaPlayer<E>(context: Context, mediaAdapter: MediaAdapter<E>) :
             // 均衡器初始化失败，跳过均衡器设置
             this.equalizer = null
             this.presetList = arrayOf()
+        }
+        
+        try {
+            if (AutomaticGainControl.isAvailable()) {
+                this.automaticGainControl = AutomaticGainControl.create(mediaPlayer.audioSessionId).apply {
+                    enabled = agcEnabled
+                }
+            }
+        } catch (e: Exception) {
+            // AGC初始化失败，跳过AGC设置
+            this.automaticGainControl = null
         }
     }
 

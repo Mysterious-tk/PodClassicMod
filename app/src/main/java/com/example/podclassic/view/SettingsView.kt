@@ -373,6 +373,114 @@ class SettingsView(context: Context) : ListView(context), ScreenView {
 
             SwitchBar(Strings.COVER_FLOW, SPManager.SP_COVER_FLOW),
 
+            SwitchBar(
+                "系统AGC",
+                SPManager.SP_AGC_ENABLED,
+                false,
+                object : OnSwitchListener {
+                    override fun onSwitch() {
+                        MediaPresenter.setAgcEnabled()
+                    }
+                }),
+
+            SwitchBar(
+                "TomSteady",
+                SPManager.SP_TOM_STEADY_ENABLED,
+                false,
+                object : OnSwitchListener {
+                    override fun onSwitch() {
+                        MediaPresenter.setTomSteadyEnabled()
+                    }
+                }),
+
+            Item("TomSteady设置", object : OnItemClickListener {
+                override fun onItemClick(index: Int, listView: ListView): Boolean {
+                    val itemList = arrayListOf(
+                        Item(
+                            "目标电平",
+                            object : OnItemClickListener {
+                                override fun onItemClick(index: Int, listView: ListView): Boolean {
+                                    // 循环切换目标电平值
+                                    val currentValue = SPManager.getFloat(SPManager.SP_TOM_STEADY_TARGET_LEVEL, 0.7f)
+                                    val values = arrayOf(0.5f, 0.6f, 0.7f, 0.8f, 0.9f)
+                                    val currentIndex = values.indexOfFirst { it == currentValue }
+                                    val nextIndex = (currentIndex + 1) % values.size
+                                    val nextValue = values[nextIndex]
+                                    SPManager.setFloat(SPManager.SP_TOM_STEADY_TARGET_LEVEL, nextValue)
+                                    MediaPresenter.setTomSteadyParameters(targetLevel = nextValue)
+                                    listView.getCurrentItem().rightText = nextValue.toString()
+                                    return true
+                                }
+                            },
+                            SPManager.getFloat(SPManager.SP_TOM_STEADY_TARGET_LEVEL, 0.7f).toString()
+                        ),
+                        Item(
+                            "最大增益",
+                            object : OnItemClickListener {
+                                override fun onItemClick(index: Int, listView: ListView): Boolean {
+                                    // 循环切换最大增益值
+                                    val currentValue = SPManager.getFloat(SPManager.SP_TOM_STEADY_MAX_GAIN, 20.0f)
+                                    val values = arrayOf(10.0f, 15.0f, 20.0f, 25.0f, 30.0f)
+                                    val currentIndex = values.indexOfFirst { it == currentValue }
+                                    val nextIndex = (currentIndex + 1) % values.size
+                                    val nextValue = values[nextIndex]
+                                    SPManager.setFloat(SPManager.SP_TOM_STEADY_MAX_GAIN, nextValue)
+                                    MediaPresenter.setTomSteadyParameters(maxGain = nextValue)
+                                    listView.getCurrentItem().rightText = nextValue.toString() + "dB"
+                                    return true
+                                }
+                            },
+                            SPManager.getFloat(SPManager.SP_TOM_STEADY_MAX_GAIN, 20.0f).toString() + "dB"
+                        ),
+                        Item(
+                            "攻击时间",
+                            object : OnItemClickListener {
+                                override fun onItemClick(index: Int, listView: ListView): Boolean {
+                                    // 循环切换攻击时间值
+                                    val currentValue = SPManager.getFloat(SPManager.SP_TOM_STEADY_ATTACK_TIME, 50.0f)
+                                    val values = arrayOf(20.0f, 50.0f, 100.0f, 150.0f, 200.0f)
+                                    val currentIndex = values.indexOfFirst { it == currentValue }
+                                    val nextIndex = (currentIndex + 1) % values.size
+                                    val nextValue = values[nextIndex]
+                                    SPManager.setFloat(SPManager.SP_TOM_STEADY_ATTACK_TIME, nextValue)
+                                    MediaPresenter.setTomSteadyParameters(attackTime = nextValue)
+                                    listView.getCurrentItem().rightText = nextValue.toString() + "ms"
+                                    return true
+                                }
+                            },
+                            SPManager.getFloat(SPManager.SP_TOM_STEADY_ATTACK_TIME, 50.0f).toString() + "ms"
+                        ),
+                        Item(
+                            "释放时间",
+                            object : OnItemClickListener {
+                                override fun onItemClick(index: Int, listView: ListView): Boolean {
+                                    // 循环切换释放时间值
+                                    val currentValue = SPManager.getFloat(SPManager.SP_TOM_STEADY_RELEASE_TIME, 200.0f)
+                                    val values = arrayOf(100.0f, 200.0f, 300.0f, 400.0f, 500.0f)
+                                    val currentIndex = values.indexOfFirst { it == currentValue }
+                                    val nextIndex = (currentIndex + 1) % values.size
+                                    val nextValue = values[nextIndex]
+                                    SPManager.setFloat(SPManager.SP_TOM_STEADY_RELEASE_TIME, nextValue)
+                                    MediaPresenter.setTomSteadyParameters(releaseTime = nextValue)
+                                    listView.getCurrentItem().rightText = nextValue.toString() + "ms"
+                                    return true
+                                }
+                            },
+                            SPManager.getFloat(SPManager.SP_TOM_STEADY_RELEASE_TIME, 200.0f).toString() + "ms"
+                        )
+                    )
+                    Core.addView(
+                        ItemListView(
+                            context, 
+                            itemList, 
+                            "TomSteady设置", 
+                            null
+                        )
+                    )
+                    return true
+                }
+            }, true),
+
             Item(Strings.RESET_ALL_SETTINGS, object : OnItemClickListener {
                 override fun onItemClick(index: Int, listView: ListView): Boolean {
                     Core.addView(

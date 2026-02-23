@@ -21,6 +21,12 @@ object SPManager {
     const val SP_PLAY_ALL = "play_all"
     const val SP_COVER_FLOW = "cover_flow"
     const val SP_REPEAT_MODE = "repeat_mode"
+    const val SP_AGC_ENABLED = "agc_enabled"
+    const val SP_TOM_STEADY_ENABLED = "tom_steady_enabled"
+    const val SP_TOM_STEADY_TARGET_LEVEL = "tom_steady_target_level"
+    const val SP_TOM_STEADY_MAX_GAIN = "tom_steady_max_gain"
+    const val SP_TOM_STEADY_ATTACK_TIME = "tom_steady_attack_time"
+    const val SP_TOM_STEADY_RELEASE_TIME = "tom_steady_release_time"
     private val sharedPreferences =
         PreferenceManager.getDefaultSharedPreferences(BaseApplication.context)
 
@@ -48,6 +54,18 @@ object SPManager {
         sharedPreferences.edit().putString(sp, value).apply()
     }
 
+    fun getFloat(sp: String?, defaultValue: Float = 0.0f): Float {
+        return try {
+            sharedPreferences.getString(sp, defaultValue.toString())?.toFloat() ?: defaultValue
+        } catch (e: Exception) {
+            defaultValue
+        }
+    }
+
+    fun setFloat(sp: String?, value: Float) {
+        sharedPreferences.edit().putString(sp, value.toString()).apply()
+    }
+
     fun reset() {
         setBoolean(SP_PLAY_ALL, true)
         setBoolean(SP_AUDIO_FOCUS, true)
@@ -63,6 +81,12 @@ object SPManager {
         setInt(SP_REPEAT_MODE, 1)
         setInt(Language.SP_NAME, 0)
         setInt(SP_EQUALIZER, 0)
+        setBoolean(SP_AGC_ENABLED, false)
+        setBoolean(SP_TOM_STEADY_ENABLED, false)
+        setString(SP_TOM_STEADY_TARGET_LEVEL, "0.7")
+        setString(SP_TOM_STEADY_MAX_GAIN, "20.0")
+        setString(SP_TOM_STEADY_ATTACK_TIME, "50.0")
+        setString(SP_TOM_STEADY_RELEASE_TIME, "200.0")
         var resetCount = getInt(SP_RESET_COUNT)
         resetCount++
         setInt(SP_RESET_COUNT, resetCount)

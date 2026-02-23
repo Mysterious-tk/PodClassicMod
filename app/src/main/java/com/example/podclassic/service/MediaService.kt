@@ -66,6 +66,10 @@ class MediaService : Service() {
         const val ACTION_MAIN = "action_main"
 
         const val ACTION_UPDATE_AUDIO_FOCUS = "action_set_audio_focus"
+        const val ACTION_SET_AGC_ENABLED = "action_set_agc_enabled"
+        const val ACTION_SET_TOM_STEADY_ENABLED = "action_set_tom_steady_enabled"
+        const val ACTION_SET_TOM_STEADY_PARAMETERS = "action_set_tom_steady_parameters"
+        const val ACTION_INIT_TOM_STEADY = "action_init_tom_steady"
     }
 
     private lateinit var mediaSessionCompat: MediaSessionCompat
@@ -309,7 +313,8 @@ class MediaService : Service() {
         )
 
         updateAudioFocus()
-
+        updateAgcEnabled()
+        updateTomSteadyEnabled()
 
         registerBroadcastReceiver()
 
@@ -464,6 +469,35 @@ class MediaService : Service() {
                 ACTION_UPDATE_AUDIO_FOCUS -> {
                     updateAudioFocus()
                 }
+                ACTION_SET_AGC_ENABLED -> {
+                    updateAgcEnabled()
+                }
+                ACTION_SET_TOM_STEADY_ENABLED -> {
+                    updateTomSteadyEnabled()
+                }
+                ACTION_SET_TOM_STEADY_PARAMETERS -> {
+                    // 处理TomSteady参数设置
+                    if (arg1 is Map<*, *>) {
+                        val params = arg1
+                        val targetLevel = params["targetLevel"] as? Float
+                        val maxGain = params["maxGain"] as? Float
+                        val minGain = params["minGain"] as? Float
+                        val attackTime = params["attackTime"] as? Float
+                        val releaseTime = params["releaseTime"] as? Float
+                        
+                        mediaPlayer.setTomSteadyParameters(
+                            targetLevel = targetLevel,
+                            maxGain = maxGain,
+                            minGain = minGain,
+                            attackTime = attackTime,
+                            releaseTime = releaseTime
+                        )
+                    }
+                }
+                ACTION_INIT_TOM_STEADY -> {
+                    // 初始化TomSteady处理器
+                    mediaPlayer.initTomSteadyProcessor()
+                }
                 else -> {
                     throw IllegalArgumentException("unknown action")
                 }
@@ -484,6 +518,14 @@ class MediaService : Service() {
 
     private fun updateAudioFocus() {
         mediaPlayer.enableAudioFocus = SPManager.getBoolean(SPManager.SP_AUDIO_FOCUS)
+    }
+
+    private fun updateAgcEnabled() {
+        mediaPlayer.agcEnabled = SPManager.getBoolean(SPManager.SP_AGC_ENABLED)
+    }
+
+    private fun updateTomSteadyEnabled() {
+        mediaPlayer.tomSteadyEnabled = SPManager.getBoolean(SPManager.SP_TOM_STEADY_ENABLED)
     }
 
     data class Action(val action: String, val arg1: Any?, val arg2: Any?)

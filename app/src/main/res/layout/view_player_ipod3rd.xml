@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="0dp"
+    android:background="@color/background"
+    android:clipChildren="false"
+    android:clipToPadding="false">
+
+    <!-- 顶部标题栏 - iPod 3rd风格：状态图标右边 -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_margin="@dimen/padding_0"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp">
+
+        <!-- 右侧：播放模式图标和睡眠倒计时 -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="end|center_vertical"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <androidx.appcompat.widget.AppCompatImageView
+                android:id="@+id/ic_play_mode"
+                android:layout_width="@dimen/icon_size"
+                android:layout_height="@dimen/icon_size"
+                android:layout_marginEnd="4dp" />
+
+            <androidx.appcompat.widget.AppCompatImageView
+                android:id="@+id/ic_repeat_mode"
+                android:layout_width="@dimen/icon_size"
+                android:layout_height="@dimen/icon_size"
+                android:layout_marginEnd="8dp" />
+
+            <!-- 睡眠倒计时图标 -->
+            <androidx.appcompat.widget.AppCompatImageView
+                android:id="@+id/ic_stop_time"
+                android:layout_width="@dimen/icon_size"
+                android:layout_height="@dimen/icon_size"
+                android:src="@drawable/ic_access_time_grey_600_18dp"
+                android:visibility="gone" />
+
+            <!-- 睡眠倒计时 -->
+            <androidx.appcompat.widget.AppCompatTextView
+                android:id="@+id/tv_stop_time"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text"
+                android:textSize="14sp"
+                android:padding="0dp"
+                android:gravity="center_vertical" />
+        </LinearLayout>
+
+    </FrameLayout>
+
+    <!-- 专辑封面和歌曲信息区域 - iPod 3rd风格 -->
+    <LinearLayout
+        android:id="@+id/container"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_margin="0dp"
+        android:layout_weight="5"
+        android:gravity="start|top"
+        android:orientation="horizontal"
+        android:padding="0dp"
+        android:clipChildren="false"
+        android:clipToPadding="false">
+
+        <!-- 专辑封面 - 靠左上显示，使用带倒影的图片 -->
+        <com.example.podclassic.widget.ImageView
+            android:id="@+id/image"
+            android:layout_width="160dp"
+            android:layout_height="200dp"
+            android:layout_marginStart="2dp"
+            android:layout_marginTop="20dp"
+            android:layout_marginEnd="8dp"
+            android:scaleType="centerCrop" />
+
+        <!-- 歌曲信息区域 - 占满剩余空间 -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="start|top"
+            android:orientation="vertical"
+            android:layout_marginEnd="2dp"
+            android:layout_marginTop="60dp">
+
+            <!-- 歌曲标题 -->
+            <androidx.appcompat.widget.AppCompatTextView
+                android:id="@+id/tv_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="marquee"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:marqueeRepeatLimit="marquee_forever"
+                android:scrollHorizontally="true"
+                android:singleLine="true"
+                android:textColor="@color/text"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:padding="0dp"
+                android:gravity="start" />
+
+            <!-- 艺术家 -->
+            <androidx.appcompat.widget.AppCompatTextView
+                android:id="@+id/tv_artist"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="@color/main"
+                android:textSize="14sp"
+                android:padding="0dp"
+                android:gravity="start" />
+
+            <!-- 专辑名 -->
+            <androidx.appcompat.widget.AppCompatTextView
+                android:id="@+id/tv_album"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="@color/text"
+                android:textSize="12sp"
+                android:padding="0dp"
+                android:gravity="start" />
+
+            <!-- 当前第几首 - iPod 3rd风格 (1/10) -->
+            <androidx.appcompat.widget.AppCompatTextView
+                android:id="@+id/tv_index"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:textColor="@color/text"
+                android:textSize="14sp"
+                android:padding="0dp"
+                android:gravity="start" />
+
+            <!-- 歌词 -->
+            <com.example.podclassic.widget.TextView
+                android:id="@+id/tv_lyric"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:gravity="center"
+                android:singleLine="true"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp"
+                android:visibility="gone" />
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <!-- 进度条区域 - iPod 3rd风格：时间-进度条-剩余时间 -->
+    <LinearLayout
+        android:id="@+id/progress_container"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_margin="0dp"
+        android:layout_weight="2"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp">
+
+        <!-- 已播放时间 -->
+        <androidx.appcompat.widget.AppCompatTextView
+            android:id="@+id/tv_current_time"
+            android:layout_width="50dp"
+            android:layout_height="wrap_content"
+            android:textColor="@color/text"
+            android:textSize="14sp"
+            android:gravity="end"
+            android:padding="0dp" />
+
+        <!-- 进度条 -->
+        <com.example.podclassic.widget.ScreenLayout
+            android:id="@+id/seek_bar"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="8dp"
+            android:layout_weight="1" />
+
+        <!-- 剩余时间 -->
+        <androidx.appcompat.widget.AppCompatTextView
+            android:id="@+id/tv_remaining_time"
+            android:layout_width="50dp"
+            android:layout_height="wrap_content"
+            android:textColor="@color/text"
+            android:textSize="14sp"
+            android:gravity="start"
+            android:padding="0dp" />
+
+    </LinearLayout>
+
+</LinearLayout>

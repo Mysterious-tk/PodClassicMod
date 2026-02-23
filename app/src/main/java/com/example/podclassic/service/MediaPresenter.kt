@@ -229,4 +229,34 @@ object MediaPresenter {
     fun setAudioFocus() {
         sendMessage(MediaService.ACTION_UPDATE_AUDIO_FOCUS)
     }
-}
+
+    fun setAgcEnabled() {
+        sendMessage(MediaService.ACTION_SET_AGC_ENABLED)
+    }
+
+    fun setTomSteadyEnabled() {
+        sendMessage(MediaService.ACTION_SET_TOM_STEADY_ENABLED)
+    }
+
+    fun setTomSteadyParameters(
+        targetLevel: Float? = null,
+        maxGain: Float? = null,
+        minGain: Float? = null,
+        attackTime: Float? = null,
+        releaseTime: Float? = null
+    ) {
+        // 创建一个包含所有参数的map
+        val params = mapOf(
+            "targetLevel" to targetLevel,
+            "maxGain" to maxGain,
+            "minGain" to minGain,
+            "attackTime" to attackTime,
+            "releaseTime" to releaseTime
+        )
+        sendMessage(MediaService.ACTION_SET_TOM_STEADY_PARAMETERS, params, null)
+    }
+
+    fun initTomSteadyProcessor() {
+        sendMessage(MediaService.ACTION_INIT_TOM_STEADY)
+    }
+}  
