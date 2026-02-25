@@ -9,6 +9,8 @@
         <item name="android:windowNoTitle">true</item>
         <item name="android:windowLayoutInDisplayCutoutMode" tools:targetApi="27">shortEdges</item>
         <item name="android:windowTranslucentNavigation">true</item>
+        <!-- Disable window background to reduce overdraw -->
+        <item name="android:windowBackground">@null</item>
     </style>
 
 </resources>

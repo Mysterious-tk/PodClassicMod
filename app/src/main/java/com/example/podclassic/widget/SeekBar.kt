@@ -40,6 +40,26 @@ class SeekBar(context: Context) : LinearLayout(context) {
         val rect = RectF()
         var seekMode = false
 
+        // Pre-allocated Paint objects to avoid allocation in onDraw
+        private val borderPaint = Paint().apply {
+            style = Paint.Style.STROKE
+            strokeWidth = 1f
+        }
+        private val glassPaint = Paint()
+        private val progressBorderPaint = Paint().apply {
+            style = Paint.Style.STROKE
+            strokeWidth = 1f
+        }
+        private val highlightPaint = Paint()
+        private val gradientPaint = Paint()
+        private val markerPaint = Paint()
+        private val markerBorderPaint = Paint().apply {
+            style = Paint.Style.STROKE
+            strokeWidth = 2f
+        }
+        private val markerHighlightPaint = Paint()
+        private val highlightRect = RectF()
+
         override fun onDraw(canvas: Canvas) {
             // Draw background with glassmorphism effect
             val backgroundColor = Color.parseColor("#202020")
@@ -48,11 +68,8 @@ class SeekBar(context: Context) : LinearLayout(context) {
             canvas.drawRoundRect(0f, 0f, width.toFloat(), height.toFloat(), height.toFloat() / 2, height.toFloat() / 2, backPaint)
             
             // Add subtle border to background
-            val borderPaint = Paint()
             borderPaint.color = Color.WHITE
             borderPaint.alpha = 20 // Reduced opacity for more transparency
-            borderPaint.style = Paint.Style.STROKE
-            borderPaint.strokeWidth = 1f
             canvas.drawRoundRect(0f, 0f, width.toFloat(), height.toFloat(), height.toFloat() / 2, height.toFloat() / 2, borderPaint)
             
             // Draw progress bar with glassmorphism effect
@@ -60,7 +77,6 @@ class SeekBar(context: Context) : LinearLayout(context) {
             
             if (progressWidth > 0) {
                 // Create blue glassmorphism effect for progress
-                val glassPaint = Paint()
                 val blueColor = Color.parseColor("#4A90D9")
                 glassPaint.color = blueColor
                 glassPaint.alpha = 140 // Reduced opacity for more transparency
@@ -70,24 +86,19 @@ class SeekBar(context: Context) : LinearLayout(context) {
                 canvas.drawRoundRect(rect, height.toFloat() / 2, height.toFloat() / 2, glassPaint)
                 
                 // Add inner border to progress bar
-                val progressBorderPaint = Paint()
                 progressBorderPaint.color = Color.WHITE
                 progressBorderPaint.alpha = 40 // Reduced opacity for more transparency
-                progressBorderPaint.style = Paint.Style.STROKE
-                progressBorderPaint.strokeWidth = 1f
                 canvas.drawRoundRect(rect, height.toFloat() / 2, height.toFloat() / 2, progressBorderPaint)
                 
                 // Add glass highlight effect
-                val highlightPaint = Paint()
                 highlightPaint.color = Color.WHITE
                 highlightPaint.alpha = 60 // Reduced opacity for more transparency
                 
                 // Draw top highlight
-                val highlightRect = RectF(0f, 0f, progressWidth, height.toFloat() / 2)
+                highlightRect.set(0f, 0f, progressWidth, height.toFloat() / 2)
                 canvas.drawRoundRect(highlightRect, height.toFloat() / 2, height.toFloat() / 2, highlightPaint)
                 
                 // Draw subtle gradient overlay for depth
-                val gradientPaint = Paint()
                 gradientPaint.shader = LinearGradient(
                     0f,
                     0f,
@@ -109,21 +120,16 @@ class SeekBar(context: Context) : LinearLayout(context) {
                 val halfMarkerSize = markerSize / 2
                 
                 // Draw marker background
-                val markerPaint = Paint()
                 markerPaint.color = Color.parseColor("#4A90D9")
                 markerPaint.alpha = 160 // Reduced opacity for more transparency
                 canvas.drawCircle(markerPosition, height / 2f, halfMarkerSize, markerPaint)
                 
                 // Draw marker border
-                val markerBorderPaint = Paint()
                 markerBorderPaint.color = Color.WHITE
                 markerBorderPaint.alpha = 120 // Reduced opacity for more transparency
-                markerBorderPaint.style = Paint.Style.STROKE
-                markerBorderPaint.strokeWidth = 2f
                 canvas.drawCircle(markerPosition, height / 2f, halfMarkerSize - 1, markerBorderPaint)
                 
                 // Draw marker highlight
-                val markerHighlightPaint = Paint()
                 markerHighlightPaint.color = Color.WHITE
                 markerHighlightPaint.alpha = 80 // Reduced opacity for more transparency
                 canvas.drawCircle(markerPosition - halfMarkerSize / 3, height / 2f - halfMarkerSize / 3, halfMarkerSize / 4, markerHighlightPaint)
