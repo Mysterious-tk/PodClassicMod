@@ -29,10 +29,7 @@ import java.util.*
 
 class MainView(context: Context) : RelativeLayout(context), ScreenView {
 
-    private val listView = ListView(context).apply {
-        // 主菜单不需要为右侧时间预留空间
-        reserveSpaceForTime = false
-    }
+    private val listView = ListView(context)
     // 图片容器（可见区域）
     private val coverContainer = FrameLayout(context)
     // 图片视图（比容器大，在容器内飘动）

@@ -26,7 +26,7 @@ class TextView : androidx.appcompat.widget.AppCompatTextView {
         maxLines = MAX_LINES
         marqueeRepeatLimit = -1
 
-        ellipsize = TextUtils.TruncateAt.END
+        ellipsize = null
 
         setPadding(DEFAULT_PADDING, DEFAULT_PADDING / 4, DEFAULT_PADDING, DEFAULT_PADDING / 4)
         gravity = Gravity.CENTER_VERTICAL
@@ -64,9 +64,10 @@ class TextView : androidx.appcompat.widget.AppCompatTextView {
             if (value == field) {
                 return
             }
-            // 只在启用跑马灯时设置 MARQUEE，不启用时不改变 ellipsize（保持 null 不显示省略号）
             if (value) {
                 ellipsize = TextUtils.TruncateAt.MARQUEE
+            } else {
+                ellipsize = null
             }
             field = value
         }

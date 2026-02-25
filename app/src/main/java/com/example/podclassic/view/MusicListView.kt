@@ -43,6 +43,15 @@ class MusicListView : FrameLayout, ScreenView {
         return name
     }
 
+    override fun onViewAdd() {
+        android.util.Log.d("MusicListView", "onViewAdd() called")
+        // 延迟刷新列表，确保视图完全布局完成后再刷新
+        postDelayed({ 
+            android.util.Log.d("MusicListView", "PostDelayed refreshList() called")
+            listView.refreshList()
+        }, 100)
+    }
+
     private val musicList: ArrayList<Music>
     private val name: String
     private val type: Int
@@ -109,24 +118,27 @@ class MusicListView : FrameLayout, ScreenView {
 
 
     private fun init() {
+        android.util.Log.d("MusicListView", "init() called, musicList.size=${musicList.size}")
         // 清空ListView的所有项
         // 注意：由于itemList是protected的，我们不能直接访问，所以需要重新创建所有项
         
         // 添加顶部装饰
         addTopDecoration()
         
-        if (SPManager.getBoolean(SPManager.SP_SHOW_INFO)) {
-            for ((index, music) in musicList.withIndex()) {
-                listView.add(createSongItem(index, music, true))
-            }
-        } else {
-            for ((index, music) in musicList.withIndex()) {
-                listView.add(createSongItem(index, music, false))
-            }
+        // 批量创建所有歌曲项，然后一次性添加，避免多次刷新
+        val showInfo = SPManager.getBoolean(SPManager.SP_SHOW_INFO)
+        android.util.Log.d("MusicListView", "Creating song items, showInfo=$showInfo")
+        val items = musicList.mapIndexed { index, music ->
+            val item = createSongItem(index, music, showInfo)
+            android.util.Log.d("MusicListView", "Created item $index: name='${item.name}', rightText='${item.rightText}'")
+            item
         }
+        android.util.Log.d("MusicListView", "Adding ${items.size} items to listView")
+        listView.addAll(items)
         
         val currentIndex = musicList.indexOf(MediaPresenter.getCurrent())
         if (currentIndex != -1) {
+            android.util.Log.d("MusicListView", "Setting current index to $currentIndex")
             listView.setCurrent(currentIndex)
         }
         
@@ -206,12 +218,12 @@ class MusicListView : FrameLayout, ScreenView {
         return item
     }
     
-    // 格式化时长为mm:ss格式
+    // 格式化时长为mm:ss格式，分钟和秒都补零
     private fun formatDuration(duration: Int): String {
         val totalSeconds = duration / 1000
         val minutes = totalSeconds / 60
         val seconds = totalSeconds % 60
-        return String.format("%d:%02d", minutes, seconds)
+        return String.format("%02d:%02d", minutes, seconds)
     }
 
     private fun refreshList() {

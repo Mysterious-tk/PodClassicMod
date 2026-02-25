@@ -13,6 +13,7 @@ import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.view.ViewTreeObserver
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -24,14 +25,12 @@ import com.example.podclassic.values.Colors
 import com.example.podclassic.values.Icons
 import com.example.podclassic.values.Values
 import com.example.podclassic.values.Values.DEFAULT_PADDING
+import com.example.podclassic.widget.TextView.Companion.TEXT_SIZE
 import java.util.*
 import kotlin.math.abs
 
 
 open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(context) {
-    
-    // 标志：是否需要为右侧时间预留空间
-    var reserveSpaceForTime = true
 
     companion object {
         const val DEFAULT_MAX_SIZE = 9
@@ -53,7 +52,10 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
 
     init {
         linearLayout.orientation = VERTICAL
-        this.addView(linearLayout)
+        // linearLayout 宽度为 MATCH_PARENT，但右侧留出 scrollBar 的空间
+        val linearLayoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
+        linearLayoutParams.rightMargin = DEFAULT_PADDING
+        this.addView(linearLayout, linearLayoutParams)
         val scrollBarLayoutParams =
             LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT)
         scrollBarLayoutParams.gravity = Gravity.END
@@ -169,6 +171,18 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
         add(item, size())
     }
 
+    // 批量添加项目，只刷新一次
+    fun addAll(items: List<Item>) {
+        itemList.addAll(items)
+        refreshList()
+    }
+
+    // 批量添加项目到指定位置，只刷新一次
+    fun addAll(items: List<Item>, index: Int) {
+        itemList.addAll(index, items)
+        refreshList()
+    }
+
     fun remove(item: Item) {
         if (itemList.remove(item)) {
             if (index == itemList.size) {
@@ -220,6 +234,7 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
     }
 
     fun refreshList() {
+        android.util.Log.d("ListView", "refreshList: itemList.size=${itemList.size}, position=$position, index=$index")
         if (itemList.size > MAX_SIZE && scrollBar.visibility == GONE) {
             scrollBar.visibility = View.VISIBLE
         }
@@ -230,17 +245,18 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
                 break
             }
             val itemView = itemViewList[i - position]
-            itemView.setText(itemList[i].name)
+            val item = itemList[i]
+            android.util.Log.d("ListView", "refreshList: i=$i, name='${item.name}', rightText='${item.rightText}', itemView.visibility=${itemView.visibility}")
+            itemView.setText(item.name)
             //itemList.height = itemHeight
             //itemView.cancelShake()
             if (scrollBar.visibility == View.VISIBLE) {
                 itemView.setPadding(0, 0, DEFAULT_PADDING, 0)
             }
-            itemView.setHighlight(i == index)
-            itemView.setRightText(itemList[i].rightText)
-            itemView.setEnable(itemList[i].enable)
             onItemCreated(i, itemView)
-
+            itemView.setHighlight(i == index)
+            itemView.setEnable(item.enable)
+            itemView.setRightText(item.rightText) // 放在最后，确保颜色正确
         }
     }
 
@@ -264,6 +280,14 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
     override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
         super.onWindowFocusChanged(hasWindowFocus)
         if (hasWindowFocus) {
+            refreshList()
+        }
+    }
+
+    override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
+        super.onLayout(changed, left, top, right, bottom)
+        if (changed) {
+            // 布局改变时刷新列表，确保所有元素正确显示
             refreshList()
         }
     }
@@ -312,8 +336,6 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
                 onItemClick()
             }
         }
-        // 设置ItemView是否需要为右侧时间预留空间
-        itemView.setReserveSpaceForTime(reserveSpaceForTime)
     }
 
     //index 为list中位置
@@ -537,7 +559,8 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
 
         private val rightText = TextView(context)
         private val leftText = TextView(context)
-        private val rightIcon = ImageView(context)
+        
+        private val rightTextWidth: Int
         
         var onItemClickListener: OnItemClickListener? = null
         var itemIndex = -1
@@ -547,23 +570,37 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
         private var touchStartY = 0f
 
         init {
+            val density = context.resources.displayMetrics.density
+            // rightText 宽度自适应，根据内容调整
+            rightTextWidth = FrameLayout.LayoutParams.WRAP_CONTENT
+            
+            val layoutParams1 = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
+            // leftText 右侧留出空间给 rightText 和 scrollBar
+            layoutParams1.rightMargin = (60 * density).toInt() + DEFAULT_PADDING * 2
+            // rightText 宽度自适应，靠右对齐
+            val layoutParams2 = FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.MATCH_PARENT, Gravity.END)
+            layoutParams2.rightMargin = DEFAULT_PADDING // 右侧留出 scrollBar 的空间
 
-            val layoutParams1 = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
-            val layoutParams2 = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT)
-            val layoutParams3 = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
-
-            layoutParams2.gravity = Gravity.END
-
-            rightIcon.scaleType = ImageView.ScaleType.CENTER
             leftText.setSingleLine()
             rightText.setSingleLine()
-            // 左侧文本不显示省略号，填不下就直接截断
             leftText.ellipsize = null
-            // 右侧文本（时长）也不显示省略号，避免秒钟被截断成...
             rightText.ellipsize = null
+            rightText.gravity = Gravity.CENTER_VERTICAL or Gravity.END
+            rightText.visibility = View.VISIBLE
+            // 为rightText设置更小的padding，确保时间能够显示
+            rightText.setPadding(DEFAULT_PADDING / 4, DEFAULT_PADDING / 4, DEFAULT_PADDING / 4, DEFAULT_PADDING / 4)
+            // 确保rightText的文本大小合适
+            rightText.textSize = 14f
+            // 设置等宽字体，确保时间对齐
+            rightText.typeface = android.graphics.Typeface.MONOSPACE
+            // 设置背景色透明
+            rightText.setBackgroundColor(0x00000000)
+            // 设置默认文字颜色
+            rightText.setTextColor(Colors.text)
+            // 确保 rightText 在最上层
+            rightText.bringToFront()
             addView(leftText, layoutParams1)
             addView(rightText, layoutParams2)
-            addView(rightIcon, layoutParams3)
             
             // 添加触摸事件监听器
             setOnTouchListener { view, event ->
@@ -608,15 +645,7 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
             fun onItemClick(index: Int)
         }
 
-        override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
-            super.onLayout(changed, left, top, right, bottom)
-            rightIcon.layout(
-                rightIcon.right - (rightIcon.height * 0.9).toInt(),
-                rightIcon.top,
-                rightIcon.right,
-                rightIcon.bottom
-            )
-        }
+    
 
         fun setHighlight(highlight: Boolean) {
             if (this.highlight == highlight) {
@@ -624,6 +653,16 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
             }
             this.highlight = highlight
             leftText.scrollable = highlight
+            // 高亮时请求焦点并重新设置文本，确保 Marquee 滚动效果生效
+            if (highlight) {
+                leftText.isSelected = true
+                leftText.requestFocus()
+                // 重新设置文本触发 Marquee
+                val text = leftText.text.toString()
+                leftText.text = text
+            } else {
+                leftText.isSelected = false
+            }
             setIcons()
         }
 
@@ -649,48 +688,42 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
 
         fun setRightText(text: String) {
             rightText.text = text
+            rightText.visibility = View.VISIBLE // 始终可见，即使文本为空
+            // 设置文字颜色
+            rightText.setTextColor(Colors.text)
+            // 确保文字居中对齐
+            rightText.gravity = Gravity.CENTER
+            updateLayout()
         }
 
-        private var hasRightIcon = false
-        private var reserveSpaceForTime = true // 默认需要为右侧时间预留空间
-        
-        fun setReserveSpaceForTime(reserve: Boolean) {
-            reserveSpaceForTime = reserve
-        }
-        
-        private fun setRightIcon(drawable: Drawable?) {
-            rightIcon.setImageDrawable(drawable)
-            hasRightIcon = (drawable != null)
+        private fun updateLayout() {
+            // 根据右侧时间文本是否为空来设置左侧文本的布局
+            val layoutParams = leftText.layoutParams as FrameLayout.LayoutParams
+            if (rightText.text.isNotEmpty()) {
+                // 有 rightText 时，留出较小空间（时间格式为 05:00，约 45dp 足够）
+                layoutParams.rightMargin = (45 * context.resources.displayMetrics.density).toInt() + DEFAULT_PADDING * 2
+                leftText.paddingRight = DEFAULT_PADDING
+                rightText.visibility = View.VISIBLE
+            } else {
+                // 没有 rightText 时，占满整个空间（只留出 scrollBar 的空间）
+                layoutParams.rightMargin = DEFAULT_PADDING
+                leftText.paddingRight = DEFAULT_PADDING
+                rightText.visibility = View.GONE
+            }
+            leftText.layoutParams = layoutParams
         }
 
         private fun setIcons() {
             if (highlight) {
                 setBackgroundColor(Colors.main)
-                leftText.setTextColor(Colors.text_light)
-                rightText.setTextColor(Colors.text_light)
-                // 只在播放时显示图标，移除箭头图标
-                if (playing) {
-                    setRightIcon(Icons.PLAYING_WHITE.drawable)
-                } else {
-                    setRightIcon(null)
-                }
+                leftText.setTextColor(0xFFFFFFFF.toInt()) // 白色
+                rightText.setTextColor(0xFFFFFFFF.toInt()) // 白色
             } else {
                 background = null
-                leftText.setTextColor(Colors.text)
-                rightText.setTextColor(Colors.text)
-                // 只在播放时显示图标，移除箭头图标
-                if (playing) {
-                    setRightIcon(Icons.PLAYING_BLACK.drawable)
-                } else {
-                    setRightIcon(null)
-                }
+                leftText.setTextColor(0xFF1A1A1A.toInt()) // 深灰色
+                rightText.setTextColor(0xFFFFFFFF.toInt()) // 白色（在黑色背景上）
             }
-            // 根据是否需要为右侧时间预留空间来设置左侧文本的右侧内边距
-            if (reserveSpaceForTime) {
-                leftText.paddingRight = DEFAULT_PADDING * 8
-            } else {
-                leftText.paddingRight = DEFAULT_PADDING
-            }
+            updateLayout()
         }
 
         private var shakeCount = 0
@@ -721,15 +754,14 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
 
             leftText.clear()
             rightText.clear()
-            rightIcon.setImageDrawable(null)
 
             highlight = false
             enable = false
             playing = false
 
-            setPadding(0, 0, 0, 0)
-
             setIcons()
         }
+
+
     }
 }
