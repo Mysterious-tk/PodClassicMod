@@ -84,7 +84,11 @@ class TomSteadyProcessor(audioSessionId: Int) {
             val format = extractor.getTrackFormat(audioTrackIndex)
 
             // 获取采样率
-            val sampleRate = format.getInteger(MediaFormat.KEY_SAMPLE_RATE, 44100)
+            val sampleRate = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                format.getInteger(MediaFormat.KEY_SAMPLE_RATE, 44100)
+            } else {
+                format.getInteger(MediaFormat.KEY_SAMPLE_RATE)
+            }
 
             // 读取音频数据
             val bufferSize = 1024 * 1024 // 1MB buffer

@@ -20,35 +20,19 @@ class AudioFocusManager(
 
     private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
-    private val audioFocusRequest =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) AudioFocusRequest
-            .Builder(AudioManager.AUDIOFOCUS_GAIN)
-            .setOnAudioFocusChangeListener(this)
-            .setAudioAttributes(audioAttributes)
-            .setWillPauseWhenDucked(false)
-            .build()
-        else null
+    private val audioFocusRequest = AudioFocusRequest
+        .Builder(AudioManager.AUDIOFOCUS_GAIN)
+        .setOnAudioFocusChangeListener(this)
+        .setAudioAttributes(audioAttributes)
+        .setWillPauseWhenDucked(false)
+        .build()
 
     fun requestAudioFocus() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            audioManager.requestAudioFocus(audioFocusRequest!!)
-        } else {
-            @Suppress("DEPRECATION")
-            audioManager.requestAudioFocus(
-                this,
-                AudioManager.STREAM_MUSIC,
-                AudioManager.AUDIOFOCUS_GAIN
-            )
-        }
+        audioManager.requestAudioFocus(audioFocusRequest)
     }
 
     fun abandonAudioFocus() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            audioManager.abandonAudioFocusRequest(audioFocusRequest!!)
-        } else {
-            @Suppress("DEPRECATION")
-            audioManager.abandonAudioFocus(this)
-        }
+        audioManager.abandonAudioFocusRequest(audioFocusRequest)
     }
 
     override fun onAudioFocusChange(focusChange: Int) {

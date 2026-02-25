@@ -64,6 +64,7 @@
     <string name="theme">主題</string>
     <string name="theme_red">紅色</string>
     <string name="theme_black">黑色</string>
+    <string name="theme_ipod_3rd">iPod 3rd</string>
     <string name="show_lyric">顯示歌詞</string>
     <string name="show_info">顯示歌手和專輯</string>
     <string name="auto_play">啟動後自動播放</string>
@@ -75,4 +76,9 @@
     <string name="internal_storage">內部存儲</string>
     <string name="sdcard">SD卡</string>
     <string name="theme_white">白色</string>
+    <string name="volume_up">+</string>
+    <string name="volume_down">-</string>
+    <string name="prev">上一首</string>
+    <string name="next">下一首</string>
+    <string name="pause">暫停</string>
 </resources>

@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.RandomAccessFile;
 import java.util.ArrayList;
+import java.util.Locale;
 
 public class MediaMetadataUtil {
     private MediaMetadataUtil() {
@@ -192,7 +193,7 @@ public class MediaMetadataUtil {
 
     public static Music getMediaMetadata(String path) {
         // 屏蔽录音文件
-        String lowerPath = path.toLowerCase();
+        String lowerPath = path.toLowerCase(Locale.ROOT);
         if (lowerPath.contains("通话录音") || lowerPath.contains("录音") || lowerPath.contains("recorder") || lowerPath.contains("recordings") || lowerPath.contains("voice") || lowerPath.contains("audio") || (lowerPath.contains("call") && lowerPath.contains("record")) || lowerPath.contains("sound") || lowerPath.contains("note")) {
             return null;
         }

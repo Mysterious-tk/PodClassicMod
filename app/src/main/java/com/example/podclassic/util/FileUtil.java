@@ -13,6 +13,7 @@ import com.example.podclassic.base.BaseApplication;
 import java.io.File;
 import java.lang.reflect.Array;
 import java.lang.reflect.Method;
+import java.util.Locale;
 
 public class FileUtil {
     public static final int TYPE_AUDIO = 1;
@@ -107,7 +108,7 @@ public class FileUtil {
     }
 
     public static int getFileType(File file) {
-        String name = file.getName().toLowerCase();
+        String name = file.getName().toLowerCase(Locale.ROOT);
         if (name.endsWith(".m4a") || name.endsWith(".aac") || name.endsWith(".flac") || name.endsWith(".mp3") || name.endsWith(".wav") || name.endsWith(".ogg")) {
             return TYPE_AUDIO;
         } else if (name.endsWith(".jpg") || name.endsWith(".gif") || name.endsWith(".bmp") || name.endsWith(".png") || name.endsWith(".heic") || name.endsWith(".heif")) {
@@ -121,7 +122,7 @@ public class FileUtil {
     }
 
     public static boolean isAudio(File file) {
-        String name = file.getName().toLowerCase();
+        String name = file.getName().toLowerCase(Locale.ROOT);
         return name.endsWith(".m4a") || name.endsWith(".aac") || name.endsWith(".flac") || name.endsWith(".mp3") || name.endsWith(".wav") || name.endsWith(".ogg");
     }
 

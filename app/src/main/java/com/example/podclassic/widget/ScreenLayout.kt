@@ -8,6 +8,8 @@ import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import androidx.core.view.contains
+import androidx.core.view.isEmpty
 import java.util.*
 
 open class ScreenLayout : ViewGroup {
@@ -65,7 +67,7 @@ open class ScreenLayout : ViewGroup {
             android.util.Log.d("ScreenLayout", "Animator is running, skipping layout")
             return
         }
-        if (childCount == 0) {
+        if (isEmpty()) {
             android.util.Log.d("ScreenLayout", "No children, skipping layout")
             return
         }
@@ -149,7 +151,7 @@ open class ScreenLayout : ViewGroup {
     private val viewStack = Stack<View>()
 
     open fun curr(): View? {
-        if (childCount == 0) {
+        if (isEmpty()) {
             return null
         }
         return getChildAt(childCount - 1)
@@ -167,7 +169,7 @@ open class ScreenLayout : ViewGroup {
         val currChild = getChildAt(childCount - 1)
         val child = viewStack.pop()
 
-        if (indexOfChild(child) != -1) {
+        if (child in this) {
             return curr()
         }
         super.addView(child)
@@ -218,7 +220,7 @@ open class ScreenLayout : ViewGroup {
             android.util.Log.d("ScreenLayout", "View is null, returning")
             return
         }
-        if (indexOfChild(view) != -1) {
+        if (view in this) {
             android.util.Log.d("ScreenLayout", "View already added, returning")
             return
         }

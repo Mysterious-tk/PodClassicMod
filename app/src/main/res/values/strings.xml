@@ -76,4 +76,9 @@
     <string name="internal_storage">内部存储</string>
     <string name="sdcard">SD卡</string>
     <string name="theme_white">白色</string>
+    <string name="volume_up">+</string>
+    <string name="volume_down">-</string>
+    <string name="prev">上一首</string>
+    <string name="next">下一首</string>
+    <string name="pause">暂停</string>
 </resources>

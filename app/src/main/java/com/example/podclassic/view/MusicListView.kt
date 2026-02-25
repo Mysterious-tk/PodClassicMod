@@ -28,6 +28,7 @@ import com.example.podclassic.util.MediaUtil
 import com.example.podclassic.util.ThreadUtil
 import com.example.podclassic.values.Colors
 import com.example.podclassic.values.Icons
+import java.util.Locale
 import com.example.podclassic.values.Values
 import com.example.podclassic.widget.ListView
 import com.example.podclassic.widget.ListView.OnItemClickListener
@@ -223,7 +224,7 @@ class MusicListView : FrameLayout, ScreenView {
         val totalSeconds = duration / 1000
         val minutes = totalSeconds / 60
         val seconds = totalSeconds % 60
-        return String.format("%02d:%02d", minutes, seconds)
+        return String.format(Locale.getDefault(), "%02d:%02d", minutes, seconds)
     }
 
     private fun refreshList() {

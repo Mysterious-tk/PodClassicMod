@@ -64,6 +64,7 @@
     <string name="theme">Theme</string>
     <string name="theme_red">Red</string>
     <string name="theme_black">Black</string>
+    <string name="theme_ipod_3rd">iPod 3rd</string>
     <string name="show_lyric">Show Lyrics</string>
     <string name="show_info">Show Extra Info</string>
     <string name="auto_play">Autoplay After Startup</string>
@@ -75,4 +76,9 @@
     <string name="sdcard">SD Card</string>
     <string name="theme_white">White</string>
     <string name="about_me">About</string>
+    <string name="volume_up">+</string>
+    <string name="volume_down">-</string>
+    <string name="prev">Previous</string>
+    <string name="next">Next</string>
+    <string name="pause">Pause</string>
 </resources>

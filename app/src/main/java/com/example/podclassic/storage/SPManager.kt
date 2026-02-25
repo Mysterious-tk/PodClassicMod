@@ -90,11 +90,11 @@ object SPManager {
         var resetCount = getInt(SP_RESET_COUNT)
         resetCount++
         setInt(SP_RESET_COUNT, resetCount)
-        sharedPreferences.edit().commit()
+        sharedPreferences.edit().apply()
     }
 
     fun save() {
-        sharedPreferences.edit().commit()
+        sharedPreferences.edit().apply()
     }
 
 

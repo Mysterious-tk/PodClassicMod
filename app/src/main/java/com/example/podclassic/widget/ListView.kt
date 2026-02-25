@@ -19,6 +19,8 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.LinearLayout.VERTICAL
 import android.widget.RelativeLayout
+import androidx.core.view.isGone
+import androidx.core.view.isVisible
 import com.example.podclassic.util.PinyinUtil
 import com.example.podclassic.util.ThreadUtil
 import com.example.podclassic.values.Colors
@@ -234,8 +236,7 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
     }
 
     fun refreshList() {
-        android.util.Log.d("ListView", "refreshList: itemList.size=${itemList.size}, position=$position, index=$index")
-        if (itemList.size > MAX_SIZE && scrollBar.visibility == GONE) {
+        if (itemList.size > MAX_SIZE && scrollBar.isGone) {
             scrollBar.visibility = View.VISIBLE
         }
         scrollBar.setScrollBar(position, MAX_SIZE, itemList.size)
@@ -246,11 +247,10 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
             }
             val itemView = itemViewList[i - position]
             val item = itemList[i]
-            android.util.Log.d("ListView", "refreshList: i=$i, name='${item.name}', rightText='${item.rightText}', itemView.visibility=${itemView.visibility}")
             itemView.setText(item.name)
             //itemList.height = itemHeight
             //itemView.cancelShake()
-            if (scrollBar.visibility == View.VISIBLE) {
+            if (scrollBar.isVisible) {
                 itemView.setPadding(0, 0, DEFAULT_PADDING, 0)
             }
             onItemCreated(i, itemView)
@@ -660,6 +660,7 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
                 // 重新设置文本触发 Marquee
                 val text = leftText.text.toString()
                 leftText.text = text
+                android.util.Log.d("ListView", "setHighlight: text='$text', width=${leftText.width}, measuredWidth=${leftText.measuredWidth}, scrollable=${leftText.scrollable}, ellipsize=${leftText.ellipsize}, isFocused=${leftText.isFocused}")
             } else {
                 leftText.isSelected = false
             }

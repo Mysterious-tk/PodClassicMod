@@ -249,12 +249,7 @@ object Core {
             SPManager.Language.EN.id -> configuration.setLocale(Locale.US)
             SPManager.Language.AUTO.id -> configuration.setLocale(Locale.getDefault())
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
-            context.createConfigurationContext(configuration)
-        } else {
-            @Suppress("DEPRECATION")
-            resources.updateConfiguration(configuration, resources.displayMetrics)
-        }
+        context.createConfigurationContext(configuration)
         Strings.init()
     }
 

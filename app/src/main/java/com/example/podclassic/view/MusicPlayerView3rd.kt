@@ -28,6 +28,7 @@ import com.example.podclassic.util.ThreadUtil
 import com.example.podclassic.util.VolumeUtil
 import com.example.podclassic.values.Colors
 import com.example.podclassic.values.Icons
+import java.util.Locale
 import com.example.podclassic.values.Strings
 import com.example.podclassic.widget.ScreenLayout
 import com.example.podclassic.widget.SeekBar
@@ -571,7 +572,7 @@ class MusicPlayerView3rd(context: Context) : FrameLayout(context), ScreenView {
         val totalSeconds = milliseconds / 1000
         val minutes = totalSeconds / 60
         val seconds = totalSeconds % 60
-        return String.format("%02d:%02d", minutes, seconds)
+        return String.format(Locale.getDefault(), "%02d:%02d", minutes, seconds)
     }
 
 
