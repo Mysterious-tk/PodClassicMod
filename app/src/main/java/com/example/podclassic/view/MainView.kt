@@ -22,14 +22,14 @@ import com.example.podclassic.util.MediaStoreUtil
 import com.example.podclassic.values.Colors
 import com.example.podclassic.values.Strings
 import com.example.podclassic.view.MusicPlayerView3rd
-import com.example.podclassic.widget.ListView
+import com.example.podclassic.widget.RecyclerListView
 import java.io.File
 import java.util.*
 
 
 class MainView(context: Context) : RelativeLayout(context), ScreenView {
 
-    private val listView = ListView(context)
+    private val listView = RecyclerListView(context)
     // 图片容器（可见区域）
     private val coverContainer = FrameLayout(context)
     // 图片视图（比容器大，在容器内飘动）
@@ -73,8 +73,8 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
         }
     }
 
-    val item = ListView.Item(Strings.NOW_PLAYING, object : ListView.OnItemClickListener {
-        override fun onItemClick(index: Int, listView: ListView): Boolean {
+    val item = RecyclerListView.Item(Strings.NOW_PLAYING, object : RecyclerListView.OnItemClickListener {
+        override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
             if (SPManager.getInt(SPManager.Theme.SP_NAME) == SPManager.Theme.IPOD_3RD.id) {
                 Core.addView(MusicPlayerView3rd(context))
             } else {
@@ -83,7 +83,7 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
             return true
         }
 
-        override fun onItemLongClick(index: Int, listView: ListView): Boolean {
+        override fun onItemLongClick(index: Int, listView: RecyclerListView): Boolean {
             return false
         }
     }, true)
@@ -159,39 +159,39 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
 
         // 初始化菜单项
         val menuItems = arrayListOf(
-            ListView.Item(Strings.SONG, object : ListView.OnItemClickListener {
-                override fun onItemClick(index: Int, listView: ListView): Boolean {
+            RecyclerListView.Item(Strings.SONG, object : RecyclerListView.OnItemClickListener {
+                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                     Core.addView(MusicView(context))
                     return true
                 }
 
-                override fun onItemLongClick(index: Int, listView: ListView): Boolean {
+                override fun onItemLongClick(index: Int, listView: RecyclerListView): Boolean {
                     return false
                 }
             }, true),
-            ListView.Item(Strings.PHOTO, object : ListView.OnItemClickListener {
+            RecyclerListView.Item(Strings.PHOTO, object : RecyclerListView.OnItemClickListener {
                 val list by lazy { MediaStoreUtil.getPhotoList() }
-                private fun getItemList(): ArrayList<ListView.Item> {
-                    val itemList = ArrayList<ListView.Item>()
+                private fun getItemList(): ArrayList<RecyclerListView.Item> {
+                    val itemList = ArrayList<RecyclerListView.Item>()
                     for (file in list) {
-                        itemList.add(ListView.Item(file.name, null, false))
+                        itemList.add(RecyclerListView.Item(file.name, null, false))
                     }
                     return itemList
                 }
 
-                override fun onItemClick(index: Int, listView: ListView): Boolean {
+                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                     Core.addView(
                         ItemListView(
                             context,
                             getItemList(),
                             Strings.PHOTO,
-                            object : ListView.OnItemClickListener {
-                                override fun onItemClick(index: Int, listView: ListView): Boolean {
+                            object : RecyclerListView.OnItemClickListener {
+                                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                                     Core.addView(ImageView(context, list, index))
                                     return true
                                 }
 
-                                override fun onItemLongClick(index: Int, listView: ListView): Boolean {
+                                override fun onItemLongClick(index: Int, listView: RecyclerListView): Boolean {
                                     return false
                                 }
                             })
@@ -199,29 +199,29 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
                     return true
                 }
 
-                override fun onItemLongClick(index: Int, listView: ListView): Boolean {
+                override fun onItemLongClick(index: Int, listView: RecyclerListView): Boolean {
                     return false
                 }
             }, true),
-            ListView.Item(Strings.VIDEO, object : ListView.OnItemClickListener {
+            RecyclerListView.Item(Strings.VIDEO, object : RecyclerListView.OnItemClickListener {
                 val list by lazy { MediaStoreUtil.getVideoList() }
 
-                private fun getItemList(): ArrayList<ListView.Item> {
-                    val itemList = ArrayList<ListView.Item>()
+                private fun getItemList(): ArrayList<RecyclerListView.Item> {
+                    val itemList = ArrayList<RecyclerListView.Item>()
                     for (file in list) {
-                        itemList.add(ListView.Item(file.name, null, false))
+                        itemList.add(RecyclerListView.Item(file.name, null, false))
                     }
                     return itemList
                 }
 
-                override fun onItemClick(index: Int, listView: ListView): Boolean {
+                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                     Core.addView(
                         ItemListView(
                             context,
                             getItemList(),
                             Strings.VIDEO,
-                            object : ListView.OnItemClickListener {
-                                override fun onItemClick(index: Int, listView: ListView): Boolean {
+                            object : RecyclerListView.OnItemClickListener {
+                                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                                     val file = list[index]
                                     return if (file.exists()) {
                                         Core.addView(VideoView(context, list[index]))
@@ -231,7 +231,7 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
                                     }
                                 }
 
-                                override fun onItemLongClick(index: Int, listView: ListView): Boolean {
+                                override fun onItemLongClick(index: Int, listView: RecyclerListView): Boolean {
                                     return false
                                 }
                             })
@@ -239,17 +239,17 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
                     return true
                 }
 
-                override fun onItemLongClick(index: Int, listView: ListView): Boolean {
+                override fun onItemLongClick(index: Int, listView: RecyclerListView): Boolean {
                     return false
                 }
             }, true),
 
-            ListView.Item(Strings.FILE, object : ListView.OnItemClickListener {
-                private fun getItemList(): ArrayList<ListView.Item>? {
+            RecyclerListView.Item(Strings.FILE, object : RecyclerListView.OnItemClickListener {
+                private fun getItemList(): ArrayList<RecyclerListView.Item>? {
                     val sdCardPath = FileUtil.getSDCardPath() ?: return null
-                    val itemList = ArrayList<ListView.Item>()
-                    itemList.add(ListView.Item(Strings.INTERNAL_STORAGE, object : ListView.OnItemClickListener {
-                        override fun onItemClick(index: Int, listView: ListView): Boolean {
+                    val itemList = ArrayList<RecyclerListView.Item>()
+                    itemList.add(RecyclerListView.Item(Strings.INTERNAL_STORAGE, object : RecyclerListView.OnItemClickListener {
+                        override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                             Core.addView(
                                 FileView(
                                     context,
@@ -259,25 +259,25 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
                             return true
                         }
 
-                        override fun onItemLongClick(index: Int, listView: ListView): Boolean {
+                        override fun onItemLongClick(index: Int, listView: RecyclerListView): Boolean {
                             return false
                         }
                     }, true))
 
-                    itemList.add(ListView.Item(Strings.SDCARD, object : ListView.OnItemClickListener {
-                        override fun onItemClick(index: Int, listView: ListView): Boolean {
+                    itemList.add(RecyclerListView.Item(Strings.SDCARD, object : RecyclerListView.OnItemClickListener {
+                        override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                             Core.addView(FileView(context, File(sdCardPath)))
                             return true
                         }
 
-                        override fun onItemLongClick(index: Int, listView: ListView): Boolean {
+                        override fun onItemLongClick(index: Int, listView: RecyclerListView): Boolean {
                             return false
                         }
                     }, true))
                     return itemList
                 }
 
-                override fun onItemClick(index: Int, listView: ListView): Boolean {
+                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                     val itemList = getItemList()
                     if (itemList == null) {
                         Core.addView(FileView(context, Environment.getExternalStorageDirectory()))
@@ -287,24 +287,24 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
                     return true
                 }
 
-                override fun onItemLongClick(index: Int, listView: ListView): Boolean {
+                override fun onItemLongClick(index: Int, listView: RecyclerListView): Boolean {
                     return false
                 }
             }, true),
 
-            ListView.Item(Strings.EXTRA_APPLICATION, object : ListView.OnItemClickListener {
-                override fun onItemClick(index: Int, listView: ListView): Boolean {
+            RecyclerListView.Item(Strings.EXTRA_APPLICATION, object : RecyclerListView.OnItemClickListener {
+                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                     Core.addView(AppsView(context))
                     return true
                 }
 
-                override fun onItemLongClick(index: Int, listView: ListView): Boolean {
+                override fun onItemLongClick(index: Int, listView: RecyclerListView): Boolean {
                     return false
                 }
             }, true),
 
-            ListView.Item(Strings.SETTINGS, object : ListView.OnItemClickListener {
-                override fun onItemClick(index: Int, listView: ListView): Boolean {
+            RecyclerListView.Item(Strings.SETTINGS, object : RecyclerListView.OnItemClickListener {
+                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                     Core.addView(
                         SettingsView(
                             context
@@ -313,13 +313,13 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
                     return true
                 }
 
-                override fun onItemLongClick(index: Int, listView: ListView): Boolean {
+                override fun onItemLongClick(index: Int, listView: RecyclerListView): Boolean {
                     return false
                 }
 
             }, true),
-            ListView.Item(Strings.SHUFFLE_PLAY, object : ListView.OnItemClickListener {
-                override fun onItemClick(index: Int, listView: ListView): Boolean {
+            RecyclerListView.Item(Strings.SHUFFLE_PLAY, object : RecyclerListView.OnItemClickListener {
+                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                     MediaPresenter.shufflePlay()
                     // 根据主题选择使用哪个播放器视图
                     if (SPManager.getInt(SPManager.Theme.SP_NAME) == SPManager.Theme.IPOD_3RD.id) {
@@ -330,7 +330,7 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
                     return true
                 }
 
-                override fun onItemLongClick(index: Int, listView: ListView): Boolean {
+                override fun onItemLongClick(index: Int, listView: RecyclerListView): Boolean {
                     return false
                 }
             }, false)

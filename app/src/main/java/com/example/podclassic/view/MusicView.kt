@@ -10,10 +10,10 @@ import com.example.podclassic.storage.MusicTable
 import com.example.podclassic.storage.SPManager
 import com.example.podclassic.util.MediaStoreUtil
 import com.example.podclassic.values.Strings
-import com.example.podclassic.widget.ListView
+import com.example.podclassic.widget.RecyclerListView
 import java.io.File
 
-class MusicView(context: Context) : ListView(context), ScreenView {
+class MusicView(context: Context) : RecyclerListView(context), ScreenView {
     override fun getTitle(): String {
         return Strings.SONG
     }
@@ -31,7 +31,7 @@ class MusicView(context: Context) : ListView(context), ScreenView {
     }
 
     private val currentList = Item(Strings.CURRENT_PLAYLIST, object : OnItemClickListener {
-        override fun onItemClick(index: Int, listView: ListView): Boolean {
+        override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
             Core.addView(
                 MusicListView(
                     context,
@@ -45,7 +45,7 @@ class MusicView(context: Context) : ListView(context), ScreenView {
     }, true)
 
     private val coverFlow = Item(Strings.COVER_FLOW, object : OnItemClickListener {
-        override fun onItemClick(index: Int, listView: ListView): Boolean {
+        override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
             if (MediaStoreUtil.getAlbumList().isEmpty()) {
                 return false
             }
@@ -58,7 +58,7 @@ class MusicView(context: Context) : ListView(context), ScreenView {
         itemList = arrayListOf(
             Item(Strings.MUSIC, object : OnItemClickListener {
                 val musicList = MediaStoreUtil.getMusicList()
-                override fun onItemClick(index: Int, listView: ListView): Boolean {
+                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                     Core.addView(
                         MusicListView(
                             context,
@@ -72,7 +72,7 @@ class MusicView(context: Context) : ListView(context), ScreenView {
             }, true),
 
             Item(Strings.ALBUM, object : OnItemClickListener {
-                override fun onItemClick(index: Int, listView: ListView): Boolean {
+                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                     Core.addView(
                         AlbumListView(
                             context,
@@ -86,7 +86,7 @@ class MusicView(context: Context) : ListView(context), ScreenView {
             }, true),
 
             Item(Strings.ARTIST, object : OnItemClickListener {
-                override fun onItemClick(index: Int, listView: ListView): Boolean {
+                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                     val singerList = MediaStoreUtil.getArtistList()
                     val itemList1 = ArrayList<Item>(singerList.size)
                     for (musicList in singerList) {
@@ -97,7 +97,7 @@ class MusicView(context: Context) : ListView(context), ScreenView {
                         itemList1,
                         Strings.ARTIST,
                         object : OnItemClickListener {
-                            override fun onItemClick(index: Int, listView: ListView): Boolean {
+                            override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                                 val albumList =
                                     MediaStoreUtil.getArtistAlbum(singerList[index].title)
                                 val musicList = MusicList.Builder().apply {
@@ -116,7 +116,7 @@ class MusicView(context: Context) : ListView(context), ScreenView {
                                 return true
                             }
 
-                            override fun onItemLongClick(index: Int, listView: ListView): Boolean {
+                            override fun onItemLongClick(index: Int, listView: RecyclerListView): Boolean {
                                 MusicListTable.artist.add(singerList[index])
                                 listView.shake()
                                 return true
@@ -130,7 +130,7 @@ class MusicView(context: Context) : ListView(context), ScreenView {
             }, true),
 
             Item(Strings.SAVE_FOLDER, object : OnItemClickListener {
-                override fun onItemClick(index: Int, listView: ListView): Boolean {
+                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                     val itemList = ArrayList<Item>()
                     val files = MusicListTable.folder.getList()
 
@@ -143,14 +143,14 @@ class MusicView(context: Context) : ListView(context), ScreenView {
                             itemList,
                             Strings.FOLDER,
                             object : OnItemClickListener {
-                                override fun onItemClick(index: Int, listView: ListView): Boolean {
+                                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                                     Core.addView(FileView(context, File(files[index].data)))
                                     return true
                                 }
 
                                 override fun onItemLongClick(
                                     index: Int,
-                                    listView: ListView
+                                    listView: RecyclerListView
                                 ): Boolean {
                                     listView.removeCurrentItem()
                                     MusicListTable.folder.delete(files[index])
@@ -164,7 +164,7 @@ class MusicView(context: Context) : ListView(context), ScreenView {
 
 
             Item(Strings.SAVE_MUSIC, object : OnItemClickListener {
-                override fun onItemClick(index: Int, listView: ListView): Boolean {
+                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                     Core.addView(
                         MusicListView(
                             context,
@@ -177,7 +177,7 @@ class MusicView(context: Context) : ListView(context), ScreenView {
                 }
             }, true),
             Item(Strings.SAVE_ALBUM, object : OnItemClickListener {
-                override fun onItemClick(index: Int, listView: ListView): Boolean {
+                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                     Core.addView(
                         AlbumListView(
                             context,
@@ -190,7 +190,7 @@ class MusicView(context: Context) : ListView(context), ScreenView {
                 }
             }, true),
             Item(Strings.SAVE_ARTIST, object : OnItemClickListener {
-                override fun onItemClick(index: Int, listView: ListView): Boolean {
+                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                     Core.addView(
                         AlbumListView(
                             context,

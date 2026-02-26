@@ -15,12 +15,12 @@ import com.example.podclassic.storage.SPManager
 import com.example.podclassic.util.MediaStoreUtil
 import com.example.podclassic.values.Strings
 import com.example.podclassic.values.Values
-import com.example.podclassic.widget.ListView
+import com.example.podclassic.widget.RecyclerListView
 import com.example.podclassic.widget.OnSwitchListener
 import com.example.podclassic.widget.SwitchBar
 import java.util.*
 
-class SettingsView(context: Context) : ListView(context), ScreenView {
+class SettingsView(context: Context) : RecyclerListView(context), ScreenView {
     companion object {
         const val about = "感谢您的使用!\n这里本应有个彩蛋, 但是没啥想法, 就这样吧.\n"
     }
@@ -44,7 +44,7 @@ class SettingsView(context: Context) : ListView(context), ScreenView {
     init {
         itemList = arrayListOf(
             Item(Strings.ABOUT, object : OnItemClickListener {
-                override fun onItemClick(index: Int, listView: ListView): Boolean {
+                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                     val statFs = StatFs(Environment.getDataDirectory().path)
                     val blockSizeLong = statFs.blockSizeLong
                     Core.addView(
@@ -68,7 +68,7 @@ class SettingsView(context: Context) : ListView(context), ScreenView {
                                     var count = 0
                                     override fun onItemClick(
                                         index: Int,
-                                        listView: ListView
+                                        listView: RecyclerListView
                                     ): Boolean {
                                         count++
                                         if (count == 7) {
@@ -120,14 +120,14 @@ class SettingsView(context: Context) : ListView(context), ScreenView {
                     ),
                 )
 
-                override fun onItemClick(index: Int, listView: ListView): Boolean {
+                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                     Core.addView(
                         ItemListView(
                             context,
                             itemList,
                             Strings.LANGUAGE,
                             object : OnItemClickListener {
-                                override fun onItemClick(index: Int, listView: ListView): Boolean {
+                                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                                     SPManager.setInt(SPManager.Language.SP_NAME, index)
                                     //Toast.makeText(context, "set language", Toast.LENGTH_SHORT).show()
                                     Core.reboot()
@@ -146,50 +146,50 @@ class SettingsView(context: Context) : ListView(context), ScreenView {
 
                 val itemList = arrayListOf(
                     Item(Strings.DISABLE, object : OnItemClickListener {
-                        override fun onItemClick(index: Int, listView: ListView): Boolean {
+                        override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                             scheduleToStop(0); return true
                         }
                     }, false),
                     //Item("1 分钟", object : OnItemClickListener { override fun onItemClick(index: Int, listView: ListView) : Boolean {scheduleToStop(1); return true } }, false),
                     Item("15 ${Strings.MINUTE}", object : OnItemClickListener {
-                        override fun onItemClick(index: Int, listView: ListView): Boolean {
+                        override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                             scheduleToStop(15); return true
                         }
                     }, false),
                     Item("30 ${Strings.MINUTE}", object : OnItemClickListener {
-                        override fun onItemClick(index: Int, listView: ListView): Boolean {
+                        override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                             scheduleToStop(30); return true
                         }
                     }, false),
                     Item("60 ${Strings.MINUTE}", object : OnItemClickListener {
-                        override fun onItemClick(index: Int, listView: ListView): Boolean {
+                        override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                             scheduleToStop(60); return true
                         }
                     }, false),
                     Item("90 ${Strings.MINUTE}", object : OnItemClickListener {
-                        override fun onItemClick(index: Int, listView: ListView): Boolean {
+                        override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                             scheduleToStop(90); return true
                         }
                     }, false),
                     Item("120 ${Strings.MINUTE}", object : OnItemClickListener {
-                        override fun onItemClick(index: Int, listView: ListView): Boolean {
+                        override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                             scheduleToStop(120); return true
                         }
                     }, false),
                     Item("240 ${Strings.MINUTE}", object : OnItemClickListener {
-                        override fun onItemClick(index: Int, listView: ListView): Boolean {
+                        override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                             scheduleToStop(240); return true
                         }
                     }, false)
                 )
 
-                override fun onItemClick(index: Int, listView: ListView): Boolean {
+                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                     Core.addView(ItemListView(context, itemList, "睡眠定时", null)); return true
                 }
             }, true),
 
             Item(Strings.EQUALIZER, object : OnItemClickListener {
-                override fun onItemClick(index: Int, listView: ListView): Boolean {
+                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                     val nameList = MediaPresenter.getPresetList()
                     val itemList = ArrayList<Item>()
                     val equalizerIndex = SPManager.getInt(
@@ -210,7 +210,7 @@ class SettingsView(context: Context) : ListView(context), ScreenView {
                             itemList,
                             Strings.EQUALIZER,
                             object : OnItemClickListener {
-                                override fun onItemClick(index: Int, listView: ListView): Boolean {
+                                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                                     MediaPresenter.setEqualizer(index)
                                     Core.removeView()
                                     return true
@@ -222,7 +222,7 @@ class SettingsView(context: Context) : ListView(context), ScreenView {
             }, true),
 
             Item(Strings.PLAY_MODE, object : OnItemClickListener {
-                override fun onItemClick(index: Int, listView: ListView): Boolean {
+                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                     val playMode = MediaPresenter.getPlayMode()
                     val next = PlayMode.getPlayMode((playMode.id + 1) % PlayMode.count)
                     MediaPresenter.nextPlayMode()
@@ -233,7 +233,7 @@ class SettingsView(context: Context) : ListView(context), ScreenView {
 
             Item(
                 Strings.SHUFFLE_PLAY, object : OnItemClickListener {
-                    override fun onItemClick(index: Int, listView: ListView): Boolean {
+                    override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                         SPManager.getBoolean(
                             SPManager.SP_PLAY_ALL
                         ).let {
@@ -252,7 +252,7 @@ class SettingsView(context: Context) : ListView(context), ScreenView {
             ),
 
             Item(Strings.REPEAT_MODE, object : OnItemClickListener {
-                override fun onItemClick(index: Int, listView: ListView): Boolean {
+                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                     val repeatMode = MediaPresenter.getRepeatMode()
                     val next = RepeatMode.getRepeatMode((repeatMode.id + 1) % RepeatMode.count)
                     MediaPresenter.nextRepeatMode()
@@ -263,7 +263,7 @@ class SettingsView(context: Context) : ListView(context), ScreenView {
 
             Item(
                 Strings.NIGHT_MODE, object : OnItemClickListener {
-                    override fun onItemClick(index: Int, listView: ListView): Boolean {
+                    override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                         var nightMode = SPManager.getInt(SPManager.NightMode.SP_NAME)
                         nightMode++
                         nightMode %= SPManager.NightMode.values
@@ -295,7 +295,7 @@ class SettingsView(context: Context) : ListView(context), ScreenView {
 
             Item(
                 Strings.TOUCH_FEEDBACK, object : OnItemClickListener {
-                    override fun onItemClick(index: Int, listView: ListView): Boolean {
+                    override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                         var sound = SPManager.getInt(
                             SPManager.Sound.SP_NAME
                         )
@@ -316,7 +316,7 @@ class SettingsView(context: Context) : ListView(context), ScreenView {
 
             Item(
                 Strings.THEME, object : OnItemClickListener {
-                    override fun onItemClick(index: Int, listView: ListView): Boolean {
+                    override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                         val themeId = SPManager.getInt(SPManager.Theme.SP_NAME)
                         SPManager.setInt(
                             SPManager.Theme.SP_NAME,
@@ -352,7 +352,7 @@ class SettingsView(context: Context) : ListView(context), ScreenView {
 
             Item(
                 Strings.AUTO_PLAY, object : OnItemClickListener {
-                    override fun onItemClick(index: Int, listView: ListView): Boolean {
+                    override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                         var autoStop = SPManager.getInt(
                             SPManager.AutoStop.SP_NAME
                         )
@@ -394,12 +394,12 @@ class SettingsView(context: Context) : ListView(context), ScreenView {
                 }),
 
             Item("TomSteady设置", object : OnItemClickListener {
-                override fun onItemClick(index: Int, listView: ListView): Boolean {
+                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                     val itemList = arrayListOf(
                         Item(
                             "目标电平",
                             object : OnItemClickListener {
-                                override fun onItemClick(index: Int, listView: ListView): Boolean {
+                                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                                     // 循环切换目标电平值
                                     val currentValue = SPManager.getFloat(SPManager.SP_TOM_STEADY_TARGET_LEVEL, 0.7f)
                                     val values = arrayOf(0.5f, 0.6f, 0.7f, 0.8f, 0.9f)
@@ -417,7 +417,7 @@ class SettingsView(context: Context) : ListView(context), ScreenView {
                         Item(
                             "最大增益",
                             object : OnItemClickListener {
-                                override fun onItemClick(index: Int, listView: ListView): Boolean {
+                                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                                     // 循环切换最大增益值
                                     val currentValue = SPManager.getFloat(SPManager.SP_TOM_STEADY_MAX_GAIN, 20.0f)
                                     val values = arrayOf(10.0f, 15.0f, 20.0f, 25.0f, 30.0f)
@@ -435,7 +435,7 @@ class SettingsView(context: Context) : ListView(context), ScreenView {
                         Item(
                             "攻击时间",
                             object : OnItemClickListener {
-                                override fun onItemClick(index: Int, listView: ListView): Boolean {
+                                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                                     // 循环切换攻击时间值
                                     val currentValue = SPManager.getFloat(SPManager.SP_TOM_STEADY_ATTACK_TIME, 50.0f)
                                     val values = arrayOf(20.0f, 50.0f, 100.0f, 150.0f, 200.0f)
@@ -453,7 +453,7 @@ class SettingsView(context: Context) : ListView(context), ScreenView {
                         Item(
                             "释放时间",
                             object : OnItemClickListener {
-                                override fun onItemClick(index: Int, listView: ListView): Boolean {
+                                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                                     // 循环切换释放时间值
                                     val currentValue = SPManager.getFloat(SPManager.SP_TOM_STEADY_RELEASE_TIME, 200.0f)
                                     val values = arrayOf(100.0f, 200.0f, 300.0f, 400.0f, 500.0f)
@@ -482,14 +482,14 @@ class SettingsView(context: Context) : ListView(context), ScreenView {
             }, true),
 
             Item(Strings.RESET_ALL_SETTINGS, object : OnItemClickListener {
-                override fun onItemClick(index: Int, listView: ListView): Boolean {
+                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                     Core.addView(
                         ItemListView(
                             context, arrayListOf(
                                 Item(Strings.CANCEL, object : OnItemClickListener {
                                     override fun onItemClick(
                                         index: Int,
-                                        listView: ListView
+                                        listView: RecyclerListView
                                     ): Boolean {
                                         Core.removeView(); return true
                                     }
@@ -497,7 +497,7 @@ class SettingsView(context: Context) : ListView(context), ScreenView {
                                 Item(Strings.RESET, object : OnItemClickListener {
                                     override fun onItemClick(
                                         index: Int,
-                                        listView: ListView
+                                        listView: RecyclerListView
                                     ): Boolean {
                                         Core.reset();Core.removeView(); return true
                                     }

@@ -3,7 +3,7 @@ package com.example.podclassic.view
 import android.annotation.SuppressLint
 import android.content.Context
 import com.example.podclassic.base.ScreenView
-import com.example.podclassic.widget.ListView
+import com.example.podclassic.widget.RecyclerListView
 
 @SuppressLint("ViewConstructor")
 open class ItemListView(
@@ -13,7 +13,7 @@ open class ItemListView(
     defaultListener: OnItemClickListener?,
     max_size: Int,
     sorted: Boolean = false
-) : ListView(context, max_size), ScreenView {
+) : RecyclerListView(context, max_size), ScreenView {
 
     constructor(
         context: Context,

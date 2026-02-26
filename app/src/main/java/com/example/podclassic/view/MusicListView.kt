@@ -30,8 +30,8 @@ import com.example.podclassic.values.Colors
 import com.example.podclassic.values.Icons
 import java.util.Locale
 import com.example.podclassic.values.Values
-import com.example.podclassic.widget.ListView
-import com.example.podclassic.widget.ListView.OnItemClickListener
+import com.example.podclassic.widget.RecyclerListView
+import com.example.podclassic.widget.RecyclerListView.OnItemClickListener
 
 @SuppressLint("ViewConstructor")
 class MusicListView : FrameLayout, ScreenView {
@@ -56,7 +56,7 @@ class MusicListView : FrameLayout, ScreenView {
     private val musicList: ArrayList<Music>
     private val name: String
     private val type: Int
-    private val listView: ListView
+    private val listView: RecyclerListView
     private val backgroundImageView: ImageView
 
     // 添加构造函数，用于创建背景ImageView
@@ -76,8 +76,8 @@ class MusicListView : FrameLayout, ScreenView {
         this.name = name
         this.type = type
         
-        // 初始化ListView和背景ImageView
-        listView = ListView(context)
+        // 初始化RecyclerListView和背景ImageView
+        listView = RecyclerListView(context)
         backgroundImageView = createBackgroundImageView(context)
         
         // 添加到FrameLayout中
@@ -95,8 +95,8 @@ class MusicListView : FrameLayout, ScreenView {
         this.name = musicList.title
         this.type = TYPE_NORMAL
         
-        // 初始化ListView和背景ImageView
-        listView = ListView(context)
+        // 初始化RecyclerListView和背景ImageView
+        listView = RecyclerListView(context)
         backgroundImageView = createBackgroundImageView(context)
         
         // 添加到FrameLayout中
@@ -144,8 +144,8 @@ class MusicListView : FrameLayout, ScreenView {
         }
         
         // 设置默认点击监听器，处理触摸播放歌曲的功能
-        listView.defaultOnItemClickListener = object : ListView.OnItemClickListener {
-            override fun onItemClick(index: Int, listView: ListView): Boolean {
+        listView.defaultOnItemClickListener = object : RecyclerListView.OnItemClickListener {
+            override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                 return enter(index)
             }
         }
@@ -210,11 +210,11 @@ class MusicListView : FrameLayout, ScreenView {
         // 移除专辑信息项，改为在背景显示专辑封面
     }
     
-    private fun createSongItem(index: Int, music: Music, showInfo: Boolean): ListView.Item {
+    private fun createSongItem(index: Int, music: Music, showInfo: Boolean): RecyclerListView.Item {
         // 只显示歌曲标题，符合iPod风格
         val displayText = music.title
         // 创建Item，设置右侧文本为歌曲时长，并设置enable为true
-        val item = ListView.Item(displayText, null, formatDuration(music.duration.toInt()))
+        val item = RecyclerListView.Item(displayText, null, formatDuration(music.duration.toInt()))
         item.enable = true
         return item
     }

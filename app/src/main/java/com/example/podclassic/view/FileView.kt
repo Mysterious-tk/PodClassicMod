@@ -12,14 +12,14 @@ import com.example.podclassic.storage.MusicTable
 import com.example.podclassic.util.FileUtil
 import com.example.podclassic.util.MediaStoreUtil
 import com.example.podclassic.values.Strings
-import com.example.podclassic.widget.ListView
+import com.example.podclassic.widget.RecyclerListView
 import java.io.File
 import java.text.Collator
 import java.util.*
 
 
 @SuppressLint("ViewConstructor")
-class FileView(context: Context, val file: File) : ListView(context), ScreenView {
+class FileView(context: Context, val file: File) : RecyclerListView(context), ScreenView {
 
     private var hasAudio = false
     val list: ArrayList<File> = file.let {

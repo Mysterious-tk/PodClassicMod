@@ -14,7 +14,7 @@ import com.example.podclassic.util.MediaStoreUtil
 import com.example.podclassic.util.ThreadUtil
 import com.example.podclassic.values.Strings
 import com.example.podclassic.values.Values.DEFAULT_PADDING
-import com.example.podclassic.widget.ListView
+import com.example.podclassic.widget.RecyclerListView
 import com.example.podclassic.widget.SeekBar
 import com.example.podclassic.widget.TextView
 import java.util.*
@@ -94,13 +94,13 @@ class MusicQuizView(context: Context) : LinearLayout(context), ScreenView,
         timer = Timer()
         val selectedMusic = selectMusics()
         while (selectedMusic.size > itemList.size()) {
-            itemList.add(ListView.Item("", null, false))
+            itemList.add(RecyclerListView.Item("", null, false))
         }
         for (i in selectedMusic.indices) {
             itemList.getItem(i).name = selectedMusic[i].title
         }
-        itemList.defaultOnItemClickListener = object : ListView.OnItemClickListener {
-            override fun onItemClick(index: Int, listView: ListView): Boolean {
+        itemList.defaultOnItemClickListener = object : RecyclerListView.OnItemClickListener {
+            override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                 return if (pack == null || index >= selectedMusic.size) {
                     false
                 } else {

@@ -7,7 +7,7 @@ import com.example.game.Brick
 import com.example.podclassic.storage.AppTable
 import com.example.podclassic.values.Strings
 import com.example.podclassic.values.Values
-import com.example.podclassic.widget.ListView
+import com.example.podclassic.widget.RecyclerListView
 
 class AppsView(context: Context) : ItemListView(
     context,
@@ -16,18 +16,18 @@ class AppsView(context: Context) : ItemListView(
         Item(Strings.GAME, object : OnItemClickListener {
             val itemList = arrayListOf(
                 Item(Strings.BRICK, object : OnItemClickListener {
-                    override fun onItemClick(index: Int, listView: ListView): Boolean {
+                    override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                         Core.addView(Brick(context)); return true
                     }
                 }, true),
                 Item(Strings.MUSIC_QUIZ, object : OnItemClickListener {
-                    override fun onItemClick(index: Int, listView: ListView): Boolean {
+                    override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                         Core.addView(MusicQuizView(context)); return true
                     }
                 }, true)
             )
 
-            override fun onItemClick(index: Int, listView: ListView): Boolean {
+            override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                 Core.addView(ItemListView(context, itemList, Strings.GAME, null)); return true
             }
 
@@ -35,7 +35,7 @@ class AppsView(context: Context) : ItemListView(
     ).apply {
         if (Values.LAUNCHER) {
             this.add(Item(Strings.APPLICATION, object : OnItemClickListener {
-                override fun onItemClick(index: Int, listView: ListView): Boolean {
+                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                     val itemList = ArrayList<Item>()
                     val appList = AppTable.getAppList()
                     for (app in appList) {
@@ -44,14 +44,14 @@ class AppsView(context: Context) : ItemListView(
                     Core.addView(
                         ItemListView(context, itemList, Strings.APPLICATION,
                             object : OnItemClickListener {
-                                override fun onItemClick(index: Int, listView: ListView): Boolean {
+                                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                                     context.startActivity(appList[index].intent)
                                     return true
                                 }
 
                                 override fun onItemLongClick(
                                     index: Int,
-                                    listView: ListView
+                                    listView: RecyclerListView
                                 ): Boolean {
                                     listView.shake()
                                     AppTable.favourite.add(appList[index])
@@ -68,7 +68,7 @@ class AppsView(context: Context) : ItemListView(
 
     init {
         this.defaultOnItemClickListener = object : OnItemClickListener {
-            override fun onItemClick(index: Int, listView: ListView): Boolean {
+            override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                 if (Values.LAUNCHER && index >= 2) {
                     context.startActivity((listView.getItem(index).extra as App).intent)
                     return true
@@ -76,7 +76,7 @@ class AppsView(context: Context) : ItemListView(
                 return false
             }
 
-            override fun onItemLongClick(index: Int, listView: ListView): Boolean {
+            override fun onItemLongClick(index: Int, listView: RecyclerListView): Boolean {
                 if (Values.LAUNCHER && index >= 2) {
                     AppTable.favourite.remove((listView.getItem(index).extra as App))
                     listView.removeCurrentItem()

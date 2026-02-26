@@ -8,10 +8,10 @@ class SwitchBar(
     bindSP: String,
     reverse: Boolean = false,
     private val onSwitchListener: OnSwitchListener? = null
-) : ListView.Item(
+) : RecyclerListView.Item(
     title,
-    object : ListView.OnItemClickListener {
-        override fun onItemClick(index: Int, listView: ListView): Boolean {
+    object : RecyclerListView.OnItemClickListener {
+        override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
             SPManager.getBoolean(bindSP).let {
                 SPManager.setBoolean(bindSP, !it)
                 listView.getCurrentItem().rightText =
