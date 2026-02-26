@@ -230,10 +230,16 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
     }
 
     private fun updateScrollBar() {
+        val oldShowScrollBar = scrollBar.visibility == View.VISIBLE
         scrollBar.setScrollBar(position, MAX_SIZE, itemList.size)
+        val newShowScrollBar = itemList.size > MAX_SIZE
         // 根据是否显示滚动条调整 RecyclerView 的 rightMargin
-        recyclerParams.rightMargin = if (itemList.size > MAX_SIZE) DEFAULT_PADDING else 0
+        recyclerParams.rightMargin = if (newShowScrollBar) DEFAULT_PADDING else 0
         recyclerView.layoutParams = recyclerParams
+        // 如果滚动条显示状态发生变化，刷新所有可见 item
+        if (oldShowScrollBar != newShowScrollBar) {
+            adapter.notifyDataSetChanged()
+        }
     }
 
     private fun updateHighlight() {
