@@ -242,7 +242,10 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
         scrollBar.setScrollBar(position, MAX_SIZE, itemList.size)
         for (i in position until MAX_SIZE + position) {
             if (i >= itemList.size) {
-                clearAt(i - position)
+                // 清除从当前位置到末尾的所有 ItemView，而不是只清除一个就 break
+                for (j in (i - position) until MAX_SIZE) {
+                    clearAt(j)
+                }
                 break
             }
             val itemView = itemViewList[i - position]
@@ -578,14 +581,14 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
             // leftText 右侧留出空间给 rightText 和 scrollBar
             layoutParams1.rightMargin = (60 * density).toInt() + DEFAULT_PADDING * 2
             // rightText 宽度自适应，靠右对齐
-            val layoutParams2 = FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.MATCH_PARENT, Gravity.END)
+            val layoutParams2 = FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.MATCH_PARENT)
+            layoutParams2.gravity = Gravity.RIGHT or Gravity.CENTER_VERTICAL
             layoutParams2.rightMargin = DEFAULT_PADDING // 右侧留出 scrollBar 的空间
 
             leftText.setSingleLine()
             rightText.setSingleLine()
             leftText.ellipsize = null
             rightText.ellipsize = null
-            rightText.gravity = Gravity.CENTER_VERTICAL or Gravity.END
             rightText.visibility = View.VISIBLE
             // 为rightText设置更小的padding，确保时间能够显示
             rightText.setPadding(DEFAULT_PADDING / 4, DEFAULT_PADDING / 4, DEFAULT_PADDING / 4, DEFAULT_PADDING / 4)
@@ -660,11 +663,19 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
                 // 重新设置文本触发 Marquee
                 val text = leftText.text.toString()
                 leftText.text = text
-                android.util.Log.d("ListView", "setHighlight: text='$text', width=${leftText.width}, measuredWidth=${leftText.measuredWidth}, scrollable=${leftText.scrollable}, ellipsize=${leftText.ellipsize}, isFocused=${leftText.isFocused}")
             } else {
                 leftText.isSelected = false
             }
-            setIcons()
+            // 直接设置背景和文字颜色，不通过 setIcons
+            if (highlight) {
+                setBackgroundColor(Colors.main)
+                leftText.setTextColor(0xFFFFFFFF.toInt())
+                rightText.setTextColor(0xFFFFFFFF.toInt())
+            } else {
+                background = null
+                leftText.setTextColor(0xFF1A1A1A.toInt())
+                rightText.setTextColor(0xFF1A1A1A.toInt())
+            }
         }
 
         fun setEnable(enable: Boolean) {
@@ -672,7 +683,7 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
                 return
             }
             this.enable = enable
-            setIcons()
+            // 不调用 setIcons，没有其他操作需要执行
         }
 
         fun setPlaying(playing: Boolean) {
@@ -680,7 +691,7 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
                 return
             }
             this.playing = playing
-            setIcons()
+            // 不调用 setIcons，没有其他操作需要执行
         }
 
         fun setText(text: String) {
@@ -690,21 +701,32 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
         fun setRightText(text: String) {
             rightText.text = text
             rightText.visibility = View.VISIBLE // 始终可见，即使文本为空
-            // 设置文字颜色
-            rightText.setTextColor(Colors.text)
-            // 确保文字居中对齐
-            rightText.gravity = Gravity.CENTER
+            // 根据高亮状态设置文字颜色
+            rightText.setTextColor(if (highlight) 0xFFFFFFFF.toInt() else Colors.text)
+            // 强制 rightText 重新测量和布局
+            rightText.measure(
+                MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED),
+                MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED)
+            )
+            rightText.requestLayout()
             updateLayout()
         }
 
         private fun updateLayout() {
             // 根据右侧时间文本是否为空来设置左侧文本的布局
             val layoutParams = leftText.layoutParams as FrameLayout.LayoutParams
-            if (rightText.text.isNotEmpty()) {
+            val hasRightText = rightText.text.isNotEmpty()
+            if (hasRightText) {
                 // 有 rightText 时，留出较小空间（时间格式为 05:00，约 45dp 足够）
                 layoutParams.rightMargin = (45 * context.resources.displayMetrics.density).toInt() + DEFAULT_PADDING * 2
                 leftText.paddingRight = DEFAULT_PADDING
                 rightText.visibility = View.VISIBLE
+                // 强制布局 rightText
+                val rightWidth = rightText.measuredWidth
+                val rightHeight = rightText.measuredHeight
+                val left = width - rightWidth - DEFAULT_PADDING
+                val top = (height - rightHeight) / 2
+                rightText.layout(left, top, left + rightWidth, top + rightHeight)
             } else {
                 // 没有 rightText 时，占满整个空间（只留出 scrollBar 的空间）
                 layoutParams.rightMargin = DEFAULT_PADDING
@@ -712,20 +734,12 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
                 rightText.visibility = View.GONE
             }
             leftText.layoutParams = layoutParams
+            // 强制整个 ItemView 重新测量和布局
+            requestLayout()
+            invalidate()
         }
 
-        private fun setIcons() {
-            if (highlight) {
-                setBackgroundColor(Colors.main)
-                leftText.setTextColor(0xFFFFFFFF.toInt()) // 白色
-                rightText.setTextColor(0xFFFFFFFF.toInt()) // 白色
-            } else {
-                background = null
-                leftText.setTextColor(0xFF1A1A1A.toInt()) // 深灰色
-                rightText.setTextColor(0xFFFFFFFF.toInt()) // 白色（在黑色背景上）
-            }
-            updateLayout()
-        }
+
 
         private var shakeCount = 0
         private var shakeTimer: Timer? = null
@@ -760,7 +774,10 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
             enable = false
             playing = false
 
-            setIcons()
+            // 清除时重置背景和文字颜色
+            background = null
+            leftText.setTextColor(0xFF1A1A1A.toInt())
+            rightText.setTextColor(0xFF1A1A1A.toInt())
         }
 
 

@@ -73,11 +73,20 @@ class MainActivity : AppCompatActivity() {
     private fun prepare() {
         supportFragmentManager
             .beginTransaction()
-            .replace(R.id.screen, SplashFragment { 
+            .replace(R.id.screen, SplashFragment {
                 Core.lock(true)
                 // 启动MediaService
                 val intent = Intent(this@MainActivity, MediaService::class.java)
-                startService(intent)
+                try {
+                    startService(intent)
+                } catch (e: Exception) {
+                    // Android 12+ 后台限制，尝试使用 startForegroundService
+                    try {
+                        startForegroundService(intent)
+                    } catch (e2: Exception) {
+                        android.util.Log.e("MainActivity", "Failed to start service: ${e2.message}")
+                    }
+                }
                 Core.initUI()
                 initMediaPlayer()
                 Core.lock(false)
