@@ -71,7 +71,27 @@ object MediaPresenter {
     }
 
     private fun sendMessage(action: String, arg1: Any? = null, arg2: Any? = null) {
-        mediaController?.sendMessage(action, arg1, arg2)
+        // 首先尝试通过绑定的控制器发送消息
+        if (mediaController != null) {
+            mediaController?.sendMessage(action, arg1, arg2)
+        } else {
+            // 如果服务未绑定，使用 startService 启动服务并传递动作
+            android.util.Log.d("MediaPresenter", "Service not bound, starting service with action: $action")
+            val context = BaseApplication.context
+            val intent = Intent(context, MediaService::class.java).apply {
+                this.action = action
+            }
+            try {
+                context.startService(intent)
+            } catch (e: Exception) {
+                // Android 8.0+ 后台限制，尝试使用 startForegroundService
+                try {
+                    context.startForegroundService(intent)
+                } catch (e2: Exception) {
+                    android.util.Log.e("MediaPresenter", "Failed to start service: ${e2.message}")
+                }
+            }
+        }
     }
 
     fun next() {

@@ -11,6 +11,7 @@ import android.os.*
 import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
+import androidx.core.app.NotificationManagerCompat
 import com.example.podclassic.bean.Music
 import com.example.podclassic.media.MediaPlayer
 import com.example.podclassic.media.PlayMode
@@ -22,6 +23,16 @@ import com.example.podclassic.util.VolumeUtil
 import kotlin.system.exitProcess
 
 
+/**
+ * 媒体播放服务
+ * 
+ * 提供完整的后台媒体播放功能，包括：
+ * 1. 前台服务保证后台播放稳定性
+ * 2. MediaSession 管理媒体会话状态
+ * 3. 通知栏媒体控制界面
+ * 4. 音频焦点管理
+ * 5. 播放进度实时更新
+ */
 class MediaService : Service() {
     companion object {
         const val ACTION_SET_EQUALIZER = "action_set_equalizer"
@@ -70,26 +81,37 @@ class MediaService : Service() {
         const val ACTION_SET_TOM_STEADY_ENABLED = "action_set_tom_steady_enabled"
         const val ACTION_SET_TOM_STEADY_PARAMETERS = "action_set_tom_steady_parameters"
         const val ACTION_INIT_TOM_STEADY = "action_init_tom_steady"
+        
+        // 进度更新间隔（毫秒）
+        const val PROGRESS_UPDATE_INTERVAL = 1000L
     }
 
     private lateinit var mediaSessionCompat: MediaSessionCompat
 
+    /**
+     * PlaybackState 构建器
+     * 配置所有支持的媒体控制操作
+     */
     private val playbackStateCompatBuilder = PlaybackStateCompat.Builder()
         .setActions(
-            PlaybackStateCompat.ACTION_FAST_FORWARD
-                    or PlaybackStateCompat.ACTION_REWIND
+            PlaybackStateCompat.ACTION_PLAY
+                    or PlaybackStateCompat.ACTION_PAUSE
                     or PlaybackStateCompat.ACTION_PLAY_PAUSE
+                    or PlaybackStateCompat.ACTION_STOP
                     or PlaybackStateCompat.ACTION_SKIP_TO_NEXT
                     or PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS
-                    or PlaybackStateCompat.ACTION_STOP
                     or PlaybackStateCompat.ACTION_SEEK_TO
-                    or PlaybackStateCompat.ACTION_PAUSE
-                    or PlaybackStateCompat.ACTION_PLAY
+                    or PlaybackStateCompat.ACTION_FAST_FORWARD
+                    or PlaybackStateCompat.ACTION_REWIND
         )
         .setState(PlaybackStateCompat.STATE_NONE, 0, 1.0f)
 
     private lateinit var notificationManager: NotificationManager
 
+    /**
+     * MediaSession 回调处理
+     * 处理来自系统和其他应用的媒体控制请求
+     */
     private val mediaSessionCallBack = object : MediaSessionCompat.Callback() {
         override fun onMediaButtonEvent(mediaButtonIntent: Intent): Boolean {
             mediaBroadcastReceiver.onReceive(this@MediaService, mediaButtonIntent)
@@ -97,18 +119,22 @@ class MediaService : Service() {
         }
 
         override fun onRewind() {
+            android.util.Log.d("MediaService", "MediaSession onRewind() called")
             mediaPlayer.backward()
         }
 
         override fun onFastForward() {
+            android.util.Log.d("MediaService", "MediaSession onFastForward() called")
             mediaPlayer.forward()
         }
 
         override fun onSkipToPrevious() {
+            android.util.Log.d("MediaService", "MediaSession onSkipToPrevious() called")
             mediaPlayer.prev()
         }
 
         override fun onSkipToNext() {
+            android.util.Log.d("MediaService", "MediaSession onSkipToNext() called")
             mediaPlayer.next()
         }
 
@@ -121,18 +147,51 @@ class MediaService : Service() {
         }
 
         override fun onPlay() {
+            android.util.Log.d("MediaService", "MediaSession onPlay() called")
+            if (mediaPlayer.getPlaylist().isEmpty()) {
+                shufflePlay()
+            }
             if (!mediaPlayer.isPlaying) mediaPlayer.play()
         }
 
         override fun onSeekTo(pos: Long) {
+            android.util.Log.d("MediaService", "MediaSession onSeekTo() called, pos=$pos")
             mediaPlayer.seekTo(pos.toInt())
+            // 更新 MediaSession 的播放状态以反映新的位置
+            updatePlaybackState()
         }
 
         override fun onStop() {
+            android.util.Log.d("MediaService", "MediaSession onStop() called")
             mediaPlayer.stop()
         }
     }
+    
+    /**
+     * 更新 MediaSession 的播放状态
+     */
+    private fun updatePlaybackState() {
+        val state = when {
+            mediaPlayer.isPlaying -> PlaybackStateCompat.STATE_PLAYING
+            mediaPlayer.isPrepared -> PlaybackStateCompat.STATE_PAUSED
+            else -> PlaybackStateCompat.STATE_STOPPED
+        }
+        
+        val position = mediaPlayer.getProgress().toLong()
+        val playbackSpeed = 1.0f
+        
+        mediaSessionCompat.setPlaybackState(
+            playbackStateCompatBuilder
+                .setState(state, position, playbackSpeed)
+                .setBufferedPosition(mediaPlayer.getDuration().toLong())
+                .build()
+        )
+    }
 
+    /**
+     * 媒体变更监听器
+     * 处理歌曲切换和播放状态变化
+     */
     private val onMediaChangeListener = object : MediaPlayer.OnMediaChangeListener<Music> {
         override fun onMediaMetadataChange(mediaPlayer: MediaPlayer<Music>) {
             val current = mediaPlayer.getCurrent()
@@ -142,32 +201,32 @@ class MediaService : Service() {
             MediaPresenter.music.set(current)
             current ?: return
 
-            mediaSessionCompat.setMetadata(
-                MediaMetadataCompat.Builder()
-                    .putBitmap(MediaMetadataCompat.METADATA_KEY_ART, current.image)
-                    .putString(MediaMetadataCompat.METADATA_KEY_ALBUM, current.album)
-                    .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, current.artist)
-                    .putString(MediaMetadataCompat.METADATA_KEY_TITLE, current.title)
-                    .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, current.duration)
-                    .build()
-            )
+            // 构建完整的媒体元数据
+            val metadataBuilder = MediaMetadataCompat.Builder()
+                .putString(MediaMetadataCompat.METADATA_KEY_MEDIA_ID, current.id?.toString() ?: "")
+                .putString(MediaMetadataCompat.METADATA_KEY_TITLE, current.title)
+                .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, current.artist)
+                .putString(MediaMetadataCompat.METADATA_KEY_ALBUM, current.album)
+                .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, current.duration)
+                .putString(MediaMetadataCompat.METADATA_KEY_ALBUM_ART_URI, current.albumId?.toString() ?: "")
+            
+            // 添加专辑封面（如果有）
+            current.image?.let {
+                metadataBuilder.putBitmap(MediaMetadataCompat.METADATA_KEY_ART, it)
+                metadataBuilder.putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, it)
+            }
+            
+            mediaSessionCompat.setMetadata(metadataBuilder.build())
+            
+            android.util.Log.d("MediaService", "Media metadata updated: ${current.title} - ${current.artist}")
         }
 
         override fun onPlaybackStateChange(mediaPlayer: MediaPlayer<Music>) {
-            val state = if (mediaPlayer.isPlaying) {
-                PlaybackStateCompat.STATE_PLAYING
-            } else {
-                PlaybackStateCompat.STATE_PAUSED
-            }
-            mediaSessionCompat.setPlaybackState(
-                playbackStateCompatBuilder.setState(
-                    state,
-                    mediaPlayer.getProgress().toLong(),
-                    1f
-                ).build()
-            )
+            updatePlaybackState()
             sendNotification()
             MediaPresenter.playState.set(mediaPlayer.getPlayState())
+            
+            android.util.Log.d("MediaService", "Playback state changed: isPlaying=${mediaPlayer.isPlaying}")
         }
     }
 
@@ -244,99 +303,263 @@ class MediaService : Service() {
     }
 
     private var notificationBuilding = false
+    
+    // 进度更新相关
+    private var progressUpdateRunnable: Runnable? = null
+    private val mainHandler = Handler(Looper.getMainLooper())
 
+    /**
+     * 发送/更新通知
+     * 包含播放进度信息
+     */
     private fun sendNotification() {
         val music = mediaPlayer.getCurrent()
         if (music == null) {
             stopForeground(true)
+            isForeground = false
+            stopProgressUpdate()
             return
         }
         if (notificationBuilding) {
             return
         }
         notificationBuilding = true
-        val notification = notificationManager.buildNotification(music, mediaPlayer.isPlaying)
-        startForeground(1, notification)
+        
+        val position = mediaPlayer.getProgress()
+        val duration = mediaPlayer.getDuration()
+        
+        val notification = notificationManager.buildNotification(
+            music, 
+            mediaPlayer.isPlaying,
+            position,
+            duration
+        )
+        startForeground(NotificationManager.NOTIFICATION_ID, notification)
+        isForeground = true
         notificationBuilding = false
+        
+        // 如果正在播放，启动进度更新
+        if (mediaPlayer.isPlaying) {
+            startProgressUpdate()
+        } else {
+            stopProgressUpdate()
+        }
+    }
+    
+    /**
+     * 启动进度更新定时器
+     */
+    private fun startProgressUpdate() {
+        stopProgressUpdate()
+        progressUpdateRunnable = object : Runnable {
+            override fun run() {
+                if (mediaPlayer.isPlaying) {
+                    updateNotificationProgress()
+                    mainHandler.postDelayed(this, PROGRESS_UPDATE_INTERVAL)
+                }
+            }
+        }
+        mainHandler.postDelayed(progressUpdateRunnable!!, PROGRESS_UPDATE_INTERVAL)
+    }
+    
+    /**
+     * 停止进度更新定时器
+     */
+    private fun stopProgressUpdate() {
+        progressUpdateRunnable?.let {
+            mainHandler.removeCallbacks(it)
+        }
+        progressUpdateRunnable = null
+    }
+    
+    /**
+     * 仅更新通知进度，不重建整个通知
+     */
+    private fun updateNotificationProgress() {
+        val music = mediaPlayer.getCurrent() ?: return
+        val position = mediaPlayer.getProgress()
+        val duration = mediaPlayer.getDuration()
+        
+        val notification = notificationManager.updateNotificationProgress(
+            music,
+            mediaPlayer.isPlaying,
+            position,
+            duration
+        )
+        
+        // 使用 NotificationManagerCompat 更新通知
+        NotificationManagerCompat.from(this).notify(
+            NotificationManager.NOTIFICATION_ID, 
+            notification
+        )
     }
 
+    // 标记服务是否在前台运行
+    private var isForeground = false
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        android.util.Log.d("MediaService", "onStartCommand() called with action: ${intent?.action}, isForeground=$isForeground")
+
+        // 确保服务在前台运行（Android 8.0+ 要求）
+        if (!isForeground) {
+            android.util.Log.d("MediaService", "Service not in foreground, starting foreground")
+            startForegroundWithNotification()
+        }
 
         val action = intent?.action
         if (action != null) {
+            android.util.Log.d("MediaService", "Handling action: $action")
             handleAction(action, null, null)
+        } else {
+            android.util.Log.d("MediaService", "No action, just updating notification")
         }
 
-        sendNotification()
-        return super.onStartCommand(intent, flags, startId)
+        // 更新通知
+        updateNotification()
+        
+        // 返回 START_STICKY 确保服务被杀死后能自动重启
+        return START_STICKY
+    }
+    
+    /**
+     * 启动前台服务并显示通知
+     */
+    private fun startForegroundWithNotification() {
+        val music = mediaPlayer.getCurrent()
+        if (music != null) {
+            val notification = notificationManager.buildNotification(
+                music,
+                mediaPlayer.isPlaying,
+                mediaPlayer.getProgress(),
+                mediaPlayer.getDuration()
+            )
+            startForeground(NotificationManager.NOTIFICATION_ID, notification)
+            isForeground = true
+        }
+    }
+    
+    /**
+     * 更新通知（不重建整个通知）
+     */
+    private fun updateNotification() {
+        val music = mediaPlayer.getCurrent()
+        if (music != null) {
+            sendNotification()
+        }
     }
 
     override fun onCreate() {
         super.onCreate()
+        android.util.Log.d("MediaService", "onCreate() called")
 
-        val component =
-            ComponentName(packageName, "com.example.podclassic.media.MediaBroadcastReceiver")
+        // 初始化 MediaSession
+        initMediaSession()
 
-        val mediaButtonIntent = Intent(Intent.ACTION_MEDIA_BUTTON)
-        mediaButtonIntent.component = component
-        val pendingIntent =
-            PendingIntent.getBroadcast(this, 0, mediaButtonIntent, PendingIntent.FLAG_IMMUTABLE)
-        mediaSessionCompat = MediaSessionCompat(this, "MusicService", component, pendingIntent)
-        mediaSessionCompat.setCallback(mediaSessionCallBack)
-        mediaSessionCompat.setSessionActivity(
-            packageManager?.getLaunchIntentForPackage(packageName)?.let { sessionIntent ->
-                PendingIntent.getActivity(this, 0, sessionIntent, PendingIntent.FLAG_IMMUTABLE)
-            })
-
-        mediaSessionCompat.isActive = true
-        mediaSessionCompat.setFlags(MediaSessionCompat.FLAG_HANDLES_MEDIA_BUTTONS or MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS)
-        mediaSessionCompat.setPlaybackState(playbackStateCompatBuilder.build())
-
-        //sessionToken = mediaSessionCompat.sessionToken
-
+        // 初始化通知管理器
         notificationManager = NotificationManager(this, mediaSessionCompat.sessionToken)
 
+        // 初始化媒体播放器
+        initMediaPlayer()
+
+        // 注册广播接收器
+        registerBroadcastReceiver()
+
+        // 初始化后台处理线程
+        initHandlerThread()
+        
+        android.util.Log.d("MediaService", "Service initialized successfully")
+    }
+    
+    /**
+     * 初始化 MediaSession
+     */
+    private fun initMediaSession() {
+        val receiverComponent = ComponentName(packageName, "com.example.podclassic.service.MediaBroadcastReceiver")
+
+        val mediaButtonIntent = Intent(Intent.ACTION_MEDIA_BUTTON).apply {
+            component = receiverComponent
+        }
+        
+        val pendingIntent = PendingIntent.getBroadcast(
+            this, 
+            0, 
+            mediaButtonIntent, 
+            PendingIntent.FLAG_IMMUTABLE
+        )
+        
+        mediaSessionCompat = MediaSessionCompat(this, "PodClassicMediaService", receiverComponent, pendingIntent)
+        
+        // 设置回调
+        mediaSessionCompat.setCallback(mediaSessionCallBack)
+        
+        // 设置会话活动（点击通知时打开应用）
+        val sessionIntent = packageManager?.getLaunchIntentForPackage(packageName)?.apply {
+            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
+        val sessionPendingIntent = PendingIntent.getActivity(
+            this, 
+            0, 
+            sessionIntent, 
+            PendingIntent.FLAG_IMMUTABLE
+        )
+        mediaSessionCompat.setSessionActivity(sessionPendingIntent)
+
+        // 激活 MediaSession
+        mediaSessionCompat.isActive = true
+        
+        // 设置标志：处理媒体按钮和传输控制
+        mediaSessionCompat.setFlags(
+            MediaSessionCompat.FLAG_HANDLES_MEDIA_BUTTONS or 
+            MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS
+        )
+        
+        // 设置初始播放状态
+        mediaSessionCompat.setPlaybackState(playbackStateCompatBuilder.build())
+        
+        android.util.Log.d("MediaService", "MediaSession initialized")
+    }
+    
+    /**
+     * 初始化媒体播放器
+     */
+    private fun initMediaPlayer() {
         mediaPlayer = MediaPlayer(this, mediaAdapter)
         mediaPlayer.addOnMediaChangeListener(onMediaChangeListener)
-
         mediaPlayer.onDataChangeListener = onDataChangeListener
 
+        // 恢复保存的播放设置
         mediaPlayer.setPlayMode(
-            PlayMode.getPlayMode(
-                SPManager.getInt(
-                    SPManager.SP_PLAY_MODE
-                )
-            )
+            PlayMode.getPlayMode(SPManager.getInt(SPManager.SP_PLAY_MODE))
         )
         mediaPlayer.setRepeatMode(
-            RepeatMode.getRepeatMode(
-                SPManager.getInt(
-                    SPManager.SP_REPEAT_MODE
-                )
-            )
+            RepeatMode.getRepeatMode(SPManager.getInt(SPManager.SP_REPEAT_MODE))
         )
 
         updateAudioFocus()
         updateAgcEnabled()
         updateTomSteadyEnabled()
-
-        registerBroadcastReceiver()
-
-
+        
+        android.util.Log.d("MediaService", "MediaPlayer initialized")
+    }
+    
+    /**
+     * 初始化后台处理线程
+     */
+    private fun initHandlerThread() {
         if (!this::handlerThread.isInitialized) {
-            handlerThread = HandlerThread("ActionMQ")
-            handlerThread.start()
+            handlerThread = HandlerThread("MediaActionMQ").apply { start() }
             handler = object : Handler(handlerThread.looper) {
                 override fun handleMessage(msg: Message) {
                     handleAction(msg)
                 }
             }
-
         }
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        isForeground = false
+        stopProgressUpdate()
         mediaSessionCompat.release()
         unregisterBroadcastReceiver()
         handlerThread.quit()
@@ -542,6 +765,7 @@ class MediaService : Service() {
     private fun stop() {
         mediaPlayer.stop()
         stopForeground(true)
+        isForeground = false
     }
 
     inner class ServiceBinder : Binder() {
