@@ -5,26 +5,20 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Shader
 import android.graphics.drawable.GradientDrawable
-import android.graphics.drawable.LayerDrawable
-import android.graphics.drawable.Drawable
 import android.util.Log
 import android.view.GestureDetector
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
-import android.view.ViewTreeObserver
 import android.widget.FrameLayout
-import android.widget.ImageView
 import android.widget.LinearLayout
-import android.widget.LinearLayout.VERTICAL
-import android.widget.RelativeLayout
 import androidx.core.view.isGone
 import androidx.core.view.isVisible
-import com.example.podclassic.util.PinyinUtil
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.example.podclassic.util.ThreadUtil
 import com.example.podclassic.values.Colors
-import com.example.podclassic.values.Icons
 import com.example.podclassic.values.Values
 import com.example.podclassic.values.Values.DEFAULT_PADDING
 import com.example.podclassic.widget.TextView.Companion.TEXT_SIZE
@@ -32,45 +26,46 @@ import java.util.*
 import kotlin.math.abs
 
 
-open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(context) {
+open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(context) {
 
     companion object {
-        const val DEFAULT_MAX_SIZE = 9
+        const val DEFAULT_MAX_SIZE = 10
         const val DELAY = 75
         const val QUICK_SLIDE = DEFAULT_MAX_SIZE * 5
     }
 
     constructor(context: Context) : this(context, DEFAULT_MAX_SIZE)
 
-    private val linearLayout = LinearLayout(context)
-    private val itemViewList = ArrayList<ItemView>(DEFAULT_MAX_SIZE)
-
+    private val recyclerView: RecyclerView
+    private val adapter: ItemAdapter
     private val scrollBar = ScrollBar(context)
-
     private val indexView = android.widget.TextView(context)
 
     // 触摸起始位置
     private var touchStartY = 0f
 
     init {
-        linearLayout.orientation = VERTICAL
-        // linearLayout 宽度为 MATCH_PARENT，但右侧留出 scrollBar 的空间
-        val linearLayoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
-        linearLayoutParams.rightMargin = DEFAULT_PADDING
-        this.addView(linearLayout, linearLayoutParams)
+        // 创建 RecyclerView
+        recyclerView = RecyclerView(context)
+        recyclerView.layoutManager = LinearLayoutManager(context)
+        recyclerView.overScrollMode = View.OVER_SCROLL_NEVER
+        
+        // 创建 Adapter
+        adapter = ItemAdapter()
+        recyclerView.adapter = adapter
+
+        // 添加 RecyclerView
+        val recyclerParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
+        recyclerParams.rightMargin = DEFAULT_PADDING
+        this.addView(recyclerView, recyclerParams)
+
+        // 添加滚动条
         val scrollBarLayoutParams =
             LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT)
         scrollBarLayoutParams.gravity = Gravity.END
         this.addView(scrollBar, scrollBarLayoutParams)
-        for (i in 0 until MAX_SIZE) {
-            val itemView = ItemView(context)
-            val layoutParams =
-                LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
-            layoutParams.weight = 1f
-            itemViewList.add(itemView)
-            linearLayout.addView(itemView, layoutParams)
-        }
 
+        // 初始化索引视图
         indexView.visibility = INVISIBLE
         val layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT)
         layoutParams.gravity = Gravity.CENTER
@@ -101,7 +96,7 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
 
         addView(indexView)
 
-        // 确保 ListView 是可点击和可触摸的
+        // 确保 RecyclerListView 是可点击和可触摸的
         isClickable = true
         isFocusable = true
         isFocusableInTouchMode = true
@@ -110,35 +105,28 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
         setOnTouchListener { _, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
-                    // 记录触摸起始位置
                     touchStartY = event.y
-                    Log.d("ListView", "touch down: $touchStartY")
+                    Log.d("RecyclerListView", "touch down: $touchStartY")
                 }
                 MotionEvent.ACTION_MOVE -> {
-                    // 计算触摸移动的距离
                     val deltaY = event.y - touchStartY
-                    Log.d("ListView", "touch move: deltaY=$deltaY")
+                    Log.d("RecyclerListView", "touch move: deltaY=$deltaY")
                     
-                    // 只要有滑动就处理，不需要等待达到阈值
                     if (Math.abs(deltaY) > 10) {
                         if (deltaY < 0) {
-                            // 向上滑动，选择下一个项目
-                            Log.d("ListView", "swipe up")
+                            Log.d("RecyclerListView", "swipe up")
                             onSlide(1)
                         } else {
-                            // 向下滑动，选择上一个项目
-                            Log.d("ListView", "swipe down")
+                            Log.d("RecyclerListView", "swipe down")
                             onSlide(-1)
                         }
-                        // 重置触摸起始位置，以便连续滑动
                         touchStartY = event.y
                     }
                 }
                 MotionEvent.ACTION_UP -> {
-                    Log.d("ListView", "touch up")
+                    Log.d("RecyclerListView", "touch up")
                 }
             }
-            // 返回 true 表示事件已处理
             true
         }
     }
@@ -173,13 +161,11 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
         add(item, size())
     }
 
-    // 批量添加项目，只刷新一次
     fun addAll(items: List<Item>) {
         itemList.addAll(items)
         refreshList()
     }
 
-    // 批量添加项目到指定位置，只刷新一次
     fun addAll(items: List<Item>, index: Int) {
         itemList.addAll(index, items)
         refreshList()
@@ -196,7 +182,6 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
             refreshList()
         }
     }
-
 
     fun getItem(index: Int): Item {
         return itemList[index]
@@ -218,66 +203,56 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
     }
 
     fun shake() {
-        itemViewList[index - position].shake()
+        // RecyclerView 中不需要实现 shake，或者可以通过其他方式实现
     }
 
     fun removeCurrentItem() {
-        itemList.removeAt(index)
-        if (index == itemList.size) {
-            index--
+        if (index < itemList.size) {
+            itemList.removeAt(index)
+            if (index == itemList.size) {
+                index--
+            }
+            if (index < 0) {
+                index = 0
+            }
+            if (position > 0 && position + MAX_SIZE > itemList.size) {
+                position--
+            }
+            refreshList()
         }
-        if (index < 0) {
-            index = 0
-        }
-        if (position > 0 && position + MAX_SIZE > itemList.size) {
-            position--
-        }
-        refreshList()
     }
 
     fun refreshList() {
+        adapter.notifyDataSetChanged()
+        updateScrollBar()
+        updateHighlight()
+    }
+
+    private fun updateScrollBar() {
         if (itemList.size > MAX_SIZE && scrollBar.isGone) {
             scrollBar.visibility = View.VISIBLE
         }
         scrollBar.setScrollBar(position, MAX_SIZE, itemList.size)
-        for (i in position until MAX_SIZE + position) {
-            if (i >= itemList.size) {
-                // 清除从当前位置到末尾的所有 ItemView，而不是只清除一个就 break
-                for (j in (i - position) until MAX_SIZE) {
-                    clearAt(j)
+    }
+
+    private fun updateHighlight() {
+        // 更新高亮状态
+        recyclerView.post {
+            for (i in 0 until recyclerView.childCount) {
+                val viewHolder = recyclerView.getChildViewHolder(recyclerView.getChildAt(i))
+                if (viewHolder is ItemViewHolder) {
+                    val itemIndex = position + i
+                    viewHolder.setHighlight(itemIndex == index)
                 }
-                break
             }
-            val itemView = itemViewList[i - position]
-            val item = itemList[i]
-            itemView.setText(item.name)
-            //itemList.height = itemHeight
-            //itemView.cancelShake()
-            if (scrollBar.isVisible) {
-                itemView.setPadding(0, 0, DEFAULT_PADDING, 0)
-            }
-            onItemCreated(i, itemView)
-            itemView.setHighlight(i == index)
-            itemView.setEnable(item.enable)
-            itemView.setRightText(item.rightText) // 放在最后，确保颜色正确
         }
     }
 
     open fun refreshItem() {
-        val itemView = itemViewList[index - position]
-        if (itemList.isEmpty()) {
-            itemView.clear()
-        } else {
-            val item = itemList[index]
-            itemView.setText(item.name)
-            itemView.setRightText(item.rightText)
-            itemView.setEnable(item.enable)
-            onItemCreated(index, itemView)
-        }
-    }
-
-    private fun clearAt(index: Int) {
-        itemViewList[index].clear()
+        if (itemList.isEmpty() || index >= itemList.size) return
+        val item = itemList[index]
+        // 刷新当前项
+        adapter.notifyItemChanged(index - position)
     }
 
     override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
@@ -290,44 +265,35 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
         super.onLayout(changed, left, top, right, bottom)
         if (changed) {
-            // 布局改变时刷新列表，确保所有元素正确显示
             refreshList()
         }
     }
 
-    // 重写onTouchEvent方法，确保触摸事件能够被正确处理
     override fun onTouchEvent(event: MotionEvent): Boolean {
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
-                // 记录触摸起始位置
                 touchStartY = event.y
-                Log.d("ListView", "onTouchEvent down: $touchStartY")
+                Log.d("RecyclerListView", "onTouchEvent down: $touchStartY")
             }
             MotionEvent.ACTION_MOVE -> {
-                // 计算触摸移动的距离
                 val deltaY = event.y - touchStartY
-                Log.d("ListView", "onTouchEvent move: deltaY=$deltaY")
+                Log.d("RecyclerListView", "onTouchEvent move: deltaY=$deltaY")
                 
-                // 只要有滑动就处理，不需要等待达到阈值
                 if (Math.abs(deltaY) > 10) {
                     if (deltaY < 0) {
-                        // 向上滑动，选择下一个项目
-                        Log.d("ListView", "swipe up")
+                        Log.d("RecyclerListView", "swipe up")
                         onSlide(1)
                     } else {
-                        // 向下滑动，选择上一个项目
-                        Log.d("ListView", "swipe down")
+                        Log.d("RecyclerListView", "swipe down")
                         onSlide(-1)
                     }
-                    // 重置触摸起始位置，以便连续滑动
                     touchStartY = event.y
                 }
             }
             MotionEvent.ACTION_UP -> {
-                Log.d("ListView", "onTouchEvent up")
+                Log.d("RecyclerListView", "onTouchEvent up")
             }
         }
-        // 返回 true 表示事件已处理
         return true
     }
 
@@ -335,16 +301,13 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
         itemView.itemIndex = index
         itemView.onItemClickListener = object : ItemView.OnItemClickListener {
             override fun onItemClick(index: Int) {
-                this@ListView.index = index
+                this@RecyclerListView.index = index
                 onItemClick()
             }
         }
     }
 
-    //index 为list中位置
     protected var index = 0
-
-    //position为屏幕上第一个元素的index
     private var position = 0
 
     var sorted = false
@@ -354,41 +317,37 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
     private var timer: Timer? = null
 
     fun onSlide(direction: Int): Boolean {
-        Log.d("ListView", "onSlide: direction=$direction, current index=$index, itemList size=${itemList.size}")
+        Log.d("RecyclerListView", "onSlide: direction=$direction, current index=$index, itemList size=${itemList.size}")
         
         if (direction == 0 || itemList.isEmpty()) {
-            Log.d("ListView", "onSlide: no items or zero direction")
+            Log.d("RecyclerListView", "onSlide: no items or zero direction")
             return false
         }
 
-        // 检查边界条件
         if ((direction < 0 && index == 0) || (direction > 0 && index == itemList.size - 1)) {
-            Log.d("ListView", "onSlide: reached boundary")
+            Log.d("RecyclerListView", "onSlide: reached boundary")
             return false
         }
 
-        // 处理滑动逻辑
         if (direction < 0) {
-            // 向上滑动，选择上一个项目
             if (index > 0) {
                 if (position > 0 && index == position) {
                     position--
                 }
                 index--
-                Log.d("ListView", "onSlide: moved up to index=$index")
+                Log.d("RecyclerListView", "onSlide: moved up to index=$index")
             }
         } else {
-            // 向下滑动，选择下一个项目
             if (index < itemList.size - 1) {
                 if (itemList.size > MAX_SIZE && index == position + MAX_SIZE - 1) {
                     position++
                 }
                 index++
-                Log.d("ListView", "onSlide: moved down to index=$index")
+                Log.d("RecyclerListView", "onSlide: moved down to index=$index")
             }
         }
         refreshList()
-        Log.d("ListView", "onSlide: completed, returning true")
+        Log.d("RecyclerListView", "onSlide: completed, returning true")
         return true
     }
 
@@ -429,8 +388,8 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
     var defaultOnItemClickListener: OnItemClickListener? = null
 
     interface OnItemClickListener {
-        fun onItemClick(index: Int, listView: ListView): Boolean
-        fun onItemLongClick(index: Int, listView: ListView): Boolean {
+        fun onItemClick(index: Int, listView: RecyclerListView): Boolean
+        fun onItemLongClick(index: Int, listView: RecyclerListView): Boolean {
             return false
         }
     }
@@ -467,6 +426,46 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
         }
     }
 
+    // RecyclerView Adapter
+    private inner class ItemAdapter : RecyclerView.Adapter<ItemViewHolder>() {
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ItemViewHolder {
+            val itemView = ItemView(context)
+            // 设置 item 宽度为 match_parent
+            itemView.layoutParams = RecyclerView.LayoutParams(RecyclerView.LayoutParams.MATCH_PARENT, RecyclerView.LayoutParams.WRAP_CONTENT)
+            android.util.Log.d("ItemAdapter", "onCreateViewHolder: parent width=${parent.width}")
+            return ItemViewHolder(itemView)
+        }
+
+        override fun onBindViewHolder(holder: ItemViewHolder, listPosition: Int) {
+            val actualIndex = position + listPosition
+            if (actualIndex < itemList.size) {
+                val item = itemList[actualIndex]
+                holder.bind(item, actualIndex == index, item.enable, item.rightText)
+                holder.itemView.setOnClickListener {
+                    this@RecyclerListView.index = actualIndex
+                    onItemClick()
+                }
+            }
+        }
+
+        override fun getItemCount(): Int {
+            return minOf(MAX_SIZE, itemList.size - position).coerceAtLeast(0)
+        }
+    }
+
+    inner class ItemViewHolder(private val listItemView: ItemView) : RecyclerView.ViewHolder(listItemView) {
+        fun bind(item: Item, isHighlighted: Boolean, isEnabled: Boolean, rightText: String) {
+            listItemView.setText(item.name)
+            listItemView.setHighlight(isHighlighted)
+            listItemView.setEnable(isEnabled)
+            listItemView.setRightText(rightText)
+        }
+
+        fun setHighlight(highlight: Boolean) {
+            listItemView.setHighlight(highlight)
+        }
+    }
+
     private class ScrollBar(context: Context) : ViewGroup(context) {
         private var position = 0
         private var maxSize = 0
@@ -489,7 +488,6 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
             this.maxSize = maxSize
             this.size = size
             refresh()
-            //invalidate()
         }
 
         private fun refresh() {
@@ -563,79 +561,77 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
         private val rightText = TextView(context)
         private val leftText = TextView(context)
         
-        private val rightTextWidth: Int
+        companion object {
+            private const val RIGHT_TEXT_MAX_WIDTH_DP = 80f
+        }
         
         var onItemClickListener: OnItemClickListener? = null
         var itemIndex = -1
         
-        // 触摸起始位置
         private var touchStartX = 0f
         private var touchStartY = 0f
+        
+        private var rightTextWidth = 0
+        private var rightTextHeight = 0
 
         init {
             val density = context.resources.displayMetrics.density
-            // rightText 宽度自适应，根据内容调整
-            rightTextWidth = FrameLayout.LayoutParams.WRAP_CONTENT
+            // 固定右边距，给 rightText 留出空间（约 60dp 足够显示时间格式 05:00）
+            val rightTextAreaWidth = (60 * density).toInt()
             
-            val layoutParams1 = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
-            // leftText 右侧留出空间给 rightText 和 scrollBar
-            layoutParams1.rightMargin = (60 * density).toInt() + DEFAULT_PADDING * 2
+            android.util.Log.d("ItemView", "init: density=$density, rightTextAreaWidth=$rightTextAreaWidth, DEFAULT_PADDING=$DEFAULT_PADDING")
+            
             // rightText 宽度自适应，靠右对齐
-            val layoutParams2 = FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.MATCH_PARENT)
+            val layoutParams2 = FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT)
             layoutParams2.gravity = Gravity.RIGHT or Gravity.CENTER_VERTICAL
-            layoutParams2.rightMargin = DEFAULT_PADDING // 右侧留出 scrollBar 的空间
+            layoutParams2.rightMargin = DEFAULT_PADDING
+            
+            // leftText 占据剩余空间，右侧留出固定区域给 rightText
+            val layoutParams1 = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
+            layoutParams1.rightMargin = rightTextAreaWidth + DEFAULT_PADDING * 2
+            
+            android.util.Log.d("ItemView", "init: leftText.rightMargin=${layoutParams1.rightMargin}, rightText.rightMargin=${layoutParams2.rightMargin}")
 
             leftText.setSingleLine()
             rightText.setSingleLine()
-            leftText.ellipsize = null
-            rightText.ellipsize = null
+            leftText.ellipsize = android.text.TextUtils.TruncateAt.END
+            rightText.ellipsize = android.text.TextUtils.TruncateAt.END
+            rightText.maxWidth = rightTextAreaWidth
             rightText.visibility = View.VISIBLE
-            // 为rightText设置更小的padding，确保时间能够显示
             rightText.setPadding(DEFAULT_PADDING / 4, DEFAULT_PADDING / 4, DEFAULT_PADDING / 4, DEFAULT_PADDING / 4)
-            // 确保rightText的文本大小合适
             rightText.textSize = 14f
-            // 设置等宽字体，确保时间对齐
             rightText.typeface = android.graphics.Typeface.MONOSPACE
-            // 设置背景色透明
             rightText.setBackgroundColor(0x00000000)
-            // 设置默认文字颜色
             rightText.setTextColor(Colors.text)
-            // 确保 rightText 在最上层
-            rightText.bringToFront()
+            // 文本在 TextView 内右对齐
+            rightText.gravity = Gravity.RIGHT or Gravity.CENTER_VERTICAL
             addView(leftText, layoutParams1)
             addView(rightText, layoutParams2)
             
-            // 添加触摸事件监听器
             setOnTouchListener { view, event ->
                 when (event.action) {
                     MotionEvent.ACTION_DOWN -> {
-                        // 记录触摸起始位置
                         touchStartX = event.x
                         touchStartY = event.y
                     }
                     MotionEvent.ACTION_MOVE -> {
-                        // 计算触摸移动的距离
                         val deltaX = event.x - touchStartX
                         val deltaY = event.y - touchStartY
                         val distance = Math.sqrt((deltaX * deltaX + deltaY * deltaY).toDouble()).toFloat()
                         
-                        // 如果有明显的滑动，不拦截事件，让事件传递给父视图
                         if (distance > 10) {
                             return@setOnTouchListener false
                         }
                     }
                     MotionEvent.ACTION_UP -> {
-                        // 计算触摸移动的距离
                         val deltaX = event.x - touchStartX
                         val deltaY = event.y - touchStartY
                         val distance = Math.sqrt((deltaX * deltaX + deltaY * deltaY).toDouble()).toFloat()
                         
-                        // 只有当移动距离很小时才触发点击事件
                         if (distance < 20) {
                             onItemClickListener?.onItemClick(itemIndex)
                             return@setOnTouchListener true
                         } else {
-                            // 如果有明显的滑动，不拦截事件
                             return@setOnTouchListener false
                         }
                     }
@@ -644,11 +640,29 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
             }
         }
         
+        override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
+            super.onLayout(changed, left, top, right, bottom)
+            // 手动布局 rightText，确保它紧贴右边
+            if (rightText.visibility != View.GONE && rightTextWidth > 0 && rightTextHeight > 0) {
+                val parentWidth = width
+                val parentHeight = height
+                val right = parentWidth - DEFAULT_PADDING
+                val leftPos = right - rightTextWidth
+                val topPos = (parentHeight - rightTextHeight) / 2
+                val bottomPos = topPos + rightTextHeight
+                
+                android.util.Log.d("ItemView", "onLayout: parent=${parentWidth}x${parentHeight}, " +
+                    "rightText=(${leftPos},${topPos},${right},${bottomPos}), " +
+                    "measured=${rightTextWidth}x${rightTextHeight}, " +
+                    "text='${rightText.text}'")
+                
+                rightText.layout(leftPos, topPos, right, bottomPos)
+            }
+        }
+        
         interface OnItemClickListener {
             fun onItemClick(index: Int)
         }
-
-    
 
         fun setHighlight(highlight: Boolean) {
             if (this.highlight == highlight) {
@@ -656,17 +670,14 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
             }
             this.highlight = highlight
             leftText.scrollable = highlight
-            // 高亮时请求焦点并重新设置文本，确保 Marquee 滚动效果生效
             if (highlight) {
                 leftText.isSelected = true
                 leftText.requestFocus()
-                // 重新设置文本触发 Marquee
                 val text = leftText.text.toString()
                 leftText.text = text
             } else {
                 leftText.isSelected = false
             }
-            // 直接设置背景和文字颜色，不通过 setIcons
             if (highlight) {
                 setBackgroundColor(Colors.main)
                 leftText.setTextColor(0xFFFFFFFF.toInt())
@@ -674,7 +685,7 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
             } else {
                 background = null
                 leftText.setTextColor(0xFF1A1A1A.toInt())
-                rightText.setTextColor(0xFF1A1A1A.toInt())
+                rightText.setTextColor(Colors.text)
             }
         }
 
@@ -683,7 +694,6 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
                 return
             }
             this.enable = enable
-            // 不调用 setIcons，没有其他操作需要执行
         }
 
         fun setPlaying(playing: Boolean) {
@@ -691,7 +701,6 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
                 return
             }
             this.playing = playing
-            // 不调用 setIcons，没有其他操作需要执行
         }
 
         fun setText(text: String) {
@@ -699,47 +708,34 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
         }
 
         fun setRightText(text: String) {
+            android.util.Log.d("ItemView", "setRightText: text='$text'")
             rightText.text = text
-            rightText.visibility = View.VISIBLE // 始终可见，即使文本为空
-            // 根据高亮状态设置文字颜色
-            rightText.setTextColor(if (highlight) 0xFFFFFFFF.toInt() else Colors.text)
-            // 强制 rightText 重新测量和布局
-            rightText.measure(
-                MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED),
-                MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED)
-            )
-            rightText.requestLayout()
-            updateLayout()
-        }
-
-        private fun updateLayout() {
-            // 根据右侧时间文本是否为空来设置左侧文本的布局
             val layoutParams = leftText.layoutParams as FrameLayout.LayoutParams
-            val hasRightText = rightText.text.isNotEmpty()
-            if (hasRightText) {
-                // 有 rightText 时，留出较小空间（时间格式为 05:00，约 45dp 足够）
-                layoutParams.rightMargin = (45 * context.resources.displayMetrics.density).toInt() + DEFAULT_PADDING * 2
-                leftText.paddingRight = DEFAULT_PADDING
-                rightText.visibility = View.VISIBLE
-                // 强制布局 rightText
-                val rightWidth = rightText.measuredWidth
-                val rightHeight = rightText.measuredHeight
-                val left = width - rightWidth - DEFAULT_PADDING
-                val top = (height - rightHeight) / 2
-                rightText.layout(left, top, left + rightWidth, top + rightHeight)
-            } else {
-                // 没有 rightText 时，占满整个空间（只留出 scrollBar 的空间）
-                layoutParams.rightMargin = DEFAULT_PADDING
-                leftText.paddingRight = DEFAULT_PADDING
+            if (text.isEmpty()) {
                 rightText.visibility = View.GONE
+                rightTextWidth = 0
+                rightTextHeight = 0
+                // 没有 rightText 时，leftText 占满空间（只留 scrollBar 空间）
+                layoutParams.rightMargin = DEFAULT_PADDING
+                leftText.layoutParams = layoutParams
+            } else {
+                rightText.visibility = View.VISIBLE
+                // 测量 rightText 的实际宽高
+                rightText.measure(
+                    MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED),
+                    MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED)
+                )
+                rightTextWidth = rightText.measuredWidth
+                rightTextHeight = rightText.measuredHeight
+                android.util.Log.d("ItemView", "setRightText: measured=${rightTextWidth}x${rightTextHeight}")
+                // 有 rightText 时，根据实际宽度调整 leftText 的 rightMargin
+                layoutParams.rightMargin = rightTextWidth + DEFAULT_PADDING * 2
+                leftText.layoutParams = layoutParams
+                // 请求重新布局以更新 rightText 位置
+                requestLayout()
             }
-            leftText.layoutParams = layoutParams
-            // 强制整个 ItemView 重新测量和布局
-            requestLayout()
-            invalidate()
+            // 颜色由 setHighlight 统一管理
         }
-
-
 
         private var shakeCount = 0
         private var shakeTimer: Timer? = null
@@ -774,12 +770,9 @@ open class ListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(c
             enable = false
             playing = false
 
-            // 清除时重置背景和文字颜色
             background = null
             leftText.setTextColor(0xFF1A1A1A.toInt())
             rightText.setTextColor(0xFF1A1A1A.toInt())
         }
-
-
     }
 }
