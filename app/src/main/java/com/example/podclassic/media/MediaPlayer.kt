@@ -229,7 +229,7 @@ class MediaPlayer<E>(context: Context, private val mediaAdapter: MediaAdapter<E>
             //stopTime自减也会走这个set
             if (value == 0) {
                 //stop timer
-                if (stopTime > 1) {
+                if (stopTime > 0) {
                     stopTimer()
                 }
             } else {
