@@ -432,7 +432,6 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
             val itemView = ItemView(context)
             // 设置 item 宽度为 match_parent
             itemView.layoutParams = RecyclerView.LayoutParams(RecyclerView.LayoutParams.MATCH_PARENT, RecyclerView.LayoutParams.WRAP_CONTENT)
-            android.util.Log.d("ItemAdapter", "onCreateViewHolder: parent width=${parent.width}")
             return ItemViewHolder(itemView)
         }
 
@@ -579,8 +578,6 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
             // 固定右边距，给 rightText 留出空间（约 60dp 足够显示时间格式 05:00）
             val rightTextAreaWidth = (60 * density).toInt()
             
-            android.util.Log.d("ItemView", "init: density=$density, rightTextAreaWidth=$rightTextAreaWidth, DEFAULT_PADDING=$DEFAULT_PADDING")
-            
             // rightText 宽度自适应，靠右对齐
             val layoutParams2 = FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT)
             layoutParams2.gravity = Gravity.RIGHT or Gravity.CENTER_VERTICAL
@@ -589,12 +586,11 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
             // leftText 占据剩余空间，右侧留出固定区域给 rightText
             val layoutParams1 = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
             layoutParams1.rightMargin = rightTextAreaWidth + DEFAULT_PADDING * 2
-            
-            android.util.Log.d("ItemView", "init: leftText.rightMargin=${layoutParams1.rightMargin}, rightText.rightMargin=${layoutParams2.rightMargin}")
 
             leftText.setSingleLine()
             rightText.setSingleLine()
-            leftText.ellipsize = android.text.TextUtils.TruncateAt.END
+            // 不放省略号，直接截断
+            leftText.ellipsize = null
             rightText.ellipsize = android.text.TextUtils.TruncateAt.END
             rightText.maxWidth = rightTextAreaWidth
             rightText.visibility = View.VISIBLE
@@ -650,12 +646,6 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
                 val leftPos = right - rightTextWidth
                 val topPos = (parentHeight - rightTextHeight) / 2
                 val bottomPos = topPos + rightTextHeight
-                
-                android.util.Log.d("ItemView", "onLayout: parent=${parentWidth}x${parentHeight}, " +
-                    "rightText=(${leftPos},${topPos},${right},${bottomPos}), " +
-                    "measured=${rightTextWidth}x${rightTextHeight}, " +
-                    "text='${rightText.text}'")
-                
                 rightText.layout(leftPos, topPos, right, bottomPos)
             }
         }
@@ -708,7 +698,6 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
         }
 
         fun setRightText(text: String) {
-            android.util.Log.d("ItemView", "setRightText: text='$text'")
             rightText.text = text
             val layoutParams = leftText.layoutParams as FrameLayout.LayoutParams
             if (text.isEmpty()) {
@@ -727,7 +716,6 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
                 )
                 rightTextWidth = rightText.measuredWidth
                 rightTextHeight = rightText.measuredHeight
-                android.util.Log.d("ItemView", "setRightText: measured=${rightTextWidth}x${rightTextHeight}")
                 // 有 rightText 时，根据实际宽度调整 leftText 的 rightMargin
                 layoutParams.rightMargin = rightTextWidth + DEFAULT_PADDING * 2
                 leftText.layoutParams = layoutParams
