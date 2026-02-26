@@ -40,6 +40,7 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
     private val adapter: ItemAdapter
     private val scrollBar = ScrollBar(context)
     private val indexView = android.widget.TextView(context)
+    private val recyclerParams: LayoutParams
 
     // 触摸起始位置
     private var touchStartY = 0f
@@ -55,7 +56,7 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
         recyclerView.adapter = adapter
 
         // 添加 RecyclerView
-        val recyclerParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
+        recyclerParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
         recyclerParams.rightMargin = DEFAULT_PADDING
         this.addView(recyclerView, recyclerParams)
 
@@ -229,10 +230,10 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
     }
 
     private fun updateScrollBar() {
-        if (itemList.size > MAX_SIZE && scrollBar.isGone) {
-            scrollBar.visibility = View.VISIBLE
-        }
         scrollBar.setScrollBar(position, MAX_SIZE, itemList.size)
+        // 根据是否显示滚动条调整 RecyclerView 的 rightMargin
+        recyclerParams.rightMargin = if (itemList.size > MAX_SIZE) DEFAULT_PADDING else 0
+        recyclerView.layoutParams = recyclerParams
     }
 
     private fun updateHighlight() {
@@ -439,7 +440,9 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
             val actualIndex = position + listPosition
             if (actualIndex < itemList.size) {
                 val item = itemList[actualIndex]
-                holder.bind(item, actualIndex == index, item.enable, item.rightText)
+                // 判断是否显示滚动条（item 数量大于 MAX_SIZE 时显示）
+                val showScrollBar = itemList.size > MAX_SIZE
+                holder.bind(item, actualIndex == index, item.enable, item.rightText, showScrollBar)
                 holder.itemView.setOnClickListener {
                     this@RecyclerListView.index = actualIndex
                     onItemClick()
@@ -453,11 +456,11 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
     }
 
     inner class ItemViewHolder(private val listItemView: ItemView) : RecyclerView.ViewHolder(listItemView) {
-        fun bind(item: Item, isHighlighted: Boolean, isEnabled: Boolean, rightText: String) {
+        fun bind(item: Item, isHighlighted: Boolean, isEnabled: Boolean, rightText: String, showScrollBar: Boolean = true) {
             listItemView.setText(item.name)
             listItemView.setHighlight(isHighlighted)
             listItemView.setEnable(isEnabled)
-            listItemView.setRightText(rightText)
+            listItemView.setRightText(rightText, showScrollBar)
         }
 
         fun setHighlight(highlight: Boolean) {
@@ -638,7 +641,7 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
         
         override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
             super.onLayout(changed, left, top, right, bottom)
-            // 手动布局 rightText，确保它紧贴右边
+            // 手动布局 rightText，确保它紧贴右边（留出滚动条空间）
             if (rightText.visibility != View.GONE && rightTextWidth > 0 && rightTextHeight > 0) {
                 val parentWidth = width
                 val parentHeight = height
@@ -697,15 +700,15 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
             leftText.text = text
         }
 
-        fun setRightText(text: String) {
+        fun setRightText(text: String, showScrollBar: Boolean = true) {
             rightText.text = text
             val layoutParams = leftText.layoutParams as FrameLayout.LayoutParams
             if (text.isEmpty()) {
                 rightText.visibility = View.GONE
                 rightTextWidth = 0
                 rightTextHeight = 0
-                // 没有 rightText 时，leftText 占满空间（只留 scrollBar 空间）
-                layoutParams.rightMargin = DEFAULT_PADDING
+                // 没有 rightText 时，根据是否显示滚动条设置边距
+                layoutParams.rightMargin = if (showScrollBar) DEFAULT_PADDING else 0
                 leftText.layoutParams = layoutParams
             } else {
                 rightText.visibility = View.VISIBLE
@@ -716,8 +719,9 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
                 )
                 rightTextWidth = rightText.measuredWidth
                 rightTextHeight = rightText.measuredHeight
-                // 有 rightText 时，根据实际宽度调整 leftText 的 rightMargin
-                layoutParams.rightMargin = rightTextWidth + DEFAULT_PADDING * 2
+                // 有 rightText 时，根据实际宽度和是否显示滚动条设置边距
+                val scrollBarMargin = if (showScrollBar) DEFAULT_PADDING * 2 else DEFAULT_PADDING
+                layoutParams.rightMargin = rightTextWidth + scrollBarMargin
                 leftText.layoutParams = layoutParams
                 // 请求重新布局以更新 rightText 位置
                 requestLayout()
