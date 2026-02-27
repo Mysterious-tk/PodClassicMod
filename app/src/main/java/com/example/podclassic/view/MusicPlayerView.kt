@@ -395,6 +395,8 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
                 return true
             } else {
                 volumeBar.setCurrent(VolumeUtil.getCurrentVolume())
+                // 切换到音量条时，确保不显示时间，只显示音量图标
+                volumeBar.textVisibility = View.GONE
                 setSeekBar(volumeBar)
                 return true
             }

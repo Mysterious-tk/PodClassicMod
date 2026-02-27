@@ -13,6 +13,7 @@ import android.graphics.drawable.Drawable
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageView
 import android.widget.LinearLayout
 import androidx.appcompat.widget.AppCompatTextView
 import com.example.podclassic.values.Colors
@@ -29,6 +30,8 @@ class SeekBar(context: Context) : LinearLayout(context) {
     private val leftTime: AppCompatTextView
     private val rightTime: AppCompatTextView
     private var progressView: ProgressView
+    private val leftIcon: ImageView
+    private val rightIcon: ImageView
 
     private var max = 1
     private var current = 0
@@ -139,39 +142,50 @@ class SeekBar(context: Context) : LinearLayout(context) {
 
     init {
         orientation = HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
         
-        // Create time text views using AppCompatTextView
+        // 创建图标 ImageView
+        leftIcon = ImageView(context).apply {
+            visibility = GONE
+        }
+        rightIcon = ImageView(context).apply {
+            visibility = GONE
+        }
+        
+        // 创建时间文本视图
         leftTime = AppCompatTextView(context).apply {
             gravity = Gravity.END or Gravity.CENTER_VERTICAL
             setTextColor(Colors.text)
             textSize = 14f
-            setPadding(0, 0, 8, 0) // Remove top padding to align with progress bar
+            setPadding(0, 0, 8, 0)
         }
         
         rightTime = AppCompatTextView(context).apply {
             gravity = Gravity.START or Gravity.CENTER_VERTICAL
             setTextColor(Colors.text)
             textSize = 14f
-            setPadding(8, 0, 0, 0) // Remove top padding to align with progress bar
+            setPadding(8, 0, 0, 0)
         }
         
-        // Create progress bar
+        // 创建进度条
         progressView = ProgressView(context)
         
-        // Add views to layout
-        addView(leftTime)
-        addView(progressView)
-        addView(rightTime)
-        
-        // Set layout parameters
-        leftTime.layoutParams = LinearLayout.LayoutParams(180, ViewGroup.LayoutParams.MATCH_PARENT)
-        
-        // Create layout params for progress bar with vertical gravity
-        val progressParams = LinearLayout.LayoutParams(0, BAR_HEIGHT / 2, 1f)
-        progressParams.gravity = Gravity.CENTER_VERTICAL // Ensure vertical alignment
-        progressView.layoutParams = progressParams
-        
-        rightTime.layoutParams = LinearLayout.LayoutParams(180, ViewGroup.LayoutParams.MATCH_PARENT)
+        // 添加视图到布局：图标 + 时间 + 进度条 + 时间 + 图标
+        addView(leftIcon, LinearLayout.LayoutParams(60, 60).apply {
+            gravity = Gravity.CENTER_VERTICAL
+        })
+        addView(leftTime, LinearLayout.LayoutParams(180, ViewGroup.LayoutParams.MATCH_PARENT).apply {
+            gravity = Gravity.CENTER_VERTICAL
+        })
+        addView(progressView, LinearLayout.LayoutParams(0, BAR_HEIGHT, 1f).apply {
+            gravity = Gravity.CENTER_VERTICAL
+        })
+        addView(rightTime, LinearLayout.LayoutParams(180, ViewGroup.LayoutParams.MATCH_PARENT).apply {
+            gravity = Gravity.CENTER_VERTICAL
+        })
+        addView(rightIcon, LinearLayout.LayoutParams(60, 60).apply {
+            gravity = Gravity.CENTER_VERTICAL
+        })
     }
 
     var textVisibility = View.VISIBLE
@@ -206,11 +220,13 @@ class SeekBar(context: Context) : LinearLayout(context) {
     }
 
     fun setLeftIcon(drawable: Drawable) {
-        leftTime.setCompoundDrawables(drawable, null, null, null)
+        leftIcon.setImageDrawable(drawable)
+        leftIcon.visibility = VISIBLE
     }
 
     fun setRightIcon(drawable: Drawable) {
-        rightTime.setCompoundDrawables(null, null, drawable, null)
+        rightIcon.setImageDrawable(drawable)
+        rightIcon.visibility = VISIBLE
     }
 
     fun set(cur: Int, duration: Int) {
