@@ -43,31 +43,35 @@ class TitleBar : FrameLayout {
     init {
         // iPod Classic 风格的银色金属质感背景
         setBackgroundColor(Colors.background_light)
+        // 时间左对齐，紧贴左边
         addView(
-            playState,
-            LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT).apply {
-                gravity = Gravity.START
-                setMargins(DEFAULT_PADDING, 0, 0, 0)
+            title,
+            LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply {
+                gravity = Gravity.START or Gravity.CENTER_VERTICAL
+                setMargins(0, 0, 0, 0)
             })
+        // 电池在右边
         addView(
             battery,
             LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT).apply {
                 gravity = Gravity.END
                 setMargins(0, DEFAULT_PADDING / 2, DEFAULT_PADDING, DEFAULT_PADDING / 2)
             })
+        // 播放状态图标在电池左边
         addView(
-            title,
-            LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply {
-                gravity = Gravity.CENTER
+            playState,
+            LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT).apply {
+                gravity = Gravity.END or Gravity.CENTER_VERTICAL
+                setMargins(0, 0, DEFAULT_PADDING * 7, 0)
             })
 
         // iPod Classic 风格的标题文字
         title.textSize = 17f
         title.setTextColor(Colors.text)
         title.setPadding(
-            DEFAULT_PADDING * 8,
+            DEFAULT_PADDING,
             DEFAULT_PADDING / 2,
-            DEFAULT_PADDING * 8,
+            DEFAULT_PADDING,
             DEFAULT_PADDING / 2
         )
         // 添加微妙的阴影效果

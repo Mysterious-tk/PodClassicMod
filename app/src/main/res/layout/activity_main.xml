@@ -17,7 +17,7 @@
         <FrameLayout
             android:id="@+id/layout_rectangle"
             android:layout_width="match_parent"
-            android:layout_height="300dp"
+            android:layout_height="380dp"
             android:layout_marginLeft="@dimen/padding_1"
             android:layout_marginRight="@dimen/padding_1"
             android:background="@drawable/round_rectangle"
@@ -36,12 +36,12 @@
         <com.example.podclassic.widget.SlideController
             android:id="@+id/slide_controller"
             android:layout_width="match_parent"
-            android:layout_height="match_parent" />
+            android:layout_height="280dp" />
         
         <com.example.podclassic.widget.SlideController3rd
             android:id="@+id/slide_controller_3rd"
             android:layout_width="match_parent"
-            android:layout_height="match_parent" 
+            android:layout_height="280dp"
             android:visibility="gone" />
     </LinearLayout>
 

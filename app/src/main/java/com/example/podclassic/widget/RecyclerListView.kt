@@ -102,8 +102,8 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
         isFocusable = true
         isFocusableInTouchMode = true
 
-        // 添加触摸事件监听器
-        setOnTouchListener { _, event ->
+        // 添加触摸事件监听器（仅处理滑动，不拦截点击）
+        setOnTouchListener { view, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
                     touchStartY = event.y
@@ -128,7 +128,8 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
                     Log.d("RecyclerListView", "touch up")
                 }
             }
-            true
+            // 返回 false 让事件继续传递给子 view（如 ItemView）
+            false
         }
     }
 
@@ -449,10 +450,8 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
                 // 判断是否显示滚动条（item 数量大于 MAX_SIZE 时显示）
                 val showScrollBar = itemList.size > MAX_SIZE
                 holder.bind(item, actualIndex == index, item.enable, item.rightText, showScrollBar)
-                holder.itemView.setOnClickListener {
-                    this@RecyclerListView.index = actualIndex
-                    onItemClick()
-                }
+                // 设置 item 的点击监听
+                onItemCreated(actualIndex, holder.itemView as ItemView)
             }
         }
 
@@ -613,35 +612,8 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
             addView(leftText, layoutParams1)
             addView(rightText, layoutParams2)
             
-            setOnTouchListener { view, event ->
-                when (event.action) {
-                    MotionEvent.ACTION_DOWN -> {
-                        touchStartX = event.x
-                        touchStartY = event.y
-                    }
-                    MotionEvent.ACTION_MOVE -> {
-                        val deltaX = event.x - touchStartX
-                        val deltaY = event.y - touchStartY
-                        val distance = Math.sqrt((deltaX * deltaX + deltaY * deltaY).toDouble()).toFloat()
-                        
-                        if (distance > 10) {
-                            return@setOnTouchListener false
-                        }
-                    }
-                    MotionEvent.ACTION_UP -> {
-                        val deltaX = event.x - touchStartX
-                        val deltaY = event.y - touchStartY
-                        val distance = Math.sqrt((deltaX * deltaX + deltaY * deltaY).toDouble()).toFloat()
-                        
-                        if (distance < 20) {
-                            onItemClickListener?.onItemClick(itemIndex)
-                            return@setOnTouchListener true
-                        } else {
-                            return@setOnTouchListener false
-                        }
-                    }
-                }
-                true
+            setOnClickListener {
+                onItemClickListener?.onItemClick(itemIndex)
             }
         }
         
