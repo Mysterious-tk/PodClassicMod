@@ -3,6 +3,11 @@ package com.example.podclassic.view
 import android.content.Context
 import android.content.res.Configuration
 import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.LinearGradient
+import android.graphics.Paint
+import android.graphics.Shader
 import android.os.Environment
 import android.os.Handler
 import android.os.Looper
@@ -143,18 +148,39 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
         // 设置ListView的背景为浅灰色，防止专辑图透出影响文字阅读
         listView.setBackgroundColor(Colors.background)
 
-        // 添加中间竖线分割，增加边界感和阴影效果
-        val dividerView = View(context)
-        val dividerParams = LayoutParams(10, LayoutParams.MATCH_PARENT)
+        // 添加中间竖线分割，右侧横向内阴影效果
+        val dividerView = object : View(context) {
+            private val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+            private val linePaint = Paint(Paint.ANTI_ALIAS_FLAG)
+
+            override fun onDraw(canvas: Canvas) {
+                val width = width.toFloat()
+                val height = height.toFloat()
+
+                // 绘制右侧内阴影（从中间到右边缘，由黑到透明）
+                val rightShadow = LinearGradient(
+                    width * 0.1f, 0f,
+                    width, 0f,
+                    intArrayOf(
+                        Color.argb(240, 0, 0, 0),    // 左侧很黑的阴影
+                        Color.argb(120, 0, 0, 0),    // 过渡
+                        Color.argb(40, 0, 0, 0),     // 中间
+                        Color.argb(0, 0, 0, 0)       // 右边缘透明
+                    ),
+                    floatArrayOf(0f, 0.3f, 0.6f, 1f),
+                    Shader.TileMode.CLAMP
+                )
+                shadowPaint.shader = rightShadow
+                canvas.drawRect(width * 0.1f, 0f, width, height, shadowPaint)
+            }
+        }
+        val dividerParams = LayoutParams(48, LayoutParams.MATCH_PARENT)
         dividerParams.addRule(RelativeLayout.ALIGN_PARENT_LEFT)
         dividerParams.leftMargin = if (isLandscape) {
-            (resources.displayMetrics.widthPixels * 0.45).toInt() - 5 // 横屏时分割线位置在45%
+            (resources.displayMetrics.widthPixels * 0.45).toInt() - 8 // 横屏时分割线位置在45%
         } else {
-            (resources.displayMetrics.widthPixels * 0.30).toInt() - 5 // 竖屏时分割线位置在30%
+            (resources.displayMetrics.widthPixels * 0.30).toInt() - 8 // 竖屏时分割线位置在30%
         }
-        dividerView.setBackgroundColor(android.graphics.Color.parseColor("#333333"))
-        // 添加阴影效果
-        dividerView.elevation = 5f
         addView(dividerView, dividerParams)
 
         // 初始化菜单项
