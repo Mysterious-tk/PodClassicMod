@@ -145,6 +145,11 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
             private val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG)
             private val linePaint = Paint(Paint.ANTI_ALIAS_FLAG)
 
+            init {
+                // 设置透明背景
+                setBackgroundColor(Color.TRANSPARENT)
+            }
+
             override fun onDraw(canvas: Canvas) {
                 val width = width.toFloat()
                 val height = height.toFloat()
@@ -168,7 +173,7 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
         }
         val dividerParams = LayoutParams(48, LayoutParams.MATCH_PARENT)
         dividerParams.addRule(RelativeLayout.ALIGN_PARENT_LEFT)
-        dividerParams.leftMargin = dividerPosition - 24 // 分割线居中在分界处
+        dividerParams.leftMargin = dividerPosition - 2 // 分割线向左微调2像素
         addView(dividerView, dividerParams)
 
         // 初始化菜单项
@@ -441,7 +446,7 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
         
         // 更新分割线位置
         val dividerParams = dividerView.layoutParams as LayoutParams
-        dividerParams.leftMargin = dividerPosition - 24
+        dividerParams.leftMargin = dividerPosition - 2
         dividerView.layoutParams = dividerParams
         
         android.util.Log.d("MainView", "Layout updated for orientation: landscape=$isLandscape, parent=${parentWidth}x${parentHeight}, container=${savedContainerWidth}x${savedContainerHeight}, divider=$dividerPosition")
