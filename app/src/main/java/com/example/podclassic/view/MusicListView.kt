@@ -8,8 +8,11 @@ import android.graphics.BlurMaskFilter
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.RenderEffect
+import android.graphics.Shader
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.GradientDrawable
+import android.os.Build
 import android.view.MotionEvent
 import android.view.ViewGroup
 import android.widget.FrameLayout
@@ -65,7 +68,9 @@ class MusicListView : FrameLayout, ScreenView {
         val layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
         imageView.layoutParams = layoutParams
         imageView.scaleType = ImageView.ScaleType.CENTER_CROP
-        imageView.alpha = 0.15f // 设置更低的透明度，让背景更暗，突出前景列表
+        // API 31+ 使用 RenderEffect 实现玻璃效果，不需要设置低透明度
+        // 低版本保持原来的透明度
+        imageView.alpha = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) 0.6f else 0.15f
         return imageView
     }
 
@@ -165,7 +170,7 @@ class MusicListView : FrameLayout, ScreenView {
         if (musicList.isNotEmpty()) {
             val firstMusic = musicList[0]
             val albumId = firstMusic.albumId
-            
+
             // 在子线程中加载专辑封面并应用模糊效果
             Thread {
                 val bitmap = MediaUtil.getAlbumImage(albumId ?: 0L)
@@ -174,6 +179,8 @@ class MusicListView : FrameLayout, ScreenView {
                     bitmap.recycle()
                     ThreadUtil.runOnUiThread {
                         backgroundImageView.setImageBitmap(blurredBitmap)
+                        // API 31+ 应用 RenderEffect 玻璃效果
+                        applyGlassEffect()
                     }
                 } else {
                     // 使用默认图标作为背景
@@ -181,27 +188,76 @@ class MusicListView : FrameLayout, ScreenView {
                         val defaultBitmap = Icons.DEFAULT.bitmap
                         val blurredBitmap = blurBitmap(defaultBitmap)
                         backgroundImageView.setImageBitmap(blurredBitmap)
+                        // API 31+ 应用 RenderEffect 玻璃效果
+                        applyGlassEffect()
                     }
                 }
             }.start()
         }
     }
+
+    // 应用玻璃效果 - 使用 RenderEffect (API 31+)
+    private fun applyGlassEffect() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            try {
+                // 创建高斯模糊效果 - 使用适中的模糊半径实现玻璃效果
+                val blurEffect = RenderEffect.createBlurEffect(
+                    40f,  // X轴模糊半径
+                    40f,  // Y轴模糊半径
+                    Shader.TileMode.CLAMP
+                )
+
+                // 应用效果到背景ImageView
+                backgroundImageView.setRenderEffect(blurEffect)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
     
-    // 模糊Bitmap的方法 - 使用更高效的实现
+    // 模糊Bitmap的方法 - API 31+ 使用 RenderEffect 实现更现代的玻璃效果
     private fun blurBitmap(bitmap: Bitmap): Bitmap {
+        // API 31+ 使用 RenderEffect 实现高质量模糊
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            return blurBitmapWithRenderEffect(bitmap)
+        }
+        // 低版本使用传统的 BlurMaskFilter
+        return blurBitmapWithMaskFilter(bitmap)
+    }
+
+    // 使用 RenderEffect 实现高质量模糊（API 31+）
+    private fun blurBitmapWithRenderEffect(bitmap: Bitmap): Bitmap {
+        // 缩小图片以提高性能，但保持较高分辨率以获得更好的玻璃效果
+        val scaleFactor = 0.25f
+        val scaledWidth = (bitmap.width * scaleFactor).toInt()
+        val scaledHeight = (bitmap.height * scaleFactor).toInt()
+
+        val scaledBitmap = Bitmap.createScaledBitmap(bitmap, scaledWidth, scaledHeight, true)
+        val blurredBitmap = Bitmap.createBitmap(scaledBitmap.width, scaledBitmap.height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(blurredBitmap)
+
+        // 先绘制原始缩放图片
+        canvas.drawBitmap(scaledBitmap, 0f, 0f, null)
+
+        scaledBitmap.recycle()
+        return blurredBitmap
+    }
+
+    // 低版本使用传统的 BlurMaskFilter
+    private fun blurBitmapWithMaskFilter(bitmap: Bitmap): Bitmap {
         // 缩小图片以提高模糊效率
         val scaleFactor = 0.1f
         val scaledWidth = (bitmap.width * scaleFactor).toInt()
         val scaledHeight = (bitmap.height * scaleFactor).toInt()
-        
+
         val scaledBitmap = Bitmap.createScaledBitmap(bitmap, scaledWidth, scaledHeight, false)
         val blurredBitmap = Bitmap.createBitmap(scaledBitmap.width, scaledBitmap.height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(blurredBitmap)
-        
+
         val paint = Paint()
         paint.maskFilter = BlurMaskFilter(10f, BlurMaskFilter.Blur.NORMAL)
         canvas.drawBitmap(scaledBitmap, 0f, 0f, paint)
-        
+
         scaledBitmap.recycle()
         return blurredBitmap
     }
