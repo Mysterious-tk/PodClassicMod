@@ -2,9 +2,12 @@ package com.example.podclassic.widget
 
 import android.content.Context
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.RenderEffect
 import android.graphics.Shader
 import android.graphics.drawable.GradientDrawable
+import android.os.Build
 import android.util.Log
 import android.view.GestureDetector
 import android.view.Gravity
@@ -533,8 +536,14 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
 
         private val bar = object : View(context) {
             private val paint by lazy {
-                Paint().apply { shader = null }
+                Paint().apply {
+                    shader = null
+                    isAntiAlias = true
+                }
             }
+
+            // 圆角半径
+            private val cornerRadius = 8f
 
             override fun onDraw(canvas: Canvas) {
                 if (paint.shader == null) {
@@ -548,7 +557,11 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
                         Shader.TileMode.MIRROR
                     )
                 }
-                canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
+                // 使用圆角矩形绘制高亮条
+                canvas.drawRoundRect(
+                    0f, 0f, width.toFloat(), height.toFloat(),
+                    cornerRadius, cornerRadius, paint
+                )
             }
         }
 
@@ -635,6 +648,15 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
             fun onItemClick(index: Int)
         }
 
+        // 高亮背景圆角矩形
+        private val highlightDrawable by lazy {
+            GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = 8f * context.resources.displayMetrics.density
+                setColor(Colors.main)
+            }
+        }
+
         fun setHighlight(highlight: Boolean) {
             if (this.highlight == highlight) {
                 return
@@ -650,7 +672,8 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
                 leftText.isSelected = false
             }
             if (highlight) {
-                setBackgroundColor(Colors.main)
+                // 应用玻璃效果高亮背景
+                applyHighlightGlassEffect()
                 leftText.setTextColor(0xFFFFFFFF.toInt())
                 rightText.setTextColor(0xFFFFFFFF.toInt())
             } else {
@@ -658,6 +681,22 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
                 leftText.setTextColor(0xFF1A1A1A.toInt())
                 rightText.setTextColor(Colors.text)
             }
+        }
+
+        // 应用高亮玻璃效果 - 半透明蓝色背景+光泽
+        private fun applyHighlightGlassEffect() {
+            // 使用半透明蓝色背景模拟玻璃效果
+            val glassDrawable = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = 8f * context.resources.displayMetrics.density
+                // 半透明蓝色渐变
+                colors = intArrayOf(
+                    Color.argb(200, 0, 122, 255),  // 半透明主蓝色
+                    Color.argb(180, 90, 200, 250)   // 半透明浅蓝色
+                )
+                orientation = GradientDrawable.Orientation.TOP_BOTTOM
+            }
+            background = glassDrawable
         }
 
         fun setEnable(enable: Boolean) {
