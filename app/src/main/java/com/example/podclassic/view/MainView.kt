@@ -1,5 +1,9 @@
 package com.example.podclassic.view
 
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
+import android.animation.ObjectAnimator
+import android.animation.ValueAnimator
 import android.content.Context
 import android.content.res.Configuration
 import android.graphics.Bitmap
@@ -13,6 +17,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.Message
 import android.view.View
+import android.view.animation.LinearInterpolator
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.RelativeLayout
@@ -51,20 +56,19 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
     private var dy = 0f
     private var bounceCount = 0
     private val coverImages = arrayOf("img/1.jpg", "img/2.jpg", "img/3.jpg", "img/4.jpg", "img/5.jpg", "img/6.jpg")
-    private val handler = object : Handler(Looper.getMainLooper()) {
-        override fun handleMessage(msg: Message) {
-            super.handleMessage(msg)
-            if (msg.what == 0) {
-                updateCoverPosition()
-                sendEmptyMessageDelayed(0, 100) // 减少延迟，使移动更快
-            }
-        }
-    }
+
+    // 动画相关
+    private var xAnimator: ObjectAnimator? = null
+    private var yAnimator: ObjectAnimator? = null
+    private var isAnimating = false
 
     init {
         // 初始化随机移动方向和速度
-        dx = (random.nextInt(6) - 3).toFloat() * 3f // 调整移动速度
-        dy = (random.nextInt(6) - 3).toFloat() * 3f // 调整移动速度
+        dx = (random.nextInt(6) - 3).toFloat() * 3f
+        dy = (random.nextInt(6) - 3).toFloat() * 3f
+
+        // 启用硬件加速
+        coverImageView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
     }
 
     override fun getTitle(): String? {
@@ -402,7 +406,7 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
                 updateCoverImage()
                 // 强制重置位置到左上角
                 resetCoverPosition()
-                handler.sendEmptyMessage(0)
+                startCoverAnimation()
                 android.util.Log.d("MainView", "Handler message sent")
             }
         }
@@ -492,96 +496,96 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
         }
     }
 
-    private fun updateCoverPosition() {
-        // 使用保存的尺寸
+    private fun startCoverAnimation() {
+        if (isAnimating) return
+        isAnimating = true
+        animateToNextPosition()
+    }
+
+    private fun animateToNextPosition() {
         val containerWidth = savedContainerWidth
         val containerHeight = savedContainerHeight
         val imageWidth = savedImageWidth
         val imageHeight = savedImageHeight
 
         if (containerWidth == 0 || containerHeight == 0 || imageWidth == 0 || imageHeight == 0) {
+            isAnimating = false
             return
         }
 
-        // AABB碰撞盒算法：确保容器完全在图片内
-        // 约束条件：
-        // - 图片左边缘 <= 容器左边缘  (x <= 0)
-        // - 图片右边缘 >= 容器右边缘  (x + imageWidth >= containerWidth)
-        // - 图片上边缘 <= 容器上边缘  (y <= 0)
-        // - 图片下边缘 >= 容器下边缘  (y + imageHeight >= containerHeight)
-        // 解得移动范围：
-        val minX = (containerWidth - imageWidth).toFloat()  // 最右位置（图片右边缘对齐容器右边缘）
-        val maxX = 0f  // 最左位置（图片左边缘对齐容器左边缘）
-        val minY = (containerHeight - imageHeight).toFloat()  // 最下位置（图片下边缘对齐容器下边缘）
-        val maxY = 0f  // 最上位置（图片上边缘对齐容器上边缘）
+        val minX = (containerWidth - imageWidth).toFloat()
+        val maxX = 0f
+        val minY = (containerHeight - imageHeight).toFloat()
+        val maxY = 0f
 
-        // 获取图片的当前位置
-        val currentX = coverImageView.x + dx
-        val currentY = coverImageView.y + dy
-
-        // 每50帧打印一次位置信息
-        if (random.nextInt(50) == 0) {
-            android.util.Log.d("MainView", "Position: ($currentX, $currentY), bounds: minX=$minX, maxX=$maxX, minY=$minY, maxY=$maxY")
-        }
+        // 计算目标位置
+        var targetX = coverImageView.x + dx * 50 // 移动距离
+        var targetY = coverImageView.y + dy * 50
 
         var bounced = false
 
-        // 边界检查和随机方向改变
-        // 检查是否碰到左边界
-        if (currentX <= minX) {
-            // 碰到左边界，向右随机方向移动
-            dx = (random.nextInt(3) + 2).toFloat() * 0.8f // 2-4的速度向右
-            dy = (random.nextInt(7) - 3).toFloat() * 0.8f // -3到3的随机y速度
+        // 边界检查
+        if (targetX <= minX) {
+            targetX = minX
+            dx = (random.nextInt(3) + 2).toFloat() * 0.8f
+            dy = (random.nextInt(7) - 3).toFloat() * 0.8f
             bounced = true
-            android.util.Log.d("MainView", "Bounced left, new velocity: dx=$dx, dy=$dy")
         }
-        // 检查是否碰到右边界
-        if (currentX >= maxX) {
-            // 碰到右边界，向左随机方向移动
-            dx = -(random.nextInt(3) + 2).toFloat() * 0.8f // 2-4的速度向左
-            dy = (random.nextInt(7) - 3).toFloat() * 0.8f // -3到3的随机y速度
+        if (targetX >= maxX) {
+            targetX = maxX
+            dx = -(random.nextInt(3) + 2).toFloat() * 0.8f
+            dy = (random.nextInt(7) - 3).toFloat() * 0.8f
             bounced = true
-            android.util.Log.d("MainView", "Bounced right, new velocity: dx=$dx, dy=$dy")
         }
-        // 检查是否碰到上边界
-        if (currentY <= minY) {
-            // 碰到上边界，向下随机方向移动
-            dx = (random.nextInt(7) - 3).toFloat() * 0.8f // -3到3的随机x速度
-            dy = (random.nextInt(3) + 2).toFloat() * 0.8f // 2-4的速度向下
+        if (targetY <= minY) {
+            targetY = minY
+            dx = (random.nextInt(7) - 3).toFloat() * 0.8f
+            dy = (random.nextInt(3) + 2).toFloat() * 0.8f
             bounced = true
-            android.util.Log.d("MainView", "Bounced top, new velocity: dx=$dx, dy=$dy")
         }
-        // 检查是否碰到下边界
-        if (currentY >= maxY) {
-            // 碰到下边界，向上随机方向移动
-            dx = (random.nextInt(7) - 3).toFloat() * 0.8f // -3到3的随机x速度
-            dy = -(random.nextInt(3) + 2).toFloat() * 0.8f // 2-4的速度向上
+        if (targetY >= maxY) {
+            targetY = maxY
+            dx = (random.nextInt(7) - 3).toFloat() * 0.8f
+            dy = -(random.nextInt(3) + 2).toFloat() * 0.8f
             bounced = true
         }
 
-        // 如果发生碰撞，增加计数
         if (bounced) {
             bounceCount++
-            // 碰撞50次后换图
             if (bounceCount >= 50) {
                 bounceCount = 0
                 changeCoverImage()
             }
         }
 
-        // 限制位置在安全范围内
-        var newX = currentX
-        var newY = currentY
+        // 创建X轴动画
+        xAnimator = ObjectAnimator.ofFloat(coverImageView, "x", coverImageView.x, targetX).apply {
+            duration = 2000 // 2秒
+            interpolator = LinearInterpolator()
+            addListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator) {
+                    if (isAnimating) {
+                        animateToNextPosition()
+                    }
+                }
+            })
+            start()
+        }
 
-        // 确保不会超过边界
-        if (newX < minX) newX = minX
-        if (newX > maxX) newX = maxX
-        if (newY < minY) newY = minY
-        if (newY > maxY) newY = maxY
+        // 创建Y轴动画
+        yAnimator = ObjectAnimator.ofFloat(coverImageView, "y", coverImageView.y, targetY).apply {
+            duration = 2000
+            interpolator = LinearInterpolator()
+            start()
+        }
+    }
 
-        // 更新图片的位置
-        coverImageView.x = newX
-        coverImageView.y = newY
+    private fun stopCoverAnimation() {
+        isAnimating = false
+        xAnimator?.cancel()
+        yAnimator?.cancel()
+        xAnimator = null
+        yAnimator = null
     }
 
     private fun changeCoverImage() {
@@ -600,6 +604,6 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
 
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
-        handler.removeCallbacksAndMessages(null)
+        stopCoverAnimation()
     }
 }
