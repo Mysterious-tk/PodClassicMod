@@ -24,7 +24,7 @@ import kotlin.math.sqrt
 class SeekBar(context: Context) : LinearLayout(context) {
 
     companion object {
-        private val BAR_HEIGHT = (Values.DEFAULT_PADDING * 2)
+        private val BAR_HEIGHT = Values.DEFAULT_PADDING
     }
 
     private val leftTime: AppCompatTextView
