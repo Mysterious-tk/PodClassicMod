@@ -41,8 +41,8 @@ class TitleBar : FrameLayout {
     }
 
     init {
-        // iPod Classic 风格的银色金属质感背景
-        setBackgroundColor(Colors.background_light)
+        // 玻璃效果下使用透明背景
+        setBackgroundColor(android.graphics.Color.TRANSPARENT)
         // 时间左对齐，紧贴左边
         addView(
             title,
