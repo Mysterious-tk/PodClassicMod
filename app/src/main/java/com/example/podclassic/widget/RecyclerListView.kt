@@ -281,6 +281,7 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
+        Log.d("RecyclerListView", "onTouchEvent: action=${event.action}")
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
                 touchStartY = event.y
@@ -293,10 +294,10 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
                 if (Math.abs(deltaY) > 10) {
                     if (deltaY < 0) {
                         Log.d("RecyclerListView", "swipe up")
-                        onSlide(1)
+                        onSlide(-1)
                     } else {
                         Log.d("RecyclerListView", "swipe down")
-                        onSlide(-1)
+                        onSlide(1)
                     }
                     touchStartY = event.y
                 }
@@ -306,6 +307,48 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
             }
         }
         return true
+    }
+    
+    // 触摸起始位置
+    private var interceptTouchStartY = 0f
+    private var isScrolling = false
+
+    override fun onInterceptTouchEvent(event: MotionEvent): Boolean {
+        Log.d("RecyclerListView", "onInterceptTouchEvent: action=${event.action}")
+        when (event.action) {
+            MotionEvent.ACTION_DOWN -> {
+                interceptTouchStartY = event.y
+                isScrolling = false
+            }
+            MotionEvent.ACTION_MOVE -> {
+                val deltaY = kotlin.math.abs(event.y - interceptTouchStartY)
+                // 如果移动距离超过阈值，拦截事件用于滑动
+                if (deltaY > 20) {
+                    isScrolling = true
+                    return true
+                }
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                // 触摸结束时重置滑动状态
+                isScrolling = false
+            }
+        }
+        return super.onInterceptTouchEvent(event)
+    }
+
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        Log.d("RecyclerListView", "dispatchTouchEvent: action=${event.action}, isScrolling=$isScrolling")
+        if (isScrolling) {
+            // 滑动模式下，直接处理滑动事件
+            val handled = onTouchEvent(event)
+            // 滑动结束时重置状态
+            if (event.action == MotionEvent.ACTION_UP || event.action == MotionEvent.ACTION_CANCEL) {
+                isScrolling = false
+            }
+            return handled
+        }
+        // 非滑动模式，让子视图处理点击
+        return super.dispatchTouchEvent(event)
     }
 
     open fun onItemCreated(index: Int, itemView: ItemView) {

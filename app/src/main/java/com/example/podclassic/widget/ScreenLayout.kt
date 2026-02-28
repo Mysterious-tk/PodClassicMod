@@ -81,12 +81,13 @@ open class ScreenLayout : ViewGroup {
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
         // 将触摸事件传递给当前显示的视图
         val currentView = curr()
+        android.util.Log.d("ScreenLayout", "dispatchTouchEvent: action=${event.action}, currentView=${currentView?.javaClass?.simpleName}")
         if (currentView != null) {
-            android.util.Log.d("ScreenLayout", "dispatching touch event to current view: ${currentView.javaClass.simpleName}")
             val handled = currentView.dispatchTouchEvent(event)
-            android.util.Log.d("ScreenLayout", "Current view handled: $handled")
-            // 即使currentView没有处理事件，也要返回true，确保事件能够被正确传递
-            return true
+            android.util.Log.d("ScreenLayout", "currentView handled: $handled")
+            if (handled) {
+                return true
+            }
         }
         return super.dispatchTouchEvent(event)
     }
@@ -95,19 +96,17 @@ open class ScreenLayout : ViewGroup {
         // 将触摸事件传递给当前显示的视图
         val currentView = curr()
         if (currentView != null) {
-            android.util.Log.d("ScreenLayout", "onTouchEvent called for current view: ${currentView.javaClass.simpleName}")
             val handled = currentView.onTouchEvent(event)
-            android.util.Log.d("ScreenLayout", "Current view onTouchEvent handled: $handled")
-            // 即使currentView没有处理事件，也要返回true，确保事件能够被正确传递
-            return true
+            if (handled) {
+                return true
+            }
         }
         return super.onTouchEvent(event)
     }
 
     override fun onInterceptTouchEvent(event: MotionEvent): Boolean {
-        // 拦截触摸事件，确保它能够被传递给onTouchEvent方法
-        android.util.Log.d("ScreenLayout", "onInterceptTouchEvent called")
-        return true
+        // 不拦截触摸事件，让子视图自己处理滑动和点击
+        return false
     }
 
     fun stackSize(): Int {
