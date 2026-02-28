@@ -80,6 +80,25 @@ class TitleBar : FrameLayout {
         MediaPresenter.playState.addObserver(observer, onDataChangeListener)
         observer.enable = true
     }
+    
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration?) {
+        super.onConfigurationChanged(newConfig)
+        updateLayoutForOrientation()
+    }
+    
+    private fun updateLayoutForOrientation() {
+        val isLandscape = resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+        
+        // 更新电池布局
+        val batteryParams = battery.layoutParams as LayoutParams
+        batteryParams.setMargins(0, DEFAULT_PADDING / 2, if (isLandscape) DEFAULT_PADDING / 2 else DEFAULT_PADDING, DEFAULT_PADDING / 2)
+        battery.layoutParams = batteryParams
+        
+        // 更新播放状态图标布局
+        val playStateParams = playState.layoutParams as LayoutParams
+        playStateParams.setMargins(0, 0, DEFAULT_PADDING * 7, 0)
+        playState.layoutParams = playStateParams
+    }
 
     private val simpleDateFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
 
