@@ -62,29 +62,23 @@ open class ScreenLayout : ViewGroup {
     private var currAnimator: Animator? = null
 
     override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
-        android.util.Log.d("ScreenLayout", "onLayout() called: changed=$changed, l=$l, t=$t, r=$r, b=$b, width=$width, height=$height")
         if (currAnimator?.isRunning == true) {
-            android.util.Log.d("ScreenLayout", "Animator is running, skipping layout")
             return
         }
         if (isEmpty()) {
-            android.util.Log.d("ScreenLayout", "No children, skipping layout")
             return
         }
         val child = getChildAt(childCount - 1)
         val childWidth = r - l
         val childHeight = b - t
-        android.util.Log.d("ScreenLayout", "Layout child: ${child.javaClass.simpleName}, childWidth=$childWidth, childHeight=$childHeight")
         child.layout(0, 0, childWidth, childHeight)
     }
 
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
         // 将触摸事件传递给当前显示的视图
         val currentView = curr()
-        android.util.Log.d("ScreenLayout", "dispatchTouchEvent: action=${event.action}, currentView=${currentView?.javaClass?.simpleName}")
         if (currentView != null) {
             val handled = currentView.dispatchTouchEvent(event)
-            android.util.Log.d("ScreenLayout", "currentView handled: $handled")
             if (handled) {
                 return true
             }
@@ -209,29 +203,22 @@ open class ScreenLayout : ViewGroup {
     }
 
     fun add(view: View?) {
-        android.util.Log.d("ScreenLayout", "add() called with view: ${view?.javaClass?.simpleName}")
         if (currAnimator != null && currAnimator?.isRunning == true) {
-            android.util.Log.d("ScreenLayout", "Cancelling running animator")
             currAnimator?.cancel()
         }
 
         if (view == null) {
-            android.util.Log.d("ScreenLayout", "View is null, returning")
             return
         }
         if (view in this) {
-            android.util.Log.d("ScreenLayout", "View already added, returning")
             return
         }
 
         // 确保视图有正确的布局参数
         if (view.layoutParams == null) {
-            android.util.Log.d("ScreenLayout", "Setting default layout params for view")
             view.layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
         }
-        android.util.Log.d("ScreenLayout", "View layoutParams: ${view.layoutParams}")
         addView(view)
-        android.util.Log.d("ScreenLayout", "View added, childCount=$childCount")
         onViewCreate(view)
         //onViewAdd(view)
 

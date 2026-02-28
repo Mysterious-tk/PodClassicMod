@@ -110,25 +110,20 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
                     touchStartY = event.y
-                    Log.d("RecyclerListView", "touch down: $touchStartY")
                 }
                 MotionEvent.ACTION_MOVE -> {
                     val deltaY = event.y - touchStartY
-                    Log.d("RecyclerListView", "touch move: deltaY=$deltaY")
                     
                     if (Math.abs(deltaY) > 10) {
                         if (deltaY < 0) {
-                            Log.d("RecyclerListView", "swipe up")
-                            onSlide(1)
-                        } else {
-                            Log.d("RecyclerListView", "swipe down")
                             onSlide(-1)
+                        } else {
+                            onSlide(1)
                         }
                         touchStartY = event.y
                     }
                 }
                 MotionEvent.ACTION_UP -> {
-                    Log.d("RecyclerListView", "touch up")
                 }
             }
             // 返回 false 让事件继续传递给子 view（如 ItemView）
@@ -285,36 +280,30 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
                 touchStartY = event.y
-                Log.d("RecyclerListView", "onTouchEvent down: $touchStartY")
             }
             MotionEvent.ACTION_MOVE -> {
                 val deltaY = event.y - touchStartY
-                Log.d("RecyclerListView", "onTouchEvent move: deltaY=$deltaY")
-                
+
                 if (Math.abs(deltaY) > 10) {
                     if (deltaY < 0) {
-                        Log.d("RecyclerListView", "swipe up")
                         onSlide(-1)
                     } else {
-                        Log.d("RecyclerListView", "swipe down")
                         onSlide(1)
                     }
                     touchStartY = event.y
                 }
             }
             MotionEvent.ACTION_UP -> {
-                Log.d("RecyclerListView", "onTouchEvent up")
             }
         }
         return true
     }
-    
+
     // 触摸起始位置
     private var interceptTouchStartY = 0f
     private var isScrolling = false
 
     override fun onInterceptTouchEvent(event: MotionEvent): Boolean {
-        Log.d("RecyclerListView", "onInterceptTouchEvent: action=${event.action}")
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
                 interceptTouchStartY = event.y
@@ -337,7 +326,6 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
     }
 
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
-        Log.d("RecyclerListView", "dispatchTouchEvent: action=${event.action}, isScrolling=$isScrolling")
         if (isScrolling) {
             // 滑动模式下，直接处理滑动事件
             val handled = onTouchEvent(event)
@@ -371,15 +359,11 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
     private var timer: Timer? = null
 
     fun onSlide(direction: Int): Boolean {
-        Log.d("RecyclerListView", "onSlide: direction=$direction, current index=$index, itemList size=${itemList.size}")
-        
         if (direction == 0 || itemList.isEmpty()) {
-            Log.d("RecyclerListView", "onSlide: no items or zero direction")
             return false
         }
 
         if ((direction < 0 && index == 0) || (direction > 0 && index == itemList.size - 1)) {
-            Log.d("RecyclerListView", "onSlide: reached boundary")
             return false
         }
 
@@ -389,7 +373,6 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
                     position--
                 }
                 index--
-                Log.d("RecyclerListView", "onSlide: moved up to index=$index")
             }
         } else {
             if (index < itemList.size - 1) {
@@ -397,11 +380,9 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
                     position++
                 }
                 index++
-                Log.d("RecyclerListView", "onSlide: moved down to index=$index")
             }
         }
         refreshList()
-        Log.d("RecyclerListView", "onSlide: completed, returning true")
         return true
     }
 
