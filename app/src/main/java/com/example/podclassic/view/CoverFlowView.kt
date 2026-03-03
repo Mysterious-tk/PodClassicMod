@@ -33,8 +33,28 @@ import kotlin.math.min
 
 class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
     companion object {
-        private const val MAX_SIZE = 15
-        private const val CENTER_INDEX = MAX_SIZE / 2
+        // iPod Classic真实CoverFlow参数
+        // 旋转角度：中间0°，内侧15°，中间30°，外侧45°
+        private const val ROTATION_ANGLE_INNER = 15f   // 紧邻中间
+        private const val ROTATION_ANGLE_MIDDLE = 30f  // 中间层
+        private const val ROTATION_ANGLE_OUTER = 45f   // 最外侧
+        
+        // 缩放比例：中间1.0，内侧0.85，中间0.70，外侧0.55
+        private const val SCALE_CENTER = 1.0f
+        private const val SCALE_INNER = 0.85f
+        private const val SCALE_MIDDLE = 0.70f
+        private const val SCALE_OUTER = 0.55f
+        
+        // Z轴深度：中间0，内侧30，中间70，外侧120
+        private const val Z_DEPTH_INNER = 30f
+        private const val Z_DEPTH_MIDDLE = 70f
+        private const val Z_DEPTH_OUTER = 120f
+        
+        // 唱片间距（均匀间距）
+        private const val COVER_SPACING = 0.65f
+
+        private const val MAX_SIZE = 7
+        private const val CENTER_INDEX = MAX_SIZE / 2  // 3
         private const val DEFAULT_DURATION = 300L
         private const val MIN_DURATION = 10L
         private const val SWIPE_THRESHOLD = 60f
@@ -210,21 +230,71 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
     private fun snapBackToPosition() {
         // 创建回弹动画
         val startOffset = currentDragOffset.toFloat()
+        
         animator = ValueAnimator.ofFloat(startOffset, 0f).apply {
-            duration = 250
-            interpolator = OvershootInterpolator(0.3f)
+            duration = 300
+            interpolator = DecelerateInterpolator(1.5f)
             addUpdateListener { animation ->
                 val offset = animation.animatedValue as Float
-                updatePositionByDrag(offset)
+                
+                // 回弹过程中使用iPod Classic风格动态效果
+                for (i in imageViews.indices) {
+                    val imageView = imageViews[i]
+                    val relativeIndex = i - CENTER_INDEX
+                    
+                    // 计算基础X位置（均匀间距）
+                    val baseCenterX = imageCenterX + relativeIndex * imageWidth * COVER_SPACING
+                    val currentCenterX = baseCenterX + offset
+                    
+                    // 计算与中心的距离
+                    val distanceFromCenter = abs(currentCenterX - imageCenterX)
+                    val normalizedDistance = distanceFromCenter / (imageWidth * COVER_SPACING)
+                    
+                    // 获取目标属性
+                    val (targetScale, targetRotation, targetZ, targetAlpha) = getCoverProperties(normalizedDistance, relativeIndex)
+                    
+                    // 应用属性
+                    imageView.scaleX = targetScale
+                    imageView.scaleY = targetScale
+                    imageView.rotationY = targetRotation
+                    imageView.alpha = targetAlpha
+                    imageView.z = targetZ
+                    
+                    // 计算布局位置
+                    val actualHalfWidth = max(1, halfImageWidth)
+                    val scaledHalfWidth = actualHalfWidth * targetScale
+                    
+                    // 以边为轴的旋转偏移计算
+                    val pivotOffset = when {
+                        relativeIndex == 0 -> 0f
+                        relativeIndex < 0 -> {
+                            val shift = scaledHalfWidth * (1 - kotlin.math.cos(Math.toRadians(targetRotation.toDouble()))).toFloat()
+                            shift
+                        }
+                        else -> {
+                            val shift = scaledHalfWidth * (1 - kotlin.math.cos(Math.toRadians((-targetRotation).toDouble()))).toFloat()
+                            -shift
+                        }
+                    }
+                    
+                    val left = (currentCenterX + pivotOffset - scaledHalfWidth).toInt()
+                    val top = (imageCenterY - scaledHalfWidth).toInt()
+                    val right = (currentCenterX + pivotOffset + scaledHalfWidth).toInt()
+                    val bottom = (imageCenterY + scaledHalfWidth).toInt()
+                    
+                    imageView.layout(left, top, right, bottom)
+                }
             }
             addListener(object : AnimatorListenerAdapter() {
                 override fun onAnimationEnd(animation: Animator) {
-                    // 回弹动画结束后，确保数据同步
+                    currentDragOffset = 0
                     updateAllImageViews()
                     updateCenterText()
                     animator = null
                 }
                 override fun onAnimationCancel(animation: Animator) {
+                    currentDragOffset = 0
+                    updateAllImageViews()
                     animator = null
                 }
             })
@@ -239,18 +309,122 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
 
     private fun updatePositionByDrag(deltaX: Float) {
         // 计算偏移量（限制范围）
-        val maxOffset = imagePadding * 2
-        val offset = deltaX.toInt().coerceIn(-maxOffset, maxOffset)
-        currentDragOffset = offset
+        val maxOffset = imageWidth * COVER_SPACING
+        val offset = deltaX.coerceIn(-maxOffset, maxOffset)
+        currentDragOffset = offset.toInt()
 
         // 实时更新所有图片位置和旋转
         for (i in imageViews.indices) {
             val imageView = imageViews[i]
             val relativeIndex = i - CENTER_INDEX
-            val albumIndex = currentCenterAlbumIndex + relativeIndex
-            val baseCenterX = imageCenterX + relativeIndex * imagePadding
-            updateImageViewPosition(baseCenterX + offset, imageView, albumIndex)
+            
+            // 计算基础X位置（均匀间距）
+            val baseCenterX = imageCenterX + relativeIndex * imageWidth * COVER_SPACING
+            val currentCenterX = baseCenterX + offset
+            
+            // 计算与中心的距离
+            val distanceFromCenter = abs(currentCenterX - imageCenterX)
+            val normalizedDistance = distanceFromCenter / (imageWidth * COVER_SPACING)
+            
+            // 获取目标属性
+            val (targetScale, targetRotation, targetZ, targetAlpha) = getCoverProperties(normalizedDistance, relativeIndex)
+            
+            // 应用属性
+            imageView.scaleX = targetScale
+            imageView.scaleY = targetScale
+            imageView.rotationY = targetRotation
+            imageView.alpha = targetAlpha
+            imageView.z = targetZ
+            
+            // 计算布局位置
+            val actualHalfWidth = max(1, halfImageWidth)
+            val scaledHalfWidth = actualHalfWidth * targetScale
+            
+            // 以边为轴的旋转偏移计算
+            val pivotOffset = when {
+                relativeIndex == 0 -> 0f
+                relativeIndex < 0 -> {
+                    val shift = scaledHalfWidth * (1 - kotlin.math.cos(Math.toRadians(targetRotation.toDouble()))).toFloat()
+                    shift
+                }
+                else -> {
+                    val shift = scaledHalfWidth * (1 - kotlin.math.cos(Math.toRadians((-targetRotation).toDouble()))).toFloat()
+                    -shift
+                }
+            }
+            
+            val left = (currentCenterX + pivotOffset - scaledHalfWidth).toInt()
+            val top = (imageCenterY - scaledHalfWidth).toInt()
+            val right = (currentCenterX + pivotOffset + scaledHalfWidth).toInt()
+            val bottom = (imageCenterY + scaledHalfWidth).toInt()
+            
+            imageView.layout(left, top, right, bottom)
         }
+    }
+
+    // 根据距离获取唱片属性
+    private fun getCoverProperties(normalizedDistance: Float, relativeIndex: Int): Quadruple<Float, Float, Float, Float> {
+        val targetScale = when {
+            normalizedDistance < 0.5f -> SCALE_CENTER
+            normalizedDistance < 1.5f -> {
+                val t = (normalizedDistance - 0.5f)
+                SCALE_CENTER - (SCALE_CENTER - SCALE_INNER) * t
+            }
+            normalizedDistance < 2.5f -> {
+                val t = (normalizedDistance - 1.5f)
+                SCALE_INNER - (SCALE_INNER - SCALE_MIDDLE) * t
+            }
+            else -> {
+                val t = (normalizedDistance - 2.5f).coerceIn(0f, 1f)
+                SCALE_MIDDLE - (SCALE_MIDDLE - SCALE_OUTER) * t
+            }
+        }
+        
+        val targetRotation = when {
+            normalizedDistance < 0.5f -> 0f
+            normalizedDistance < 1.5f -> {
+                val t = (normalizedDistance - 0.5f)
+                val maxRot = if (relativeIndex < 0) ROTATION_ANGLE_INNER else -ROTATION_ANGLE_INNER
+                maxRot * t
+            }
+            normalizedDistance < 2.5f -> {
+                val t = (normalizedDistance - 1.5f)
+                val baseRot = if (relativeIndex < 0) ROTATION_ANGLE_INNER else -ROTATION_ANGLE_INNER
+                val maxRot = if (relativeIndex < 0) ROTATION_ANGLE_MIDDLE else -ROTATION_ANGLE_MIDDLE
+                baseRot + (maxRot - baseRot) * t
+            }
+            else -> {
+                val t = (normalizedDistance - 2.5f).coerceIn(0f, 1f)
+                val baseRot = if (relativeIndex < 0) ROTATION_ANGLE_MIDDLE else -ROTATION_ANGLE_MIDDLE
+                val maxRot = if (relativeIndex < 0) ROTATION_ANGLE_OUTER else -ROTATION_ANGLE_OUTER
+                baseRot + (maxRot - baseRot) * t
+            }
+        }
+        
+        val targetZ = when {
+            normalizedDistance < 0.5f -> 0f
+            normalizedDistance < 1.5f -> {
+                val t = (normalizedDistance - 0.5f)
+                -Z_DEPTH_INNER * t
+            }
+            normalizedDistance < 2.5f -> {
+                val t = (normalizedDistance - 1.5f)
+                -Z_DEPTH_INNER - (Z_DEPTH_MIDDLE - Z_DEPTH_INNER) * t
+            }
+            else -> {
+                val t = (normalizedDistance - 2.5f).coerceIn(0f, 1f)
+                -Z_DEPTH_MIDDLE - (Z_DEPTH_OUTER - Z_DEPTH_MIDDLE) * t
+            }
+        }
+        
+        val targetAlpha = when {
+            normalizedDistance < 0.5f -> 1.0f
+            normalizedDistance < 1.5f -> 0.95f
+            normalizedDistance < 2.5f -> 0.85f
+            else -> 0.75f
+        }
+        
+        return Quadruple(targetScale, targetRotation, targetZ, targetAlpha)
     }
 
     // 转动圆盘操作处理
@@ -277,38 +451,23 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
 
     private fun startSlideAnimation(slideVal: Int, oldCenterIndex: Int) {
         // 预绑定动画过程中需要显示的图片数据
-        // 只绑定可见范围内的ImageView（中心前后3个），减少图片加载数量
-        val visibleRange = 3
         for (i in imageViews.indices) {
             val relativeIndex = i - CENTER_INDEX
-            // 只绑定可见范围内的ImageView
-            if (relativeIndex in -visibleRange..visibleRange) {
-                val imageView = imageViews[i]
-                // 使用滑动前的中心索引计算专辑索引
-                val albumIndex = oldCenterIndex + relativeIndex
-                // 只绑定数据，不更新位置
-                if (albumIndex in 0 until albums.size) {
-                    imageView.bindItem(albums[albumIndex])
-                } else {
-                    imageView.bindItem(null)
-                }
+            val imageView = imageViews[i]
+            val albumIndex = oldCenterIndex + relativeIndex
+            if (albumIndex in 0 until albums.size) {
+                imageView.bindItem(albums[albumIndex])
+            } else {
+                imageView.bindItem(null)
             }
         }
         
-        // 找到中心ImageView
-        val centerImageView = imageViews[CENTER_INDEX]
+        // 使用 ValueAnimator 实现动画
+        val targetValue = -slideVal * imageWidth * COVER_SPACING
         
-        // 记录中心ImageView的初始状态
-        val initialScale = centerImageView.scaleX
-        val initialAlpha = centerImageView.alpha
-        
-        // 使用 ValueAnimator 实现动画，与 snapBackToPosition 保持一致
-        val targetValue = -slideVal * imagePadding
-        
-        animator = ValueAnimator.ofFloat(0f, targetValue.toFloat()).apply {
+        animator = ValueAnimator.ofFloat(0f, targetValue).apply {
             duration = animationDuration
-            // 使用线性插值器，让动画更流畅
-            interpolator = LinearInterpolator()
+            interpolator = DecelerateInterpolator(1.0f)
             addUpdateListener { animation ->
                 val currentValue = animation.animatedValue as Float
 
@@ -316,63 +475,61 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
                 for (i in imageViews.indices) {
                     val imageView = imageViews[i]
                     val relativeIndex = i - CENTER_INDEX
-                    val baseCenterX = imageCenterX + relativeIndex * imagePadding
-                    val currentCenterX = baseCenterX + currentValue.toInt()
+                    
+                    // 计算基础X位置（均匀间距）
+                    val baseCenterX = imageCenterX + relativeIndex * imageWidth * COVER_SPACING
+                    val currentCenterX = baseCenterX + currentValue
 
-                    if (i == CENTER_INDEX) {
-                        // 中心专辑：只更新位置，不更新缩放（保持 0.7f）
-                        updateImageViewPositionForAnim(currentCenterX, imageView)
-                        // 滚动过程中主专辑保持缩小状态（0.7f），丝滑滚动
-                        imageView.scaleX = 0.7f
-                        imageView.scaleY = 0.7f
-                        imageView.alpha = 0.9f
-                    } else {
-                        // 其他专辑：正常更新位置和缩放
-                        updateImageViewPosition(currentCenterX, imageView, 0)
+                    // 计算与中心的距离
+                    val distanceFromCenter = abs(currentCenterX - imageCenterX)
+                    val normalizedDistance = distanceFromCenter / (imageWidth * COVER_SPACING)
+                    
+                    // 获取目标属性
+                    val (targetScale, targetRotation, targetZ, targetAlpha) = getCoverProperties(normalizedDistance, relativeIndex)
+
+                    // 应用属性
+                    imageView.scaleX = targetScale
+                    imageView.scaleY = targetScale
+                    imageView.rotationY = targetRotation
+                    imageView.alpha = targetAlpha
+                    imageView.z = targetZ
+                    
+                    // 计算布局位置
+                    val actualHalfWidth = max(1, halfImageWidth)
+                    val scaledHalfWidth = actualHalfWidth * targetScale
+                    
+                    // 以边为轴的旋转偏移计算
+                    val pivotOffset = when {
+                        relativeIndex == 0 -> 0f
+                        relativeIndex < 0 -> {
+                            val shift = scaledHalfWidth * (1 - kotlin.math.cos(Math.toRadians(targetRotation.toDouble()))).toFloat()
+                            shift
+                        }
+                        else -> {
+                            val shift = scaledHalfWidth * (1 - kotlin.math.cos(Math.toRadians((-targetRotation).toDouble()))).toFloat()
+                            -shift
+                        }
                     }
+                    
+                    val left = (currentCenterX + pivotOffset - scaledHalfWidth).toInt()
+                    val top = (imageCenterY - scaledHalfWidth).toInt()
+                    val right = (currentCenterX + pivotOffset + scaledHalfWidth).toInt()
+                    val bottom = (imageCenterY + scaledHalfWidth).toInt()
+                    
+                    imageView.layout(left, top, right, bottom)
                 }
             }
             addListener(object : AnimatorListenerAdapter() {
                 override fun onAnimationEnd(animation: Animator) {
-                    // 动画结束后，更新中心文本（唱片名）
                     currentDragOffset = 0
                     updateCenterText()
-
-                    // 找到实际在中心位置的 ImageView（根据当前绑定的专辑数据）
-                    val centerAlbum = albums.getOrNull(currentCenterAlbumIndex)
-                    var actualCenterImageView: CoverImageView? = null
-
-                    // 确保所有专辑先重置为 0.7f
-                    for (imageView in imageViews) {
-                        imageView.animate().cancel()
-                        imageView.scaleX = 0.7f
-                        imageView.scaleY = 0.7f
-                        imageView.alpha = 0.9f
-
-                        // 检查是否是当前中心专辑
-                        if (imageView.getTag(R.id.tag_album) == centerAlbum) {
-                            actualCenterImageView = imageView
-                        }
-                    }
-
-                    // 主专辑从 0.7 放大到 1.0
-                    actualCenterImageView?.animate()
-                        ?.scaleX(1.0f)
-                        ?.scaleY(1.0f)
-                        ?.alpha(1.0f)
-                        ?.setDuration(200)
-                        ?.setInterpolator(DecelerateInterpolator())
-                        ?.start()
-
-                    // 更新边界外的图片视图数据（visibleRange范围外的），避免显示旧图片
-                    updateBoundaryImageViews()
-
+                    updateAllImageViews()
                     animator = null
                 }
                 override fun onAnimationCancel(animation: Animator) {
-                    // 动画取消时也需要更新边界图片
                     currentDragOffset = 0
-                    updateBoundaryImageViews()
+                    updateCenterText()
+                    updateAllImageViews()
                     animator = null
                 }
             })
@@ -380,149 +537,125 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
         animator?.start()
     }
 
-    private fun updateImageViewPosition(centerX: Int, imageView: CoverImageView, @Suppress("UNUSED_PARAMETER") albumIndex: Int) {
-        // 计算与中心的距离，用于确定层级和透明度
-        val distance = abs(imageCenterX - centerX)
-        val direction = if (centerX < imageCenterX) -1 else if (centerX > imageCenterX) 1 else 0
-        
-        // 添加尺寸渐变效果
-        // 主专辑旁边的所有专辑统一使用 0.7f 缩放系数
-        val scale = if (distance > 0) 0.7f else 1.0f
-        
-        // 调整旋转效果：保持明显但不过度
-        val rotationAngle = if (distance > 0) {
-            val maxRotation = 45f
-        val rotationFactor = min(distance.toFloat() / imagePadding, 1.0f)
-        -direction * maxRotation * rotationFactor
-        } else {
-            0f
-        }
-        
-        // 计算透明度：距离中心越近，透明度越高
-        // 主唱片透明度0.9，其他唱片最高0.7，最低0.6
-        val alpha = if (distance == 0) {
-            0.9f
-        } else {
-            val alphaRange = imagePadding * 2
-            if (alphaRange > 0) {
-                (0.7f - (distance.toFloat() / alphaRange) * 0.1f).coerceIn(0.6f, 0.7f)
-            } else {
-                0.7f
-            }
-        }
-        
-        // 添加透视效果：远离中心的专辑封面添加X轴平移
-        val perspectiveOffset = if (distance > 0) {
-            val perspectiveFactor = min(distance.toFloat() / (imagePadding * 1.5f), 1.0f)
-            direction * halfImageWidth * 0.3f * perspectiveFactor // 减小透视偏移
-        } else {
-            0f
-        }
-        
-        // 计算布局位置（考虑透视效果）
-        val actualHalfWidth = max(1, halfImageWidth)
-        val scaledHalfWidth = actualHalfWidth * scale
-        val left = centerX + perspectiveOffset - scaledHalfWidth
-        val top = imageCenterY - scaledHalfWidth
-        val right = centerX + perspectiveOffset + scaledHalfWidth
-        val bottom = imageCenterY + scaledHalfWidth
-        
-        // 只在位置真正改变时才更新布局
-        val leftInt = left.toInt()
-        val topInt = top.toInt()
-        val rightInt = right.toInt()
-        val bottomInt = bottom.toInt()
-        
-        if (imageView.left != leftInt || imageView.top != topInt || imageView.right != rightInt || imageView.bottom != bottomInt) {
-            imageView.layout(leftInt, topInt, rightInt, bottomInt)
-        }
-        
-        // 设置其他属性
-        imageView.scaleX = scale
-        imageView.scaleY = scale
-        imageView.rotationY = rotationAngle
-        // 调整Z轴深度差异
-        imageView.z = -distance.toFloat() * 2
-        imageView.alpha = alpha
-    }
-    
-    private fun updateImageViewPositionAndData(centerX: Int, imageView: CoverImageView, albumIndex: Int) {
-        // 更新位置
-        updateImageViewPosition(centerX, imageView, albumIndex)
-
-        // 更新ImageView的数据
-        if (albumIndex in 0 until albums.size) {
-            imageView.bindItem(albums[albumIndex])
-        } else {
-            imageView.bindItem(null)
-        }
-    }
-
-    /**
-     * 动画过程中使用：只更新位置，不更新缩放和透明度
-     * 用于中心专辑在滚动动画中保持固定缩放
-     */
-    private fun updateImageViewPositionForAnim(centerX: Int, imageView: CoverImageView) {
-        // 计算与中心的距离，用于确定层级
-        val distance = abs(imageCenterX - centerX)
-        val direction = if (centerX < imageCenterX) -1 else if (centerX > imageCenterX) 1 else 0
-
-        // 添加透视效果：远离中心的专辑封面添加X轴平移
-        val perspectiveOffset = if (distance > 0) {
-            val perspectiveFactor = min(distance.toFloat() / (imagePadding * 1.5f), 1.0f)
-            direction * halfImageWidth * 0.3f * perspectiveFactor
-        } else {
-            0f
-        }
-
-        // 计算布局位置（使用固定缩放 0.7f 计算）
-        val actualHalfWidth = max(1, halfImageWidth)
-        val scaledHalfWidth = actualHalfWidth * 0.7f
-        val left = centerX + perspectiveOffset - scaledHalfWidth
-        val top = imageCenterY - scaledHalfWidth
-        val right = centerX + perspectiveOffset + scaledHalfWidth
-        val bottom = imageCenterY + scaledHalfWidth
-
-        // 只在位置真正改变时才更新布局
-        val leftInt = left.toInt()
-        val topInt = top.toInt()
-        val rightInt = right.toInt()
-        val bottomInt = bottom.toInt()
-
-        if (imageView.left != leftInt || imageView.top != topInt || imageView.right != rightInt || imageView.bottom != bottomInt) {
-            imageView.layout(leftInt, topInt, rightInt, bottomInt)
-        }
-
-        // 只更新旋转和Z轴，不更新缩放和透明度（由动画控制）
-        val rotationAngle = if (distance > 0) {
-            val maxRotation = 45f
-            val rotationFactor = min(distance.toFloat() / imagePadding, 1.0f)
-            -direction * maxRotation * rotationFactor
-        } else {
-            0f
-        }
-        imageView.rotationY = rotationAngle
-        imageView.z = -distance.toFloat() * 2
-    }
+    // 辅助类用于返回多个值
+    private data class Quadruple<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
 
     private fun updateAllImageViews() {
-        // 更新所有图片数据和位置
-        // 主专辑与两边专辑的间距更大，两边专辑之间更紧密
-        val centerGap = (imagePadding * 1.3f).toInt()  // 主专辑与旁边专辑的间距
+        // iPod Classic真实CoverFlow布局
+        // 7张唱片水平排列，以边为轴旋转，形成扇形布局
+        
+        // 计算每张唱片的属性
+        val coverData = Array(7) { index ->
+            val relativeIndex = index - CENTER_INDEX  // -3, -2, -1, 0, 1, 2, 3
+            val distance = abs(relativeIndex)
+            
+            // 旋转角度：中间0°，内侧15°，中间30°，外侧45°
+            val rotation = when {
+                relativeIndex == 0 -> 0f
+                relativeIndex < 0 -> when (distance) {
+                    1 -> ROTATION_ANGLE_INNER   // 左侧第1张：15°
+                    2 -> ROTATION_ANGLE_MIDDLE  // 左侧第2张：30°
+                    else -> ROTATION_ANGLE_OUTER // 左侧第3张：45°
+                }
+                else -> when (distance) {
+                    1 -> -ROTATION_ANGLE_INNER   // 右侧第1张：-15°
+                    2 -> -ROTATION_ANGLE_MIDDLE  // 右侧第2张：-30°
+                    else -> -ROTATION_ANGLE_OUTER // 右侧第3张：-45°
+                }
+            }
+            
+            // 缩放比例：中间1.0，内侧0.85，中间0.70，外侧0.55
+            val scale = when (distance) {
+                0 -> SCALE_CENTER
+                1 -> SCALE_INNER
+                2 -> SCALE_MIDDLE
+                else -> SCALE_OUTER
+            }
+            
+            // Z轴深度：中间0，内侧30，中间70，外侧120
+            val zDepth = when (distance) {
+                0 -> 0f
+                1 -> -Z_DEPTH_INNER
+                2 -> -Z_DEPTH_MIDDLE
+                else -> -Z_DEPTH_OUTER
+            }
+            
+            // 透明度
+            val alpha = when (distance) {
+                0 -> 1.0f
+                1 -> 0.95f
+                2 -> 0.85f
+                else -> 0.75f
+            }
+            
+            Triple(rotation, scale, zDepth) to alpha
+        }
+        
+        // 计算基础位置（均匀间距）
+        val basePositions = FloatArray(7)
+        val actualHalfWidth = max(1, halfImageWidth)
+        
+        // 中间唱片位置
+        basePositions[CENTER_INDEX] = imageCenterX.toFloat()
+        
+        // 计算各位置的X坐标（均匀间距）
+        for (i in 0 until 7) {
+            if (i == CENTER_INDEX) continue
+            
+            val relativeIndex = i - CENTER_INDEX
+            basePositions[i] = imageCenterX + relativeIndex * actualHalfWidth * 2 * COVER_SPACING
+        }
+        
+        // 应用布局
         for (i in imageViews.indices) {
             val imageView = imageViews[i]
             val relativeIndex = i - CENTER_INDEX
+            val distance = abs(relativeIndex)
             val albumIndex = currentCenterAlbumIndex + relativeIndex
-            // 计算位置：主专辑旁边的使用更大的间距，其他的使用标准间距
-            val baseCenterX = when (relativeIndex) {
-                0 -> imageCenterX
-                1, -1 -> imageCenterX + relativeIndex * centerGap
+            
+            // 绑定数据
+            if (albumIndex in 0 until albums.size) {
+                imageView.bindItem(albums[albumIndex])
+            } else {
+                imageView.bindItem(null)
+            }
+            
+            val (attrs, alpha) = coverData[i]
+            val (rotation, scale, zDepth) = attrs
+            
+            // 应用属性
+            imageView.scaleX = scale
+            imageView.scaleY = scale
+            imageView.rotationY = rotation
+            imageView.alpha = alpha
+            imageView.z = zDepth
+            
+            // 计算布局位置
+            val scaledHalfWidth = actualHalfWidth * scale
+            val baseX = basePositions[i]
+            
+            // 以边为轴的旋转偏移计算
+            // 左侧唱片以右边为轴，右侧唱片以左边为轴
+            val pivotOffset = when {
+                relativeIndex == 0 -> 0f
+                relativeIndex < 0 -> {
+                    // 左侧唱片：以右边为轴向中心旋转
+                    val shift = scaledHalfWidth * (1 - kotlin.math.cos(Math.toRadians(rotation.toDouble()))).toFloat()
+                    shift
+                }
                 else -> {
-                    val direction = if (relativeIndex > 0) 1 else -1
-                    imageCenterX + direction * centerGap + (relativeIndex - direction) * imagePadding
+                    // 右侧唱片：以左边为轴向中心旋转
+                    val shift = scaledHalfWidth * (1 - kotlin.math.cos(Math.toRadians((-rotation).toDouble()))).toFloat()
+                    -shift
                 }
             }
-            updateImageViewPositionAndData(baseCenterX, imageView, albumIndex)
+            
+            val left = (baseX + pivotOffset - scaledHalfWidth).toInt()
+            val top = (imageCenterY - scaledHalfWidth).toInt()
+            val right = (baseX + pivotOffset + scaledHalfWidth).toInt()
+            val bottom = (imageCenterY + scaledHalfWidth).toInt()
+            
+            imageView.layout(left, top, right, bottom)
         }
     }
 
@@ -532,25 +665,6 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
             val centerAlbum = albums[currentCenterAlbumIndex]
             albumTitle.text = centerAlbum.title
             artistName.text = centerAlbum.subtitle
-        }
-    }
-
-    private fun updateBoundaryImageViews() {
-        // 只更新visibleRange范围外的图片视图数据，避免显示旧图片
-        val visibleRange = 3
-        for (i in imageViews.indices) {
-            val relativeIndex = i - CENTER_INDEX
-            // 只处理visibleRange范围外的ImageView
-            if (relativeIndex !in -visibleRange..visibleRange) {
-                val imageView = imageViews[i]
-                val albumIndex = currentCenterAlbumIndex + relativeIndex
-                // 只绑定数据，不更新位置（避免闪烁）
-                if (albumIndex in 0 until albums.size) {
-                    imageView.bindItem(albums[albumIndex])
-                } else {
-                    imageView.bindItem(null)
-                }
-            }
         }
     }
 
@@ -566,25 +680,15 @@ class CoverFlowView(context: Context) : ScreenView, FrameLayout(context) {
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec)
 
-        imageWidth = measuredHeight / 4 * 3
+        // iPod Classic真实CoverFlow：中间唱片占屏幕高度的约70%
+        imageWidth = (measuredHeight * 0.70f).toInt()
         halfImageWidth = imageWidth / 2
 
-        // 根据屏幕宽高比动态调整imagePadding，确保在横屏下也有合适的间距
-        val screenRatio = measuredWidth.toFloat() / measuredHeight.toFloat()
-        imagePadding = if (screenRatio > 1.5f) {
-            (measuredWidth - imageWidth) / 5
-        } else if (screenRatio > 1.0f) {
-            (measuredWidth - imageWidth) / 4
-        } else {
-            // 竖屏：增大间距，让主专辑与两边专辑之间留出更多空隙
-            (measuredWidth - imageWidth) / 3
-        }
-        
-        // 确保 imagePadding 至少为 50，避免间距过小导致的滑动问题
-        imagePadding = max(imagePadding, 50)
+        // imagePadding在新布局中不再使用，但保留用于兼容
+        imagePadding = (imageWidth * COVER_SPACING).toInt()
 
         imageCenterX = measuredWidth / 2
-        imageCenterY = measuredHeight / 2
+        imageCenterY = (measuredHeight * 0.42f).toInt()  // 稍微偏上，给文字留空间
         textHeight = measuredHeight / 10
     }
 

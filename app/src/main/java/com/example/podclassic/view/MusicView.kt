@@ -49,7 +49,8 @@ class MusicView(context: Context) : RecyclerListView(context), ScreenView {
             if (MediaStoreUtil.getAlbumList().isEmpty()) {
                 return false
             }
-            Core.addView(CoverFlowView(context))
+            // 使用Jetpack Compose版本的CoverFlow
+            Core.addView(ComposeCoverFlowView(context))
             return true
         }
     }, true)
