@@ -184,38 +184,77 @@ private fun CoverFlowContent(
 
         Log.d("CoverFlow", "ScreenView尺寸: width=${screenWidthPx.toInt()}, height=${screenHeightPx.toInt()}")
 
-        // 使用remember缓存布局计算，避免每次重组都重新计算
-        // key使用animatingToIndex确保滑动时更新位置
-        val coverFlowData = remember(animatingToIndex) {
-            val displayCount = 7
-            val centerOffset = displayCount / 2 // 3
-            val availableWidth = screenWidthPx - coverSizePx
-            val step = availableWidth / (displayCount - 1) // 6个间隔
+        // 计算布局参数
+        val displayCount = 7
+        val centerOffset = displayCount / 2 // 3
+        // 计算布局：7张图均匀分布在屏幕宽度内
+        // 最左边贴着左边缘，最右边贴着右边缘
+        val step = (screenWidthPx - coverSizePx) / (displayCount - 1)
 
-            List(displayCount) { displayPos ->
-                val albumIndex = animatingToIndex + displayPos - centerOffset
-                val finalX = displayPos * step
-                val offsetFromCenter = displayPos - centerOffset
-                val zIndex = when {
-                    offsetFromCenter == 0 -> 100f
-                    else -> 100f - abs(offsetFromCenter) * 10f
-                }
+        Log.d("CoverFlow", "Layout: screenWidth=${screenWidthPx.toInt()}, coverSize=${coverSizePx.toInt()}, step=${step.toInt()}, animatingToIndex=$animatingToIndex")
 
-                CoverFlowData(
-                    displayPos = displayPos,
-                    albumIndex = albumIndex,
-                    transform = CoverTransform(
-                        x = finalX,
-                        y = centerY - coverSizePx / 2f,
-                        rotationY = 0f,
-                        skewY = 0f,
-                        translationY = 0f,
-                        scale = 1f,
-                        zIndex = zIndex,
-                        alpha = 1f
-                    )
-                )
+        // 直接计算布局数据，不使用remember
+        val coverFlowData = List(displayCount) { displayPos ->
+            val albumIndex = animatingToIndex + displayPos - centerOffset
+            val offsetFromCenter = displayPos - centerOffset
+
+            // 计算基础X位置
+            val baseX = displayPos * step
+
+            // 计算3D旋转：左边向右旋转，右边向左旋转
+            // 增加旋转角度，让透视效果更明显
+            val rotateY = 75f
+            val targetRotateY = when {
+                offsetFromCenter < 0 -> -rotateY  // 左边：向右旋转
+                offsetFromCenter > 0 -> -rotateY  // 右边：也向右旋转
+                else -> 0f                        // 当前：不旋转
             }
+
+            // 计算平行变换（skewY）：增加立体感
+            // 左边图片底部向内倾斜，右边图片底部向内倾斜
+            val skewY = 15f
+            val targetSkewY = when {
+                offsetFromCenter < 0 -> skewY   // 左边：正倾斜
+                offsetFromCenter > 0 -> -skewY  // 右边：负倾斜
+                else -> 0f                      // 当前：不倾斜
+            }
+
+            // 补偿透视偏移：旋转后图片视觉上会向内收缩
+            // 根据旋转角度向外调整位置（增加偏移量）
+            val perspectiveOffset = when {
+                offsetFromCenter < 0 -> -coverSizePx * 0.45f  // 左边：向左偏移
+                offsetFromCenter > 0 -> coverSizePx * 0.45f   // 右边：向右偏移
+                else -> 0f                                    // 中间：不偏移
+            }
+            val finalX = baseX + perspectiveOffset
+
+            if (displayPos == 0 || displayPos == 6) {
+                Log.d("CoverFlow", "Pos $displayPos: baseX=${baseX.toInt()}, finalX=${finalX.toInt()}, albumIndex=$albumIndex")
+            }
+
+            // 计算ZIndex：当前位置(3)最靠上，距离越远越靠下
+            val zIndex = when {
+                offsetFromCenter == 0 -> 100f
+                else -> 100f - abs(offsetFromCenter) * 10f
+            }
+
+            // 缩放：所有封面都不缩小
+            val targetScale = 1f
+
+            CoverFlowData(
+                displayPos = displayPos,
+                albumIndex = albumIndex,
+                transform = CoverTransform(
+                    x = finalX,
+                    y = centerY - coverSizePx / 2f,
+                    rotationY = targetRotateY,
+                    skewY = targetSkewY,
+                    translationY = 0f,
+                    scale = targetScale,
+                    zIndex = zIndex,
+                    alpha = 1f
+                )
+            )
         }
 
         // CoverFlow区域 - 使用Column垂直排列封面和文字
@@ -387,6 +426,7 @@ private fun CoverFlowItem(
     val yOffsetDp = with(density) { transform.y.toDp() }
 
     // 使用 graphicsLayer 实现 3D 效果
+    // rotationY会导致透视偏移，需要通过调整位置来补偿
     Box(
         modifier = Modifier
             .offset(x = xOffsetDp, y = yOffsetDp)
@@ -394,7 +434,9 @@ private fun CoverFlowItem(
                 scaleX = transform.scale
                 scaleY = transform.scale
                 rotationY = transform.rotationY
-                cameraDistance = 800f
+                // 使用rotationX模拟skewY倾斜效果
+                rotationX = transform.skewY * 0.5f
+                cameraDistance = 300f
                 transformOrigin = TransformOrigin.Center
             }
             .zIndex(transform.zIndex)
