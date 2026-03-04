@@ -165,6 +165,23 @@ private fun CoverFlowContent(
         }
     }
 
+    // 预加载相邻专辑图片
+    val context = LocalContext.current
+    LaunchedEffect(animatingToIndex) {
+        // 预加载当前显示范围前后各3张专辑
+        val preloadRange = 3
+        for (offset in -preloadRange..preloadRange) {
+            val preloadIndex = animatingToIndex + offset
+            if (preloadIndex in albums.indices) {
+                val albumId = albums[preloadIndex].id ?: 0L
+                // 触发图片加载（如果未缓存）
+                if (albumBitmapCache[albumId] == null) {
+                    loadAlbumBitmap(context, albumId)
+                }
+            }
+        }
+    }
+
     // 使用BoxWithConstraints获取实际可用尺寸
     androidx.compose.foundation.layout.BoxWithConstraints(
         modifier = Modifier.fillMaxSize()
@@ -397,7 +414,7 @@ private fun renderTransform(
 
 /**
  * CoverFlow单个专辑项 - 使用RenderTransform计算的属性
- * 使用remember缓存图片，避免重复加载
+ * 使用Animatable实现平滑动画过渡
  */
 @Composable
 private fun CoverFlowItem(
@@ -421,21 +438,52 @@ private fun CoverFlowItem(
         }
     }
 
+    // 使用Animatable实现动画
+    val xAnim = remember { Animatable(transform.x) }
+    val rotationYAnim = remember { Animatable(transform.rotationY) }
+    val scaleAnim = remember { Animatable(transform.scale) }
+    val skewYAnim = remember { Animatable(transform.skewY) }
+
+    // 当目标值变化时，启动动画
+    LaunchedEffect(transform.x) {
+        xAnim.animateTo(
+            targetValue = transform.x,
+            animationSpec = tween(durationMillis = 400, easing = CubicInOutEasing)
+        )
+    }
+    LaunchedEffect(transform.rotationY) {
+        rotationYAnim.animateTo(
+            targetValue = transform.rotationY,
+            animationSpec = tween(durationMillis = 400, easing = CubicInOutEasing)
+        )
+    }
+    LaunchedEffect(transform.scale) {
+        scaleAnim.animateTo(
+            targetValue = transform.scale,
+            animationSpec = tween(durationMillis = 400, easing = CubicInOutEasing)
+        )
+    }
+    LaunchedEffect(transform.skewY) {
+        skewYAnim.animateTo(
+            targetValue = transform.skewY,
+            animationSpec = tween(durationMillis = 400, easing = CubicInOutEasing)
+        )
+    }
+
     // 将像素位置转换为Dp
-    val xOffsetDp = with(density) { transform.x.toDp() }
+    val xOffsetDp = with(density) { xAnim.value.toDp() }
     val yOffsetDp = with(density) { transform.y.toDp() }
 
-    // 使用 graphicsLayer 实现 3D 效果
-    // rotationY会导致透视偏移，需要通过调整位置来补偿
+    // 使用 graphicsLayer 实现 3D 效果，使用动画值
     Box(
         modifier = Modifier
             .offset(x = xOffsetDp, y = yOffsetDp)
             .graphicsLayer {
-                scaleX = transform.scale
-                scaleY = transform.scale
-                rotationY = transform.rotationY
+                scaleX = scaleAnim.value
+                scaleY = scaleAnim.value
+                rotationY = rotationYAnim.value
                 // 使用rotationX模拟skewY倾斜效果
-                rotationX = transform.skewY * 0.5f
+                rotationX = skewYAnim.value * 0.5f
                 cameraDistance = 300f
                 transformOrigin = TransformOrigin.Center
             }
@@ -459,6 +507,15 @@ private fun CoverFlowItem(
                 )
             }
         }
+    }
+}
+
+// CubicInOut缓动函数
+private val CubicInOutEasing: (Float) -> Float = { fraction ->
+    if (fraction < 0.5f) {
+        4f * fraction * fraction * fraction
+    } else {
+        1f - (-2f * fraction + 2f).let { it * it * it } / 2f
     }
 }
 
