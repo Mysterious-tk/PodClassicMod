@@ -23,10 +23,13 @@ import android.widget.ImageView
 import android.widget.RelativeLayout
 import android.widget.RelativeLayout.LayoutParams
 import com.example.podclassic.base.Core
+import com.example.podclassic.base.Observer
 import com.example.podclassic.base.ScreenView
 import com.example.podclassic.bean.Music
 import com.example.podclassic.service.MediaPresenter
 import com.example.podclassic.storage.SPManager
+import com.example.podclassic.util.LiveData
+import com.example.podclassic.util.ThreadUtil
 import com.example.podclassic.util.FileUtil
 import com.example.podclassic.util.MediaStoreUtil
 import com.example.podclassic.values.Colors
@@ -103,6 +106,9 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
             return false
         }
     }, true)
+
+    // Observer for real-time music state monitoring
+    private val observer = Observer()
 
     init {
         // 检查是否是横屏模式
@@ -361,6 +367,20 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
         for (menuItem in menuItems) {
             listView.add(menuItem)
         }
+
+        // 监听音乐状态变化，动态添加/移除"正在播放"项并更新封面
+        observer.addLiveData(MediaPresenter.music, object : LiveData.OnDataChangeListener {
+            override fun onStart() {
+                updateNowPlayingItem()
+                updateCoverImage()
+            }
+            override fun onDataChange() {
+                ThreadUtil.runOnUiThread {
+                    updateNowPlayingItem()
+                    updateCoverImage()
+                }
+            }
+        })
     }
 
     override fun enter(): Boolean {
@@ -379,15 +399,24 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
         return ScreenView.LAUNCH_MODE_SINGLE
     }
 
+    override fun getObserver(): Observer? {
+        return observer
+    }
+
     override fun onViewAdd() {
         android.util.Log.d("MainView", "onViewAdd() called")
         if (MediaPresenter.getCurrent() == null) {
             listView.remove(item)
             android.util.Log.d("MainView", "No current music, removed 'Now Playing' item")
         } else {
+            // 添加到末尾（不指定 index）
             listView.addIfNotExist(item)
-            android.util.Log.d("MainView", "Added 'Now Playing' item")
+            android.util.Log.d("MainView", "Added 'Now Playing' item at end of list")
         }
+
+        // 强制刷新 ListView，确保新增/移除的 item 立即可见
+        // forceRefresh 使用 RecyclerView.post 确保在正确的时机刷新
+        listView.forceRefresh()
 
         // 检查父容器尺寸是否已测量
         val parentWidth = (parent as? android.view.ViewGroup)?.width ?: 0
@@ -409,7 +438,22 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
             }
         }
     }
-    
+
+    /**
+     * 根据当前音乐状态更新"正在播放"项
+     * 有音乐时添加到列表末尾，无音乐时从列表移除
+     * 注意：此方法不滚动列表，只在末尾添加/移除项
+     */
+    private fun updateNowPlayingItem() {
+        if (MediaPresenter.getCurrent() == null) {
+            listView.remove(item)
+            android.util.Log.d("MainView", "Music stopped, removed 'Now Playing' item")
+        } else {
+            listView.addIfNotExist(item)
+            android.util.Log.d("MainView", "Music started, added 'Now Playing' item at end")
+        }
+    }
+
     /**
      * 根据当前屏幕方向更新布局参数
      */

@@ -149,11 +149,20 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
     fun addIfNotExist(item: Item, index: Int) {
         if (!itemList.contains(item)) {
             add(item, index)
+        } else {
+            // item 已存在，但仍需刷新视图
+            refreshList()
         }
     }
 
     fun add(item: Item, index: Int) {
         itemList.add(index, item)
+        // 如果在索引 0 添加，确保 position 更新以显示新 item
+        if (index == 0 && position > 0) {
+            position = 0
+            // 当前选中的 index 也需要相应调整（因为所有元素都向后移动了一位）
+            this.index++
+        }
         refreshList()
     }
 
@@ -259,6 +268,42 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
         val item = itemList[index]
         // 刷新当前项
         adapter.notifyItemChanged(index - position)
+    }
+
+    /**
+     * 强制刷新列表，使用 RecyclerView.post 确保在布局完成后刷新
+     * 适用于视图刚刚添加到屏幕时的刷新
+     */
+    fun forceRefresh() {
+        recyclerView.post {
+            // 双重 post 确保 RecyclerView 布局完成
+            recyclerView.post {
+                // 计算最后一个 item 的索引
+                val lastIndex = itemList.size - 1
+                if (lastIndex >= 0) {
+                    // 设置高亮到最后一个 item
+                    index = lastIndex
+                    // 计算 position 使最后一个 item 可见
+                    position = (lastIndex - MAX_SIZE + 1).coerceAtLeast(0)
+                } else {
+                    position = 0
+                    index = 0
+                }
+
+                // 强制重新绑定所有可见项
+                adapter.notifyDataSetChanged()
+
+                // 三重 post 确保布局完成后再滚动
+                recyclerView.post {
+                    val layoutManager = recyclerView.layoutManager as? LinearLayoutManager
+                    // 使用 smoothScrollToPosition 确保滚动到底部
+                    layoutManager?.smoothScrollToPosition(recyclerView, null, lastIndex.coerceAtLeast(0))
+
+                    updateScrollBar()
+                    updateHighlight()
+                }
+            }
+        }
     }
 
     override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
