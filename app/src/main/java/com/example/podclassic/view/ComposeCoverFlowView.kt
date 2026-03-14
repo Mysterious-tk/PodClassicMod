@@ -164,8 +164,9 @@ class ComposeCoverFlowView(context: Context) : FrameLayout(context), ScreenView 
 
     companion object {
         // 预加载可见范围的图片（带倒影）
+        // 扩展预加载范围到 -3..3，确保所有可见图片都被预加载，减少闪烁
         suspend fun preloadVisibleImages(albums: List<MusicList>, centerIndex: Int) {
-            val range = -2..2
+            val range = -3..3
             for (offset in range) {
                 val index = centerIndex + offset
                 if (index in albums.indices) {
@@ -234,21 +235,11 @@ private fun CoverFlowContent(
         label = "coverflow_scroll"
     )
 
-    // Phase 2: 使用动画索引的整数部分作为显示索引（用于布局计算）
-    val displayIndex = remember(animatedIndex) {
-        derivedStateOf { animatedIndex.toInt() }
-    }.value
-
-    // Phase 2: 浮点进度用于平滑变换（0.0 到 1.0）
-    val animationProgress = remember(animatedIndex, displayIndex) {
-        derivedStateOf { animatedIndex - displayIndex }
-    }.value
-
     // 同步动画状态到外部状态
-    LaunchedEffect(displayIndex) {
+    LaunchedEffect(targetIndex) {
         animatedIndexState.floatValue = animatedIndex
         // 同步 currentIndex 以便点击时选择正确的专辑
-        currentIndexState.intValue = displayIndex.coerceIn(0, albums.size - 1)
+        currentIndexState.intValue = targetIndex.coerceIn(0, albums.size - 1)
     }
 
     // 使用BoxWithConstraints获取实际可用尺寸
@@ -273,7 +264,8 @@ private fun CoverFlowContent(
             // 第一张图从x=0开始，最后一张图结束于x=screenWidth-coverSize
             val maxOffset = 3f
             // 间距 = (Box宽度 - 封面宽度) / 6
-            val calculatedSpacing = (screenWidthPx - coverSizePx) / (maxOffset * 2f)
+            // 使用 round 确保间距为整数，避免浮点数精度误差
+            val calculatedSpacing = kotlin.math.round((screenWidthPx - coverSizePx) / (maxOffset * 2f))
 
             CoverFlowMetrics(
                 coverSizeDp = coverSize,
@@ -297,15 +289,15 @@ private fun CoverFlowContent(
             )
         }
 
-
-        // Phase 2: 布局数据现在只依赖于稳定的 displayIndex，而不是每帧变化的 animatedIndex
-        val coverFlowData = remember(displayIndex, cachedMetrics.layoutParams, albums.size) {
+        // Phase 2: 布局数据 - 使用稳定的 key 减少不必要的重组
+        // 依赖 animatedIndex 确保动画流畅，使用 remember 避免不必要的重新计算
+        val coverFlowData = remember(animatedIndex) {
             List(cachedMetrics.layoutParams.displayCount) { displayPos ->
                 calculateCoverFlowItem(
                     displayPos = displayPos,
                     centerOffset = cachedMetrics.layoutParams.centerOffset,
                     animatedIndex = animatedIndex,
-                    displayIndex = displayIndex,
+                    targetIndex = targetIndex,
                     params = cachedMetrics.layoutParams,
                     albumsSize = albums.size
                 )
@@ -355,7 +347,7 @@ private fun CoverFlowContent(
                     .zIndex(200f), // 确保文字始终显示在封面和倒影之上
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                val currentAlbum = if (displayIndex in albums.indices) albums[displayIndex] else null
+                val currentAlbum = if (targetIndex in albums.indices) albums[targetIndex] else null
                 currentAlbum?.let { album ->
                     Text(
                         text = album.title ?: "",
@@ -789,13 +781,13 @@ private fun calculateCoverFlowItem(
     displayPos: Int,
     centerOffset: Int,
     animatedIndex: Float,
-    displayIndex: Int,
+    targetIndex: Int,
     params: CoverFlowLayoutParams,
     albumsSize: Int
 ): CoverFlowData {
 
-    // 1. 计算专辑索引
-    val rawAlbumIndex = displayIndex + displayPos - centerOffset
+    // 1. 计算专辑索引 - 使用 targetIndex 计算稳定索引（不会跳转）
+    val rawAlbumIndex = targetIndex + displayPos - centerOffset
     val inBounds = rawAlbumIndex >= 0 && rawAlbumIndex < albumsSize
     val albumIndex = rawAlbumIndex.coerceIn(0, (albumsSize - 1).coerceAtLeast(0))
     val isPlaceholder = !inBounds
@@ -808,11 +800,13 @@ private fun calculateCoverFlowItem(
     val contentCenterX = params.contentLeft + (params.contentRight - params.contentLeft) / 2f
     val centerLeft = contentCenterX - params.coverSizePx / 2f
 
-    // X位置 = 中心左边缘 + 偏移 * 间距
+    // X位置 = 中心左边缘 + (偏移 - 动画进度) * 间距
     // pos=0(offset=-3): x=0 (最左，贴box左边缘)
     // pos=3(offset=0): centerLeft (中心)
     // pos=6(offset=3): x=contentRight-coverSize (最右，贴box右边缘)
-    val finalX = centerLeft + offsetFromCenter * params.itemSpacing
+    // 包含动画进度，实现平滑过渡
+    val animationOffset = animatedIndex - targetIndex
+    val finalX = centerLeft + (offsetFromCenter - animationOffset) * params.itemSpacing
 
     // Y位置 = 垂直中心
     val finalY = params.centerY - params.coverSizePx / 2f
