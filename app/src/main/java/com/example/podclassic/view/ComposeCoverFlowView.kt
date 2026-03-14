@@ -11,6 +11,8 @@ import android.graphics.PorterDuff
 import android.graphics.PorterDuffXfermode
 import android.graphics.Shader
 import android.util.Log
+import android.view.GestureDetector
+import android.view.MotionEvent
 import android.widget.FrameLayout
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -130,6 +132,8 @@ class ComposeCoverFlowView(context: Context) : FrameLayout(context), ScreenView 
     init {
         // 设置白色背景，保持一致的视觉效果
         setBackgroundColor(Colors.white)
+        // 添加原生手势处理层
+        addTouchHandler()
         // 添加 ComposeView 并设置为填充整个父容器
         addView(
             composeView,
@@ -138,6 +142,62 @@ class ComposeCoverFlowView(context: Context) : FrameLayout(context), ScreenView 
                 LayoutParams.MATCH_PARENT
             )
         )
+    }
+
+    /**
+     * 添加原生触摸手势处理
+     * 支持：左右滑动切换专辑、点击中间项目进入
+     */
+    private fun addTouchHandler() {
+        val gestureDetector = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onDown(e: MotionEvent): Boolean {
+                return true
+            }
+
+            override fun onFling(
+                e1: MotionEvent?,
+                e2: MotionEvent,
+                velocityX: Float,
+                velocityY: Float
+            ): Boolean {
+                if (e1 == null) return false
+
+                val diffX = e2.x - e1.x
+                val SWIPE_THRESHOLD = 60f
+
+                if (abs(diffX) > SWIPE_THRESHOLD) {
+                    // 左右滑动：向右滑(diffX>0)显示上一张，向左滑(diffX<0)显示下一张
+                    slide(if (diffX > 0) -1 else 1)
+                    return true
+                }
+                return false
+            }
+
+            override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
+                // 点击中间区域进入专辑
+                val centerX = width / 2f
+                val centerY = height / 2f
+                val tapThreshold = 150f * resources.displayMetrics.density
+
+                val dx = abs(e.x - centerX)
+                val dy = abs(e.y - centerY)
+
+                if (dx < tapThreshold && dy < tapThreshold) {
+                    return enter()
+                }
+                return false
+            }
+        })
+
+        // 设置触摸监听器到 FrameLayout
+        setOnTouchListener { _, event ->
+            gestureDetector.onTouchEvent(event)
+            true
+        }
+
+        // 确保可以接收点击事件
+        isClickable = true
+        isFocusable = true
     }
 
     override fun enter(): Boolean {
