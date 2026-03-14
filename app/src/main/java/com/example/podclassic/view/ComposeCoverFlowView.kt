@@ -297,27 +297,6 @@ private fun CoverFlowContent(
             )
         }
 
-        debugLog("CoverFlowLayout") {
-            "Screen: w=${containerWidth}, h=${containerHeight}, px=(${cachedMetrics.screenWidthPx}, ${cachedMetrics.screenHeightPx})"
-        }
-        debugLog("CoverFlowLayout") {
-            "Content area: padding=${cachedMetrics.containerPaddingPx.toInt()}px, " +
-            "contentWidth=${(cachedMetrics.screenWidthPx - 2 * cachedMetrics.containerPaddingPx).toInt()}px, " +
-            "contentLeft=${cachedMetrics.layoutParams.contentLeft.toInt()}px, " +
-            "contentRight=${cachedMetrics.layoutParams.contentRight.toInt()}px"
-        }
-        debugLog("CoverFlowLayout") {
-            "Cover size: ${cachedMetrics.coverSizeDp} (${cachedMetrics.coverSizePx.toInt()}px)"
-        }
-        debugLog("CoverFlowLayout") {
-            "Albums total: ${albums.size}, animatedIndex: $animatedIndex, displayIndex: $displayIndex"
-        }
-        debugLog("CoverFlowLayout") {
-            "LayoutParams: coverSize=${cachedMetrics.layoutParams.coverSizePx.toInt()}px, " +
-            "screen=${cachedMetrics.layoutParams.screenWidthPx.toInt()}px, " +
-            "itemSpacing=${cachedMetrics.layoutParams.itemSpacing.toInt()}px, " +
-            "displayCount=${cachedMetrics.layoutParams.displayCount}"
-        }
 
         // Phase 2: 布局数据现在只依赖于稳定的 displayIndex，而不是每帧变化的 animatedIndex
         val coverFlowData = remember(displayIndex, cachedMetrics.layoutParams, albums.size) {
@@ -333,21 +312,6 @@ private fun CoverFlowContent(
             }
         }
 
-        // Phase 5: 使用缓存的 Dp 值进行日志
-        debugLog("CoverFlowLayout") {
-            buildString {
-                appendLine("CoverFlow items positions (total ${coverFlowData.size}):")
-                coverFlowData.forEach { data ->
-                    val xDp = with(density) { data.transform.x.toDp().value }
-                    val yDp = with(density) { data.transform.y.toDp().value }
-                    val boundsStr = if (data.isPlaceholder) "PLACEHOLDER" else "VALID"
-                    val continuousOffset = (data.displayPos - cachedMetrics.layoutParams.centerOffset) - animationProgress
-                    appendLine("  pos=${data.displayPos}, albumIdx=${data.albumIndex}, " +
-                        "offset=${continuousOffset.toInt()}, x=${xDp.toInt()}dp, y=${yDp.toInt()}dp, " +
-                        "rot=${data.transform.rotationY.toInt()}°, scale=${data.transform.scale}, [$boundsStr]")
-                }
-            }
-        }
 
         // CoverFlow区域
         Box(
@@ -357,11 +321,6 @@ private fun CoverFlowContent(
         ) {
             // 封面区域 - 始终显示7个位置，不足的用占位图填补
             coverFlowData.forEach { data ->
-                debugLog("CoverFlowRender") {
-                    "Rendering: pos=${data.displayPos}, albumIdx=${data.albumIndex}, " +
-                    "isPlaceholder=${data.isPlaceholder}, alpha=${data.transform.alpha}, " +
-                    "x=${data.transform.x.toInt()}px, zIndex=${data.transform.zIndex}"
-                }
                 if (data.isPlaceholder) {
                     // 占位图使用 displayPos 作为 key
                     key(data.displayPos) {
@@ -431,10 +390,6 @@ private fun StableCoverFlowItem(
     layoutCameraDistance: Float = 1200f
 ) {
     val albumId = album.id ?: 0L
-
-    debugLog("StableCoverFlowItem") {
-        "Rendering: albumId=$albumId, position=$position, alpha=${transform.alpha}, scale=${transform.scale}"
-    }
     val context = LocalContext.current
     val density = LocalDensity.current
 
@@ -490,14 +445,6 @@ private fun StableCoverFlowItem(
     val xOffsetDp = with(density) { transform.x.toDp() }
     val yOffsetDp = with(density) { transform.y.toDp() }
 
-    debugLog("CoverFlowItem") {
-        "Item pos=$position: offset=($xOffsetDp, $yOffsetDp), size=$coverSize, scale=${transform.scale}, alpha=${transform.alpha}"
-    }
-
-    debugLog("BitmapState") {
-        "Position $position: albumId=$albumId, bitmapState=${if (bitmapState == null) "NULL" else "LOADED"}, xOffsetDp=$xOffsetDp, yOffsetDp=$yOffsetDp"
-    }
-
     // 计算倒影后的总高度（原图 + 倒影 = 原图的1.5倍）
     // 处理分辨率600px，显示尺寸150dp，由Compose自动缩放
     val originalSizeDp = 150.dp
@@ -509,13 +456,7 @@ private fun StableCoverFlowItem(
             .offset(x = xOffsetDp, y = yOffsetDp)
             .coverFlowTransform(transform, layoutCameraDistance)
     ) {
-        debugLog("BoxRender") {
-            "Box rendering: pos=$position, bitmapState=${if (bitmapState == null) "NULL" else "LOADED"}, reflectedHeightDp=$reflectedHeightDp"
-        }
         bitmapState?.let { bmp ->
-            debugLog("ImageRender") {
-                "Rendering image: pos=$position, bmpSize=${bmp.width}x${bmp.height}, coverSize=$coverSize, reflectedHeightDp=$reflectedHeightDp"
-            }
             // 显示带倒影的图片
             // Bitmap 尺寸是 600x900（宽x高），宽高比是 2:3
             // 显示尺寸：宽度=coverSize (150.dp)，高度=reflectedHeightDp (225.dp)
@@ -532,9 +473,6 @@ private fun StableCoverFlowItem(
             Column(
                 modifier = Modifier.size(reflectedHeightDp)
             ) {
-                debugLog("PlaceholderRender") {
-                    "Rendering placeholder for position $position (albumId=$albumId)"
-                }
                 // 原图部分
                 Box(
                     modifier = Modifier
@@ -590,9 +528,6 @@ private fun PlaceholderCoverFlowItem(
     position: Int,
     layoutCameraDistance: Float = 1200f
 ) {
-    debugLog("PlaceholderCoverFlowItem") {
-        "Rendering: position=$position, alpha=${transform.alpha}, scale=${transform.scale}"
-    }
 
     val density = LocalDensity.current
 
@@ -600,9 +535,6 @@ private fun PlaceholderCoverFlowItem(
     val xOffsetDp = with(density) { transform.x.toDp() }
     val yOffsetDp = with(density) { transform.y.toDp() }
 
-    debugLog("CoverFlowItem") {
-        "Placeholder pos=$position: offset=($xOffsetDp, $yOffsetDp), scale=${transform.scale}, alpha=${transform.alpha}"
-    }
 
     // 计算倒影后的总高度（原图 + 倒影 = 原图的1.5倍）
     val originalSizeDp = 150.dp
@@ -861,20 +793,6 @@ private fun calculateCoverFlowItem(
     params: CoverFlowLayoutParams,
     albumsSize: Int
 ): CoverFlowData {
-    // 调试日志
-    debugLog("CoverFlowCalc") {
-        if (displayPos == 0) {
-            """
-            === calculateCoverFlowItem params (SIMPLIFIED) ===
-            centerX=${params.centerX.toInt()}px, centerY=${params.centerY.toInt()}px
-            coverSize=${params.coverSizePx.toInt()}px, screenWidth=${params.screenWidthPx.toInt()}px
-            itemSpacing=${params.itemSpacing.toInt()}px
-            maxSideCount=${params.maxSideCount}, displayCount=${params.displayCount}
-            centerOffset=$centerOffset (第${centerOffset+1}张在中轴)
-            =================================
-            """.trimIndent()
-        } else ""
-    }
 
     // 1. 计算专辑索引
     val rawAlbumIndex = displayIndex + displayPos - centerOffset
@@ -898,14 +816,6 @@ private fun calculateCoverFlowItem(
 
     // Y位置 = 垂直中心
     val finalY = params.centerY - params.coverSizePx / 2f
-
-    // 调试日志 - 详细记录位置
-    debugLog("CoverFlowCalc") {
-        "pos=$displayPos (第${displayPos+1}张): offsetFromCenter=$offsetFromCenter, " +
-        "centerLeft=${centerLeft.toInt()}px, spacing=${params.itemSpacing.toInt()}px, " +
-        "finalX=${finalX.toInt()}px, finalY=${finalY.toInt()}px, " +
-        "isPlaceholder=$isPlaceholder, albumIndex=$albumIndex"
-    }
 
     // 3. 简化变换参数 - 无旋转、无弧形偏移、无缩放
     val rotationY = 0f
