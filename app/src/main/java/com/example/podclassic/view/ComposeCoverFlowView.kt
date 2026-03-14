@@ -14,6 +14,7 @@ import android.util.Log
 import android.widget.FrameLayout
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -25,6 +26,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -40,9 +42,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
@@ -76,6 +81,8 @@ private inline fun debugLog(tag: String, lazyMessage: () -> String) {
 
 // 全局图片缓存 - 使用 LRU 策略避免内存无限增长
 private val albumBitmapCache = mutableMapOf<Long, Bitmap?>()
+// 倒影图片缓存 - 使用 String 类型的键
+private val reflectedBitmapCache = mutableMapOf<String, Bitmap?>()
 private const val MAX_CACHE_SIZE = 30
 
 /**
@@ -156,19 +163,38 @@ class ComposeCoverFlowView(context: Context) : FrameLayout(context), ScreenView 
     }
 
     companion object {
-        // 预加载可见范围的图片
+        // 预加载可见范围的图片（带倒影）
         suspend fun preloadVisibleImages(albums: List<MusicList>, centerIndex: Int) {
             val range = -2..2
             for (offset in range) {
                 val index = centerIndex + offset
                 if (index in albums.indices) {
                     val albumId = albums[index].id ?: 0L
-                    if (albumBitmapCache[albumId] == null) {
+                    val reflectedCacheKey = "${albumId}_reflected"
+                    if (reflectedBitmapCache[reflectedCacheKey] == null) {
                         try {
-                            val bitmap = MediaUtil.getAlbumImage(albumId)
-                            albumBitmapCache[albumId] = bitmap
+                            // 限制缓存大小
+                            if (reflectedBitmapCache.size >= MAX_CACHE_SIZE) {
+                                val firstKey = reflectedBitmapCache.keys.first()
+                                reflectedBitmapCache.remove(firstKey)?.recycle()
+                            }
+
+                            val originalBmp = MediaUtil.getAlbumImage(albumId)
+                            if (originalBmp != null) {
+                                // 统一原图大小为600x600，使用CENTER_CROP方式提高质量
+                                val normalizedBmp = createSquareBitmapWithCenterCrop(originalBmp, 600)
+                                // 创建带倒影的图片
+                                val reflectedBmp = createReflectedBitmap(normalizedBmp)
+                                // 回收中间图片
+                                if (normalizedBmp != originalBmp) {
+                                    normalizedBmp.recycle()
+                                }
+                                reflectedBitmapCache[reflectedCacheKey] = reflectedBmp
+                            } else {
+                                reflectedBitmapCache[reflectedCacheKey] = null
+                            }
                         } catch (e: Exception) {
-                            albumBitmapCache[albumId] = null
+                            reflectedBitmapCache[reflectedCacheKey] = null
                         }
                     }
                 }
@@ -237,7 +263,8 @@ private fun CoverFlowContent(
             val containerPaddingDp = 24f
             val containerPaddingPx = with(density) { containerPaddingDp.dp.toPx() }
 
-            val coverSize = (containerWidth / 2.2f).coerceIn(100.dp, 150.dp)
+            // 显示尺寸150dp，处理分辨率600px（由Compose自动缩放）
+            val coverSize = 150.dp
             val coverSizePx = with(density) { coverSize.toPx() }
             val screenWidthPx = with(density) { containerWidth.toPx() }
             val screenHeightPx = with(density) { containerHeight.toPx() }
@@ -330,6 +357,11 @@ private fun CoverFlowContent(
         ) {
             // 封面区域 - 始终显示7个位置，不足的用占位图填补
             coverFlowData.forEach { data ->
+                debugLog("CoverFlowRender") {
+                    "Rendering: pos=${data.displayPos}, albumIdx=${data.albumIndex}, " +
+                    "isPlaceholder=${data.isPlaceholder}, alpha=${data.transform.alpha}, " +
+                    "x=${data.transform.x.toInt()}px, zIndex=${data.transform.zIndex}"
+                }
                 if (data.isPlaceholder) {
                     // 占位图使用 displayPos 作为 key
                     key(data.displayPos) {
@@ -355,12 +387,13 @@ private fun CoverFlowContent(
                 }
             }
 
-            // 专辑信息文字 - 放在底部
+            // 专辑信息文字 - 放在底部，使用高zIndex确保显示在封面之上
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .padding(bottom = 24.dp),
+                    .padding(bottom = 24.dp)
+                    .zIndex(200f), // 确保文字始终显示在封面和倒影之上
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 val currentAlbum = if (displayIndex in albums.indices) albums[displayIndex] else null
@@ -387,6 +420,7 @@ private fun CoverFlowContent(
  * 稳定的CoverFlowItem - Phase 3: 使用 LaunchedEffect 替代 produceState
  * 减少不必要的 recomposition，避免级联更新
  * 添加 crossfade 过渡效果实现平滑加载
+ * 添加倒影效果
  */
 @Composable
 private fun StableCoverFlowItem(
@@ -398,39 +432,59 @@ private fun StableCoverFlowItem(
 ) {
     val albumId = album.id ?: 0L
 
+    debugLog("StableCoverFlowItem") {
+        "Rendering: albumId=$albumId, position=$position, alpha=${transform.alpha}, scale=${transform.scale}"
+    }
+    val context = LocalContext.current
+    val density = LocalDensity.current
+
+    // 使用带倒影的缓存键
+    val reflectedCacheKey = "${albumId}_reflected"
+
     // Phase 3: 使用手动状态管理而非 produceState
     // 只在 albumId 变化时触发加载，不会因为父组件重组而重复执行
     var bitmapState by remember(albumId) {
-        mutableStateOf(albumBitmapCache[albumId])
+        mutableStateOf(reflectedBitmapCache[reflectedCacheKey])
     }
 
     // 使用 LaunchedEffect 异步加载图片
     LaunchedEffect(albumId) {
-        if (bitmapState == null && albumBitmapCache[albumId] == null) {
+        if (bitmapState == null && reflectedBitmapCache[reflectedCacheKey] == null) {
             val loaded = withContext(Dispatchers.IO) {
                 try {
                     // 限制缓存大小
-                    if (albumBitmapCache.size >= MAX_CACHE_SIZE) {
-                        val firstKey = albumBitmapCache.keys.first()
-                        albumBitmapCache.remove(firstKey)?.recycle()
+                    if (reflectedBitmapCache.size >= MAX_CACHE_SIZE) {
+                        val firstKey = reflectedBitmapCache.keys.first()
+                        reflectedBitmapCache.remove(firstKey)?.recycle()
                     }
 
-                    val bmp = MediaUtil.getAlbumImage(albumId)
-                    albumBitmapCache[albumId] = bmp
-                    bmp
+                    val originalBmp = MediaUtil.getAlbumImage(albumId)
+                    if (originalBmp != null) {
+                        // 统一原图大小为600x600，使用CENTER_CROP方式提高质量
+                        val normalizedBmp = createSquareBitmapWithCenterCrop(originalBmp, 600)
+                        // 创建带倒影的图片
+                        val reflectedBmp = createReflectedBitmap(normalizedBmp)
+                        // 回收中间图片
+                        if (normalizedBmp != originalBmp) {
+                            normalizedBmp.recycle()
+                        }
+                        reflectedBitmapCache[reflectedCacheKey] = reflectedBmp
+                        reflectedBmp
+                    } else {
+                        reflectedBitmapCache[reflectedCacheKey] = null
+                        null
+                    }
                 } catch (e: Exception) {
                     debugLog("CoverFlowItem") { "Error loading album image: albumId=$albumId, ${e.message}" }
-                    albumBitmapCache[albumId] = null
+                    reflectedBitmapCache[reflectedCacheKey] = null
                     null
                 }
             }
             bitmapState = loaded
-        } else if (albumBitmapCache[albumId] != null) {
-            bitmapState = albumBitmapCache[albumId]
+        } else if (reflectedBitmapCache[reflectedCacheKey] != null) {
+            bitmapState = reflectedBitmapCache[reflectedCacheKey]
         }
     }
-
-    val density = LocalDensity.current
 
     // 将像素位置转换为Dp
     val xOffsetDp = with(density) { transform.x.toDp() }
@@ -440,27 +494,72 @@ private fun StableCoverFlowItem(
         "Item pos=$position: offset=($xOffsetDp, $yOffsetDp), size=$coverSize, scale=${transform.scale}, alpha=${transform.alpha}"
     }
 
+    debugLog("BitmapState") {
+        "Position $position: albumId=$albumId, bitmapState=${if (bitmapState == null) "NULL" else "LOADED"}, xOffsetDp=$xOffsetDp, yOffsetDp=$yOffsetDp"
+    }
+
+    // 计算倒影后的总高度（原图 + 倒影 = 原图的1.5倍）
+    // 处理分辨率600px，显示尺寸150dp，由Compose自动缩放
+    val originalSizeDp = 150.dp
+    val reflectedHeightDp = originalSizeDp * 1.5f
+
     // Phase 4: 使用优化的 graphicsLayer 修饰符
     Box(
         modifier = Modifier
-            .size(coverSize)
             .offset(x = xOffsetDp, y = yOffsetDp)
             .coverFlowTransform(transform, layoutCameraDistance)
     ) {
+        debugLog("BoxRender") {
+            "Box rendering: pos=$position, bitmapState=${if (bitmapState == null) "NULL" else "LOADED"}, reflectedHeightDp=$reflectedHeightDp"
+        }
         bitmapState?.let { bmp ->
-            // 直接显示图片，不使用动画避免组件重建时的闪烁
+            debugLog("ImageRender") {
+                "Rendering image: pos=$position, bmpSize=${bmp.width}x${bmp.height}, coverSize=$coverSize, reflectedHeightDp=$reflectedHeightDp"
+            }
+            // 显示带倒影的图片
+            // Bitmap 尺寸是 600x900（宽x高），宽高比是 2:3
+            // 显示尺寸：宽度=coverSize (150.dp)，高度=reflectedHeightDp (225.dp)
             Image(
                 bitmap = bmp.asImageBitmap(),
                 contentDescription = album.title,
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier
+                    .size(width = coverSize, height = reflectedHeightDp),
+                contentScale = ContentScale.FillBounds,
+                alignment = Alignment.TopCenter
             )
         } ?: run {
-            // 显示占位符 - 使用深灰色背景
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.DarkGray)
-            )
+            // 显示占位符 - 使用深灰色背景，同样需要倒影空间
+            Column(
+                modifier = Modifier.size(reflectedHeightDp)
+            ) {
+                debugLog("PlaceholderRender") {
+                    "Rendering placeholder for position $position (albumId=$albumId)"
+                }
+                // 原图部分
+                Box(
+                    modifier = Modifier
+                        .size(originalSizeDp)
+                        .background(Color.DarkGray)
+                )
+                // 倒影部分
+                Box(
+                    modifier = Modifier
+                        .size(originalSizeDp)
+                        .graphicsLayer {
+                            scaleY = -1f
+                            translationY = size.height
+                        }
+                        .background(
+                            brush = Brush.verticalGradient(
+                                colorStops = arrayOf(
+                                    0.0f to Color.DarkGray,
+                                    0.5f to Color.DarkGray.copy(alpha = 0.5f),
+                                    1.0f to Color.Black
+                                )
+                            )
+                        )
+                )
+            }
         }
     }
 }
@@ -482,7 +581,7 @@ private fun Modifier.coverFlowTransform(
 
 /**
  * 占位图片组件 - 用于填补不足7张的位置
- * 显示半透明深灰背景和音乐图标
+ * 显示半透明深灰背景和音乐图标，带倒影效果
  */
 @Composable
 private fun PlaceholderCoverFlowItem(
@@ -491,6 +590,10 @@ private fun PlaceholderCoverFlowItem(
     position: Int,
     layoutCameraDistance: Float = 1200f
 ) {
+    debugLog("PlaceholderCoverFlowItem") {
+        "Rendering: position=$position, alpha=${transform.alpha}, scale=${transform.scale}"
+    }
+
     val density = LocalDensity.current
 
     // 将像素位置转换为Dp
@@ -501,28 +604,74 @@ private fun PlaceholderCoverFlowItem(
         "Placeholder pos=$position: offset=($xOffsetDp, $yOffsetDp), scale=${transform.scale}, alpha=${transform.alpha}"
     }
 
+    // 计算倒影后的总高度（原图 + 倒影 = 原图的1.5倍）
+    val originalSizeDp = 150.dp
+    val reflectedHeightDp = originalSizeDp * 1.5f
+    val reflectionSizeDp = originalSizeDp / 2
+
     // Phase 4: 使用优化的 transform 修饰符
     Box(
         modifier = Modifier
-            .size(coverSize)
             .offset(x = xOffsetDp, y = yOffsetDp)
             .coverFlowTransform(transform, layoutCameraDistance)
     ) {
-        // 占位图样式 - 深灰背景 + 文字
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    color = Color.DarkGray.copy(alpha = 0.5f),
-                    shape = RoundedCornerShape(4.dp)
+        Box(modifier = Modifier.size(reflectedHeightDp)) {
+            // 原图部分
+            Box(
+                modifier = Modifier
+                    .size(originalSizeDp)
+                    .background(
+                        color = Color.DarkGray.copy(alpha = 0.5f),
+                        shape = RoundedCornerShape(4.dp)
+                    )
+            ) {
+                Text(
+                    text = "♪",
+                    color = Color.Gray.copy(alpha = 0.5f),
+                    fontSize = 48.sp,
+                    modifier = Modifier.align(Alignment.Center)
                 )
-        ) {
-            Text(
-                text = "♪",
-                color = Color.Gray.copy(alpha = 0.5f),
-                fontSize = 48.sp,
-                modifier = Modifier.align(Alignment.Center)
-            )
+            }
+
+            // 倒影部分 - 使用Canvas绘制
+            Canvas(
+                modifier = Modifier
+                    .size(originalSizeDp)
+                    .offset(y = originalSizeDp)
+            ) {
+                val pxSize = originalSizeDp.toPx()
+                val pxReflectionSize = pxSize / 2
+
+                // 使用Native Canvas绘制倒影
+                drawIntoCanvas { canvas ->
+                    val nativeCanvas = canvas.nativeCanvas
+
+                    // 保存当前状态
+                    val saveCount = nativeCanvas.save()
+
+                    // 创建倒影的渐变遮罩
+                    val gradient = android.graphics.LinearGradient(
+                        0f, 0f, 0f, pxReflectionSize,
+                        intArrayOf(0x00000000.toInt(), 0xB3000000.toInt(), 0xCC000000.toInt()),
+                        floatArrayOf(0f, 0.3f, 1f),
+                        android.graphics.Shader.TileMode.CLAMP
+                    )
+
+                    // 绘制倒影背景
+                    val paint = android.graphics.Paint().apply {
+                        color = android.graphics.Color.argb(77, 64, 64, 64)
+                        shader = gradient
+                    }
+
+                    nativeCanvas.drawRect(
+                        0f, 0f, pxSize, pxReflectionSize,
+                        paint
+                    )
+
+                    // 恢复状态
+                    nativeCanvas.restoreToCount(saveCount)
+                }
+            }
         }
     }
 }
@@ -827,4 +976,57 @@ private fun createReflectedBitmap(bitmap: Bitmap): Bitmap {
     )
 
     return bitmap4Reflection
+}
+
+/**
+ * 创建统一的正方形Bitmap，使用CENTER_CROP方式
+ * 如果原图不是正方形，会裁剪多余部分以完全填充
+ * 如果原图小于目标尺寸，会等比放大后再裁剪
+ * 如果原图大于目标尺寸，会等比缩小后再裁剪
+ *
+ * @param source 原始图片
+ * @param targetSize 目标尺寸（宽度和高度相同）
+ * @return 统一大小后的正方形Bitmap（CENTER_CROP效果）
+ */
+private fun createSquareBitmapWithCenterCrop(source: Bitmap, targetSize: Int): Bitmap {
+    val srcWidth = source.width
+    val srcHeight = source.height
+
+    // 如果已经是目标尺寸的正方形，直接返回
+    if (srcWidth == targetSize && srcHeight == targetSize) {
+        return source
+    }
+
+    // 计算缩放比例：使短边等于目标尺寸（CENTER_CROP效果）
+    val minSide = minOf(srcWidth, srcHeight).toFloat()
+    val scale = targetSize / minSide
+
+    val scaledWidth = (srcWidth * scale).toInt()
+    val scaledHeight = (srcHeight * scale).toInt()
+
+    // 创建缩放后的图片
+    val scaledBitmap = if (scale != 1f) {
+        Bitmap.createScaledBitmap(source, scaledWidth, scaledHeight, true)
+    } else {
+        source
+    }
+
+    // 从缩放后图片的中心裁剪出 targetSize x targetSize 的区域
+    val left = ((scaledWidth - targetSize) / 2f).coerceAtLeast(0f).toInt()
+    val top = ((scaledHeight - targetSize) / 2f).coerceAtLeast(0f).toInt()
+
+    val resultBitmap = Bitmap.createBitmap(
+        scaledBitmap,
+        left,
+        top,
+        targetSize,
+        targetSize
+    )
+
+    // 如果创建了新的缩放bitmap，回收它
+    if (scaledBitmap != source) {
+        scaledBitmap.recycle()
+    }
+
+    return resultBitmap
 }
