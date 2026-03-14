@@ -66,7 +66,7 @@ import kotlin.math.pow
 
 // Conditional debug logging - Phase 1: Quick Wins
 // Set to false to disable debug logging in production builds
-private const val ENABLE_DEBUG_LOGGING = false
+private const val ENABLE_DEBUG_LOGGING = true
 
 private inline fun debugLog(tag: String, lazyMessage: () -> String) {
     if (ENABLE_DEBUG_LOGGING) {
@@ -234,20 +234,29 @@ private fun CoverFlowContent(
 
         // Phase 5: 缓存密度相关的计算值
         val cachedMetrics = remember(containerWidth, containerHeight, density) {
+            val containerPaddingDp = 24f
+            val containerPaddingPx = with(density) { containerPaddingDp.dp.toPx() }
+
             val coverSize = (containerWidth / 2.2f).coerceIn(100.dp, 150.dp)
             val coverSizePx = with(density) { coverSize.toPx() }
             val screenWidthPx = with(density) { containerWidth.toPx() }
             val screenHeightPx = with(density) { containerHeight.toPx() }
+
+            // 简化版间距计算：基于Box宽度（完整宽度）均匀分布7张图
+            // 第一张图从x=0开始，最后一张图结束于x=screenWidth-coverSize
             val maxOffset = 3f
-            val calculatedSpacing = (screenWidthPx / 2f - coverSizePx / 2f) / maxOffset
+            // 间距 = (Box宽度 - 封面宽度) / 6
+            val calculatedSpacing = (screenWidthPx - coverSizePx) / (maxOffset * 2f)
 
             CoverFlowMetrics(
                 coverSizeDp = coverSize,
                 coverSizePx = coverSizePx,
                 screenWidthPx = screenWidthPx,
                 screenHeightPx = screenHeightPx,
+                containerPaddingPx = containerPaddingPx,
                 itemSpacing = calculatedSpacing,
                 layoutParams = CoverFlowLayoutParams(
+                    containerPaddingPx = containerPaddingPx,
                     coverSizePx = coverSizePx,
                     screenWidthPx = screenWidthPx,
                     screenHeightPx = screenHeightPx,
@@ -263,6 +272,12 @@ private fun CoverFlowContent(
 
         debugLog("CoverFlowLayout") {
             "Screen: w=${containerWidth}, h=${containerHeight}, px=(${cachedMetrics.screenWidthPx}, ${cachedMetrics.screenHeightPx})"
+        }
+        debugLog("CoverFlowLayout") {
+            "Content area: padding=${cachedMetrics.containerPaddingPx.toInt()}px, " +
+            "contentWidth=${(cachedMetrics.screenWidthPx - 2 * cachedMetrics.containerPaddingPx).toInt()}px, " +
+            "contentLeft=${cachedMetrics.layoutParams.contentLeft.toInt()}px, " +
+            "contentRight=${cachedMetrics.layoutParams.contentRight.toInt()}px"
         }
         debugLog("CoverFlowLayout") {
             "Cover size: ${cachedMetrics.coverSizeDp} (${cachedMetrics.coverSizePx.toInt()}px)"
@@ -531,6 +546,7 @@ private data class CoverFlowMetrics(
     val coverSizePx: Float,
     val screenWidthPx: Float,
     val screenHeightPx: Float,
+    val containerPaddingPx: Float,
     val itemSpacing: Float,
     val layoutParams: CoverFlowLayoutParams
 )
@@ -564,6 +580,9 @@ private data class CoverTransform(
  * 5. 边界安全：确保元素不会超出屏幕
  */
 private data class CoverFlowLayoutParams(
+    // 容器内边距（像素）
+    val containerPaddingPx: Float = 0f,
+
     // 封面尺寸（像素）
     val coverSizePx: Float,
 
@@ -596,6 +615,10 @@ private data class CoverFlowLayoutParams(
     // 计算中心位置
     val centerX: Float get() = screenWidthPx / 2f
     val centerY: Float get() = screenHeightPx * 0.4f
+
+    // 内容区域边界 - 使用完整Box宽度（0到screenWidth）
+    val contentLeft: Float get() = 0f
+    val contentRight: Float get() = screenWidthPx
 
     // 总显示数量
     val displayCount: Int get() = maxSideCount * 2 + 1
@@ -689,16 +712,16 @@ private fun calculateCoverFlowItem(
     params: CoverFlowLayoutParams,
     albumsSize: Int
 ): CoverFlowData {
-    // 调试日志 - 仅在第一次调用时打印参数
+    // 调试日志
     debugLog("CoverFlowCalc") {
         if (displayPos == 0) {
             """
-            === calculateCoverFlowItem params ===
+            === calculateCoverFlowItem params (SIMPLIFIED) ===
             centerX=${params.centerX.toInt()}px, centerY=${params.centerY.toInt()}px
             coverSize=${params.coverSizePx.toInt()}px, screenWidth=${params.screenWidthPx.toInt()}px
-            itemSpacing=${params.itemSpacing.toInt()}px, arcStrength=${params.arcStrength}
+            itemSpacing=${params.itemSpacing.toInt()}px
             maxSideCount=${params.maxSideCount}, displayCount=${params.displayCount}
-            animatedIndex=$animatedIndex, displayIndex=$displayIndex
+            centerOffset=$centerOffset (第${centerOffset+1}张在中轴)
             =================================
             """.trimIndent()
         } else ""
@@ -710,56 +733,40 @@ private fun calculateCoverFlowItem(
     val albumIndex = rawAlbumIndex.coerceIn(0, (albumsSize - 1).coerceAtLeast(0))
     val isPlaceholder = !inBounds
 
-    // 2. 计算连续偏移（带小数的偏移量）
-    val continuousOffset = (displayPos - centerOffset) - (animatedIndex - displayIndex)
+    // 2. 基础平铺计算 - 第4张（pos=3）在中轴，其他往两边铺
+    // 相对于中心的偏移：-3, -2, -1, 0, 1, 2, 3
+    val offsetFromCenter = displayPos - centerOffset
 
-    // 3. 计算基础 X 位置（线性分布）
-    // 减去半个封面宽度，使封面中心对齐到屏幕中心
-    val baseX = (params.centerX - params.coverSizePx / 2f) + (continuousOffset * params.itemSpacing)
+    // 使用内容区域的中心（不是屏幕中心），因为间距是基于contentWidth计算的
+    val contentCenterX = params.contentLeft + (params.contentRight - params.contentLeft) / 2f
+    val centerLeft = contentCenterX - params.coverSizePx / 2f
 
-    // 4. 计算弧形偏移（向两侧推移）
-    val arcOffset = calculateArcOffset(continuousOffset, params)
+    // X位置 = 中心左边缘 + 偏移 * 间距
+    // pos=0(offset=-3): x=0 (最左，贴box左边缘)
+    // pos=3(offset=0): centerLeft (中心)
+    // pos=6(offset=3): x=contentRight-coverSize (最右，贴box右边缘)
+    val finalX = centerLeft + offsetFromCenter * params.itemSpacing
 
-    // 5. 最终 X 位置（应用边界限制）
-    // 所有元素（包括占位图）都应该在屏幕内
-    val rawFinalX = baseX + arcOffset
-    val finalX = rawFinalX.coerceIn(
-        minimumValue = 0f,
-        maximumValue = params.screenWidthPx - params.coverSizePx
-    )
-
-    // 调试日志 - 详细记录位置计算过程
-    debugLog("CoverFlowCalc") {
-        if (displayPos == 4 || displayPos == 5) {
-            "pos=$displayPos: continuousOffset=${continuousOffset.toFloat()}, " +
-            "baseX=${baseX.toInt()}px, arcOffset=${arcOffset.toInt()}px, " +
-            "rawFinalX=${rawFinalX.toInt()}px, " +
-            "finalX=${finalX.toInt()}px, " +
-            "isPlaceholder=$isPlaceholder"
-        } else ""
-    }
-
-    // 6. 计算 Y 位置
+    // Y位置 = 垂直中心
     val finalY = params.centerY - params.coverSizePx / 2f
 
-    // 7. 计算旋转
-    val rotationY = calculateRotation(continuousOffset, params)
+    // 调试日志 - 详细记录位置
+    debugLog("CoverFlowCalc") {
+        "pos=$displayPos (第${displayPos+1}张): offsetFromCenter=$offsetFromCenter, " +
+        "centerLeft=${centerLeft.toInt()}px, spacing=${params.itemSpacing.toInt()}px, " +
+        "finalX=${finalX.toInt()}px, finalY=${finalY.toInt()}px, " +
+        "isPlaceholder=$isPlaceholder, albumIndex=$albumIndex"
+    }
 
-    // 8. 计算缩放
-    val scale = calculateScale(continuousOffset, params)
-
-    // 9. 计算透明度
-    val baseAlpha = calculateAlpha(continuousOffset, params)
-    val alpha = if (isPlaceholder) baseAlpha * 0.3f else baseAlpha
-
-    // 10. 计算其他变换参数
-    // 统一使用中心旋转，避免边缘旋转导致的视觉偏移
+    // 3. 简化变换参数 - 无旋转、无弧形偏移、无缩放
+    val rotationY = 0f
+    val skewY = 0f
+    val scale = 1.0f
+    val alpha = if (isPlaceholder) 0.3f else 1.0f
     val transformOriginX = 0.5f
-    val skewY = -continuousOffset * 5f
-    val zIndex = 100f - abs(continuousOffset) * 10f
-
-    // 11. graphicsLayer 使用的 translationX
-    val translationX = arcOffset
+    val zIndex = 100f - abs(offsetFromCenter) * 10f
+    val translationX = 0f
+    val translationY = 0f
 
     return CoverFlowData(
         displayPos = displayPos,
@@ -770,7 +777,7 @@ private fun calculateCoverFlowItem(
             y = finalY,
             rotationY = rotationY,
             skewY = skewY,
-            translationY = 0f,
+            translationY = translationY,
             scale = scale,
             zIndex = zIndex,
             alpha = alpha,
