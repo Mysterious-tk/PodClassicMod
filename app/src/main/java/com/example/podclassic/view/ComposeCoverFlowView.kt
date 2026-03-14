@@ -61,6 +61,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.example.podclassic.base.Core
 import com.example.podclassic.base.ScreenView
+import com.example.podclassic.values.Colors
 import com.example.podclassic.bean.MusicList
 import com.example.podclassic.util.MediaStoreUtil
 import com.example.podclassic.util.MediaUtil
@@ -127,8 +128,8 @@ class ComposeCoverFlowView(context: Context) : FrameLayout(context), ScreenView 
     }
 
     init {
-        // 设置黑色背景，避免切换时的闪烁
-        setBackgroundColor(android.graphics.Color.BLACK)
+        // 设置白色背景，保持一致的视觉效果
+        setBackgroundColor(Colors.white)
         // 添加 ComposeView 并设置为填充整个父容器
         addView(
             composeView,
@@ -237,16 +238,11 @@ private fun CoverFlowContent(
         derivedStateOf { targetIndexState.intValue }
     }
 
-    // 根据滑动间隔计算动画时长
-    // 持续滚动时动画加速，离散点击时播放完整动画
+    // 根据滑动间隔判断是否快速滚动
+    // 只分两档：快速滚动跳过动画，正常滚动 400ms
     val currentTime = System.currentTimeMillis()
     val timeSinceLastSlide = currentTime - lastSlideTimeState.longValue
-    val animationDuration = when {
-        timeSinceLastSlide < 80 -> 0      // 极快连续滚动: 直接跳过动画
-        timeSinceLastSlide < 150 -> 50    // 快速连续滚动: 50ms
-        timeSinceLastSlide < 300 -> 150   // 中速滚动: 150ms
-        else -> 400                       // 离散点击/慢速: 400ms 完整动画
-    }
+    val animationDuration = if (timeSinceLastSlide < 100) 0 else 400
 
     // 平滑动画索引 - 使用 tween 动画实现动态时长的平滑过渡
     val animatedIndex by animateFloatAsState(
@@ -261,7 +257,7 @@ private fun CoverFlowContent(
     // 同步动画状态到外部状态
     LaunchedEffect(targetIndex) {
         // 在动画开始时更新时间戳，供下次动画计算使用
-        lastSlideTimeState.longValue = System.currentTimeMillis()
+        lastSlideTimeState.longValue = currentTime
         animatedIndexState.floatValue = animatedIndex
         // 同步 currentIndex 以便点击时选择正确的专辑
         currentIndexState.intValue = targetIndex.coerceIn(0, albums.size - 1)
@@ -366,7 +362,7 @@ private fun CoverFlowContent(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black)
+                .background(Color(Colors.white))
         ) {
             // 封面区域 - 始终显示7个位置，不足的用占位图填补
             coverFlowData.forEach { data ->
@@ -408,13 +404,13 @@ private fun CoverFlowContent(
                 currentAlbum?.let { album ->
                     Text(
                         text = album.title ?: "",
-                        color = Color.White,
+                        color = Color.Black,
                         fontSize = 18.sp,
                         textAlign = TextAlign.Center
                     )
                     Text(
                         text = album.subtitle ?: "",
-                        color = Color.Gray,
+                        color = Color.DarkGray,
                         fontSize = 14.sp,
                         textAlign = TextAlign.Center
                     )
@@ -506,8 +502,9 @@ private fun StableCoverFlowItem(
                 bitmap = bmp.asImageBitmap(),
                 contentDescription = album.title,
                 modifier = Modifier
-                    .size(width = coverSize, height = reflectedHeightDp),
-                contentScale = ContentScale.FillBounds,
+                    .size(width = coverSize, height = reflectedHeightDp)
+                    .background(Color.Transparent),
+                contentScale = ContentScale.Fit,
                 alignment = Alignment.TopCenter
             )
         } ?: run {
@@ -882,7 +879,7 @@ private fun calculateCoverFlowItem(
 
     // 侧边收紧：将左3张(0,1,2)和右3张(4,5,6)向边缘收紧
     // 通过向边缘平移产生中心留白效果
-    val sideTightenAmount = 20f * density.density  // 20dp 收紧量
+    val sideTightenAmount = 25f * density.density  // 25dp 收紧量
     val sideAdjustment = when {
         offsetFromCenter <= -1 -> -sideTightenAmount  // 左侧(0,1,2)向左收紧
         offsetFromCenter >= 1 -> sideTightenAmount   // 右侧(4,5,6)向右收紧
