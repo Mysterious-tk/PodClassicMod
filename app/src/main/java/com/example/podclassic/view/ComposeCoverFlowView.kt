@@ -1,5 +1,6 @@
 package com.example.podclassic.view
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -11,31 +12,34 @@ import android.graphics.PorterDuffXfermode
 import android.graphics.Shader
 import android.util.Log
 import android.widget.FrameLayout
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.MutableIntState
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
@@ -51,32 +55,56 @@ import com.example.podclassic.bean.MusicList
 import com.example.podclassic.util.MediaStoreUtil
 import com.example.podclassic.util.MediaUtil
 import com.example.podclassic.values.Strings
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.abs
 import kotlin.math.pow
 
+// Conditional debug logging - Phase 1: Quick Wins
+// Set to false to disable debug logging in production builds
+private const val ENABLE_DEBUG_LOGGING = false
+
+private inline fun debugLog(tag: String, lazyMessage: () -> String) {
+    if (ENABLE_DEBUG_LOGGING) {
+        Log.d(tag, lazyMessage())
+    }
+}
+
+// 全局图片缓存 - 使用 LRU 策略避免内存无限增长
+private val albumBitmapCache = mutableMapOf<Long, Bitmap?>()
+private const val MAX_CACHE_SIZE = 30
+
 /**
- * Jetpack Compose + 3D动画实现的CoverFlow
- * 参考机制重构：
- * 1. RenderTransform作为刷新入口，重新计算每个专辑封面的位置和叠放顺序
- * 2. 区分当前封面左边和右边的不同处理
- * 3. 计算3D旋转、倾斜和平移
- * 4. 使用动画实现平滑过渡
+ * Jetpack Compose CoverFlow - 优化版本
+ * 修复了快速滚动时的闪现问题，添加了 3D 变换效果
  */
 class ComposeCoverFlowView(context: Context) : FrameLayout(context), ScreenView {
 
     private val albums = MediaStoreUtil.getAlbumList()
 
     // 使用MutableState确保Compose能观察到变化
-    // 初始位置设为3（中间位置，显示第4张专辑，左右各3张）
-    private val currentIndexState = mutableIntStateOf(3.coerceAtMost(albums.size - 1))
-    private val targetIndexState = mutableIntStateOf(3.coerceAtMost(albums.size - 1))
+    private val currentIndexState = mutableIntStateOf(
+        if (albums.isEmpty()) 0 else 3.coerceAtMost(albums.size - 1)
+    )
+    private val targetIndexState = mutableIntStateOf(
+        if (albums.isEmpty()) 0 else 3.coerceAtMost(albums.size - 1)
+    )
+    // 浮点动画索引 - 支持平滑插值动画
+    private val animatedIndexState = mutableFloatStateOf(
+        if (albums.isEmpty()) 0f else 3f.coerceAtMost((albums.size - 1).toFloat())
+    )
 
     private val composeView = androidx.compose.ui.platform.ComposeView(context).apply {
         setContent {
             CoverFlowContent(
                 albums = albums,
                 currentIndexState = currentIndexState,
-                targetIndexState = targetIndexState
+                targetIndexState = targetIndexState,
+                animatedIndexState = animatedIndexState
             )
         }
     }
@@ -84,17 +112,14 @@ class ComposeCoverFlowView(context: Context) : FrameLayout(context), ScreenView 
     init {
         // 设置黑色背景，避免切换时的闪烁
         setBackgroundColor(android.graphics.Color.BLACK)
-        addView(composeView)
-    }
-
-    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        super.onMeasure(widthMeasureSpec, heightMeasureSpec)
-        composeView.measure(widthMeasureSpec, heightMeasureSpec)
-    }
-
-    override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
-        super.onLayout(changed, left, top, right, bottom)
-        composeView.layout(0, 0, right - left, bottom - top)
+        // 添加 ComposeView 并设置为填充整个父容器
+        addView(
+            composeView,
+            LayoutParams(
+                LayoutParams.MATCH_PARENT,
+                LayoutParams.MATCH_PARENT
+            )
+        )
     }
 
     override fun enter(): Boolean {
@@ -115,7 +140,7 @@ class ComposeCoverFlowView(context: Context) : FrameLayout(context), ScreenView 
     }
 
     override fun onViewAdd() {
-        // 不需要重新设置content，MutableState会保持状态
+        // produceState 会自动处理图片加载，不需要预加载
     }
 
     override fun onViewDelete() {
@@ -123,214 +148,219 @@ class ComposeCoverFlowView(context: Context) : FrameLayout(context), ScreenView 
 
     override fun slide(slideVal: Int): Boolean {
         val newIndex = targetIndexState.intValue + slideVal
-        Log.d("CoverFlow", "slide called: slideVal=$slideVal, current=${currentIndexState.intValue}, target=${targetIndexState.intValue}, newIndex=$newIndex, albums.size=${albums.size}")
         if (newIndex in albums.indices) {
             targetIndexState.intValue = newIndex
-            Log.d("CoverFlow", "slide accepted: new target=${targetIndexState.intValue}")
             return true
         }
-        Log.d("CoverFlow", "slide rejected: newIndex out of bounds")
         return false
+    }
+
+    companion object {
+        // 预加载可见范围的图片
+        suspend fun preloadVisibleImages(albums: List<MusicList>, centerIndex: Int) {
+            val range = -2..2
+            for (offset in range) {
+                val index = centerIndex + offset
+                if (index in albums.indices) {
+                    val albumId = albums[index].id ?: 0L
+                    if (albumBitmapCache[albumId] == null) {
+                        try {
+                            val bitmap = MediaUtil.getAlbumImage(albumId)
+                            albumBitmapCache[albumId] = bitmap
+                        } catch (e: Exception) {
+                            albumBitmapCache[albumId] = null
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
 /**
- * CoverFlow内容组件 - 使用RenderTransform机制管理位置和动画
+ * CoverFlow内容组件
+ * 使用 smooth animation 实现 Apple 风格的 CoverFlow 滚动效果
+ * Phase 2 & 5: Separate animation from layout state, cache density values
  */
+@SuppressLint("UnusedBoxWithConstraintsScope")
 @Composable
 private fun CoverFlowContent(
     albums: List<MusicList>,
-    currentIndexState: MutableIntState,
-    targetIndexState: MutableIntState
+    currentIndexState: androidx.compose.runtime.MutableIntState,
+    targetIndexState: androidx.compose.runtime.MutableIntState,
+    animatedIndexState: androidx.compose.runtime.MutableFloatState
 ) {
     val density = LocalDensity.current
+    val context = LocalContext.current
 
-    // 直接读取State的值
-    val currentIndex = currentIndexState.intValue
-    val targetIndex = targetIndexState.intValue
-
-    // 使用State来跟踪动画状态
-    var animatingFromIndex by remember { mutableIntStateOf(currentIndex) }
-    var animatingToIndex by remember { mutableIntStateOf(targetIndex) }
-
-    // 动画进度
-    val animationProgress = remember { Animatable(0f) }
-
-    // 监听外部索引变化，直接切换位置（无动画，避免闪烁）
-    LaunchedEffect(targetIndex) {
-        if (targetIndex != animatingToIndex) {
-            animatingToIndex = targetIndex
-            currentIndexState.intValue = targetIndex
-            Log.d("CoverFlow", "Position updated: now at $animatingToIndex")
-        }
+    // 读取当前目标索引
+    val targetIndex by remember {
+        derivedStateOf { targetIndexState.intValue }
     }
 
-    // 预加载相邻专辑图片
-    val context = LocalContext.current
-    LaunchedEffect(animatingToIndex) {
-        // 预加载当前显示范围前后各3张专辑
-        val preloadRange = 3
-        for (offset in -preloadRange..preloadRange) {
-            val preloadIndex = animatingToIndex + offset
-            if (preloadIndex in albums.indices) {
-                val albumId = albums[preloadIndex].id ?: 0L
-                // 触发图片加载（如果未缓存）
-                if (albumBitmapCache[albumId] == null) {
-                    loadAlbumBitmap(context, albumId)
-                }
-            }
-        }
+    // 平滑动画索引 - 使用 spring 动画实现平滑过渡
+    val animatedIndex by animateFloatAsState(
+        targetValue = targetIndex.toFloat(),
+        animationSpec = spring(
+            dampingRatio = 0.7f,  // 阻尼，0.7 = 略带弹性
+            stiffness = 400f      // 刚度，控制速度
+        ),
+        label = "coverflow_scroll"
+    )
+
+    // Phase 2: 使用动画索引的整数部分作为显示索引（用于布局计算）
+    val displayIndex = remember(animatedIndex) {
+        derivedStateOf { animatedIndex.toInt() }
+    }.value
+
+    // Phase 2: 浮点进度用于平滑变换（0.0 到 1.0）
+    val animationProgress = remember(animatedIndex, displayIndex) {
+        derivedStateOf { animatedIndex - displayIndex }
+    }.value
+
+    // 同步动画状态到外部状态
+    LaunchedEffect(displayIndex) {
+        animatedIndexState.floatValue = animatedIndex
+        // 同步 currentIndex 以便点击时选择正确的专辑
+        currentIndexState.intValue = displayIndex.coerceIn(0, albums.size - 1)
     }
 
     // 使用BoxWithConstraints获取实际可用尺寸
     androidx.compose.foundation.layout.BoxWithConstraints(
         modifier = Modifier.fillMaxSize()
     ) {
-        // 获取实际可用尺寸
         val containerWidth = maxWidth
         val containerHeight = maxHeight
 
-        // 根据屏幕宽度动态计算参数
-        val coverSize = (containerWidth / 2.2f).coerceIn(100.dp, 150.dp)
-        val coverSizePx = with(density) { coverSize.toPx() }
+        // Phase 5: 缓存密度相关的计算值
+        val cachedMetrics = remember(containerWidth, containerHeight, density) {
+            val coverSize = (containerWidth / 2.2f).coerceIn(100.dp, 150.dp)
+            val coverSizePx = with(density) { coverSize.toPx() }
+            val screenWidthPx = with(density) { containerWidth.toPx() }
+            val screenHeightPx = with(density) { containerHeight.toPx() }
+            val maxOffset = 3f
+            val calculatedSpacing = (screenWidthPx / 2f - coverSizePx / 2f) / maxOffset
 
-        // 计算屏幕尺寸（像素）- 这是ScreenView的实际尺寸
-        val screenWidthPx = with(density) { containerWidth.toPx() }
-        val screenHeightPx = with(density) { containerHeight.toPx() }
-        val centerY = screenHeightPx * 0.4f
-
-        Log.d("CoverFlow", "ScreenView尺寸: width=${screenWidthPx.toInt()}, height=${screenHeightPx.toInt()}")
-
-        // 计算布局参数
-        val displayCount = 7
-        val centerOffset = displayCount / 2 // 3
-        // 计算布局：7张图均匀分布在屏幕宽度内
-        // 最左边贴着左边缘，最右边贴着右边缘
-        val step = (screenWidthPx - coverSizePx) / (displayCount - 1)
-
-        Log.d("CoverFlow", "Layout: screenWidth=${screenWidthPx.toInt()}, coverSize=${coverSizePx.toInt()}, step=${step.toInt()}, animatingToIndex=$animatingToIndex")
-
-        // 直接计算布局数据，不使用remember
-        val coverFlowData = List(displayCount) { displayPos ->
-            val albumIndex = animatingToIndex + displayPos - centerOffset
-            val offsetFromCenter = displayPos - centerOffset
-
-            // 计算基础X位置
-            val baseX = displayPos * step
-
-            // 计算3D旋转：左边向右旋转，右边向左旋转
-            // 增加旋转角度，让透视效果更明显
-            val rotateY = 75f
-            val targetRotateY = when {
-                offsetFromCenter < 0 -> -rotateY  // 左边：向右旋转
-                offsetFromCenter > 0 -> -rotateY  // 右边：也向右旋转
-                else -> 0f                        // 当前：不旋转
-            }
-
-            // 计算平行变换（skewY）：增加立体感
-            // 左边图片底部向内倾斜，右边图片底部向内倾斜
-            val skewY = 15f
-            val targetSkewY = when {
-                offsetFromCenter < 0 -> skewY   // 左边：正倾斜
-                offsetFromCenter > 0 -> -skewY  // 右边：负倾斜
-                else -> 0f                      // 当前：不倾斜
-            }
-
-            // 补偿透视偏移：旋转后图片视觉上会向内收缩
-            // 根据旋转角度向外调整位置（增加偏移量）
-            val perspectiveOffset = when {
-                offsetFromCenter < 0 -> -coverSizePx * 0.45f  // 左边：向左偏移
-                offsetFromCenter > 0 -> coverSizePx * 0.45f   // 右边：向右偏移
-                else -> 0f                                    // 中间：不偏移
-            }
-            val finalX = baseX + perspectiveOffset
-
-            if (displayPos == 0 || displayPos == 6) {
-                Log.d("CoverFlow", "Pos $displayPos: baseX=${baseX.toInt()}, finalX=${finalX.toInt()}, albumIndex=$albumIndex")
-            }
-
-            // 计算ZIndex：当前位置(3)最靠上，距离越远越靠下
-            val zIndex = when {
-                offsetFromCenter == 0 -> 100f
-                else -> 100f - abs(offsetFromCenter) * 10f
-            }
-
-            // 缩放：所有封面都不缩小
-            val targetScale = 1f
-
-            CoverFlowData(
-                displayPos = displayPos,
-                albumIndex = albumIndex,
-                transform = CoverTransform(
-                    x = finalX,
-                    y = centerY - coverSizePx / 2f,
-                    rotationY = targetRotateY,
-                    skewY = targetSkewY,
-                    translationY = 0f,
-                    scale = targetScale,
-                    zIndex = zIndex,
-                    alpha = 1f
+            CoverFlowMetrics(
+                coverSizeDp = coverSize,
+                coverSizePx = coverSizePx,
+                screenWidthPx = screenWidthPx,
+                screenHeightPx = screenHeightPx,
+                itemSpacing = calculatedSpacing,
+                layoutParams = CoverFlowLayoutParams(
+                    coverSizePx = coverSizePx,
+                    screenWidthPx = screenWidthPx,
+                    screenHeightPx = screenHeightPx,
+                    itemSpacing = calculatedSpacing,
+                    arcStrength = 0f,
+                    maxRotation = 60f,
+                    minScale = 0.85f,
+                    maxSideCount = 3,
+                    cameraDistance = 1200f
                 )
             )
         }
 
-        // CoverFlow区域 - 使用Column垂直排列封面和文字
-        Column(
+        debugLog("CoverFlowLayout") {
+            "Screen: w=${containerWidth}, h=${containerHeight}, px=(${cachedMetrics.screenWidthPx}, ${cachedMetrics.screenHeightPx})"
+        }
+        debugLog("CoverFlowLayout") {
+            "Cover size: ${cachedMetrics.coverSizeDp} (${cachedMetrics.coverSizePx.toInt()}px)"
+        }
+        debugLog("CoverFlowLayout") {
+            "Albums total: ${albums.size}, animatedIndex: $animatedIndex, displayIndex: $displayIndex"
+        }
+        debugLog("CoverFlowLayout") {
+            "LayoutParams: coverSize=${cachedMetrics.layoutParams.coverSizePx.toInt()}px, " +
+            "screen=${cachedMetrics.layoutParams.screenWidthPx.toInt()}px, " +
+            "itemSpacing=${cachedMetrics.layoutParams.itemSpacing.toInt()}px, " +
+            "displayCount=${cachedMetrics.layoutParams.displayCount}"
+        }
+
+        // Phase 2: 布局数据现在只依赖于稳定的 displayIndex，而不是每帧变化的 animatedIndex
+        val coverFlowData = remember(displayIndex, cachedMetrics.layoutParams, albums.size) {
+            List(cachedMetrics.layoutParams.displayCount) { displayPos ->
+                calculateCoverFlowItem(
+                    displayPos = displayPos,
+                    centerOffset = cachedMetrics.layoutParams.centerOffset,
+                    animatedIndex = animatedIndex,
+                    displayIndex = displayIndex,
+                    params = cachedMetrics.layoutParams,
+                    albumsSize = albums.size
+                )
+            }
+        }
+
+        // Phase 5: 使用缓存的 Dp 值进行日志
+        debugLog("CoverFlowLayout") {
+            buildString {
+                appendLine("CoverFlow items positions (total ${coverFlowData.size}):")
+                coverFlowData.forEach { data ->
+                    val xDp = with(density) { data.transform.x.toDp().value }
+                    val yDp = with(density) { data.transform.y.toDp().value }
+                    val boundsStr = if (data.isPlaceholder) "PLACEHOLDER" else "VALID"
+                    val continuousOffset = (data.displayPos - cachedMetrics.layoutParams.centerOffset) - animationProgress
+                    appendLine("  pos=${data.displayPos}, albumIdx=${data.albumIndex}, " +
+                        "offset=${continuousOffset.toInt()}, x=${xDp.toInt()}dp, y=${yDp.toInt()}dp, " +
+                        "rot=${data.transform.rotationY.toInt()}°, scale=${data.transform.scale}, [$boundsStr]")
+                }
+            }
+        }
+
+        // CoverFlow区域
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .background(Color.Black)
         ) {
-            // 封面区域
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .background(Color.Transparent)
-            ) {
-                coverFlowData.forEach { data ->
-                    // 使用 albumIndex 作为 key，这样只有真正变化的专辑才会重组
+            // 封面区域 - 始终显示7个位置，不足的用占位图填补
+            coverFlowData.forEach { data ->
+                if (data.isPlaceholder) {
+                    // 占位图使用 displayPos 作为 key
+                    key(data.displayPos) {
+                        PlaceholderCoverFlowItem(
+                            transform = data.transform,
+                            coverSize = cachedMetrics.coverSizeDp,
+                            position = data.displayPos,
+                            layoutCameraDistance = cachedMetrics.layoutParams.cameraDistance
+                        )
+                    }
+                } else {
+                    // 显示真实专辑 - 使用 albumIndex 作为 key，确保同一专辑在不同位置时组件被移动而非重建
                     key(data.albumIndex) {
-                        if (data.albumIndex in albums.indices) {
-                            CoverFlowItem(
-                                album = albums[data.albumIndex],
-                                transform = data.transform,
-                                coverSize = coverSize,
-                                position = data.displayPos
-                            )
-                        } else {
-                            CoverFlowPlaceholder(
-                                transform = data.transform,
-                                coverSize = coverSize,
-                                position = data.displayPos
-                            )
-                        }
+                        val album = albums[data.albumIndex]
+                        StableCoverFlowItem(
+                            album = album,
+                            transform = data.transform,
+                            coverSize = cachedMetrics.coverSizeDp,
+                            position = data.displayPos,
+                            layoutCameraDistance = cachedMetrics.layoutParams.cameraDistance
+                        )
                     }
                 }
             }
 
-            // 专辑信息文字 - 紧贴着封面下方
+            // 专辑信息文字 - 放在底部
             Column(
                 modifier = Modifier
+                    .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .padding(bottom = 16.dp),
+                    .padding(bottom = 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                val currentAlbum = if (animatingToIndex in albums.indices) albums[animatingToIndex] else null
+                val currentAlbum = if (displayIndex in albums.indices) albums[displayIndex] else null
                 currentAlbum?.let { album ->
                     Text(
                         text = album.title ?: "",
                         color = Color.White,
                         fontSize = 18.sp,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth()
+                        textAlign = TextAlign.Center
                     )
                     Text(
                         text = album.subtitle ?: "",
                         color = Color.Gray,
                         fontSize = 14.sp,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth()
+                        textAlign = TextAlign.Center
                     )
                 }
             }
@@ -339,194 +369,112 @@ private fun CoverFlowContent(
 }
 
 /**
- * CoverFlow数据类，用于缓存布局计算
- */
-private data class CoverFlowData(
-    val displayPos: Int,
-    val albumIndex: Int,
-    val transform: CoverTransform
-)
-
-/**
- * RenderTransform - 刷新的入口
- * 当当前位置发生变化时，调用此方法，重新计算每个专辑封面的位置和叠放顺序
- *
- * 封面叠层的顺序是当前封面最靠上，左右两边的封面随着距离由近及远，依次向下叠放。
- *
- * @param pos 当前封面的索引
- * @param currentPos 当前选中的位置
- * @param totalCount 总封面数量
- * @param centerX 屏幕中心X坐标（像素）
- * @param centerY 屏幕中心Y坐标（像素）
- * @param coverSizePx 封面尺寸（像素）
- */
-/**
- * RenderTransform - 刷新的入口
- * 基于显示位置（0-6）计算每个封面的位置和叠放顺序
- * 
- * 显示7个位置：0(最左) 1 2 3(当前) 4 5 6(最右)
- * 位置3始终对应当前选中的专辑
- * 
- * 7张图在一个屏幕内，使用固定格子宽度，允许部分重叠
- */
-private fun renderTransform(
-    displayPos: Int,        // 显示位置 0-6
-    currentPos: Int,        // 当前选中的专辑索引
-    totalCount: Int,
-    screenWidth: Float,     // 屏幕宽度（像素）
-    centerY: Float,
-    coverSizePx: Float
-): CoverTransform {
-    // 配置参数
-    val centerOffset = 3 // 中心位置偏移（位置3是中心）
-    
-    // 计算格子宽度：让7个格子刚好填满屏幕宽度的90%
-    // 格子宽度 < 封面宽度，实现重叠效果
-    val cellWidth = (screenWidth * 0.9f) / 7f
-    
-    // 计算起始位置（居中）
-    val totalWidth = cellWidth * 7f
-    val startX = (screenWidth - totalWidth) / 2f
-    
-    // 计算最终X坐标
-    val finalX = startX + displayPos * cellWidth
-
-    // 计算相对于中心位置的偏移
-    val offsetFromCenter = displayPos - centerOffset
-
-    // 计算ZIndex：当前位置(3)最靠上，距离越远越靠下
-    val zIndex = when {
-        offsetFromCenter == 0 -> 100f // 当前位置最上层
-        else -> 100f - abs(offsetFromCenter) * 10f
-    }
-
-    return CoverTransform(
-        x = finalX,
-        y = centerY - coverSizePx / 2f,
-        rotationY = 0f,
-        skewY = 0f,
-        translationY = 0f,
-        scale = 1f,
-        zIndex = zIndex,
-        alpha = 1f
-    )
-}
-
-/**
- * CoverFlow单个专辑项 - 使用RenderTransform计算的属性
- * 使用Animatable实现平滑动画过渡
+ * 稳定的CoverFlowItem - Phase 3: 使用 LaunchedEffect 替代 produceState
+ * 减少不必要的 recomposition，避免级联更新
+ * 添加 crossfade 过渡效果实现平滑加载
  */
 @Composable
-private fun CoverFlowItem(
+private fun StableCoverFlowItem(
     album: MusicList,
     transform: CoverTransform,
     coverSize: androidx.compose.ui.unit.Dp,
-    position: Int
+    position: Int,
+    layoutCameraDistance: Float = 1200f
 ) {
-    val context = LocalContext.current
+    val albumId = album.id ?: 0L
+
+    // Phase 3: 使用手动状态管理而非 produceState
+    // 只在 albumId 变化时触发加载，不会因为父组件重组而重复执行
+    var bitmapState by remember(albumId) {
+        mutableStateOf(albumBitmapCache[albumId])
+    }
+
+    // 使用 LaunchedEffect 异步加载图片
+    LaunchedEffect(albumId) {
+        if (bitmapState == null && albumBitmapCache[albumId] == null) {
+            val loaded = withContext(Dispatchers.IO) {
+                try {
+                    // 限制缓存大小
+                    if (albumBitmapCache.size >= MAX_CACHE_SIZE) {
+                        val firstKey = albumBitmapCache.keys.first()
+                        albumBitmapCache.remove(firstKey)?.recycle()
+                    }
+
+                    val bmp = MediaUtil.getAlbumImage(albumId)
+                    albumBitmapCache[albumId] = bmp
+                    bmp
+                } catch (e: Exception) {
+                    debugLog("CoverFlowItem") { "Error loading album image: albumId=$albumId, ${e.message}" }
+                    albumBitmapCache[albumId] = null
+                    null
+                }
+            }
+            bitmapState = loaded
+        } else if (albumBitmapCache[albumId] != null) {
+            bitmapState = albumBitmapCache[albumId]
+        }
+    }
+
     val density = LocalDensity.current
 
-    // 使用remember缓存bitmap，key为album.id，避免重复加载
-    var bitmap by remember(album.id) {
-        mutableStateOf<Bitmap?>(null)
-    }
-
-    // 只在bitmap为null时加载
-    LaunchedEffect(album.id) {
-        if (bitmap == null) {
-            bitmap = loadAlbumBitmap(context, album.id ?: 0L)
-        }
-    }
-
-    // 使用Animatable实现动画
-    val xAnim = remember { Animatable(transform.x) }
-    val rotationYAnim = remember { Animatable(transform.rotationY) }
-    val scaleAnim = remember { Animatable(transform.scale) }
-    val skewYAnim = remember { Animatable(transform.skewY) }
-
-    // 当目标值变化时，启动动画
-    LaunchedEffect(transform.x) {
-        xAnim.animateTo(
-            targetValue = transform.x,
-            animationSpec = tween(durationMillis = 400, easing = CubicInOutEasing)
-        )
-    }
-    LaunchedEffect(transform.rotationY) {
-        rotationYAnim.animateTo(
-            targetValue = transform.rotationY,
-            animationSpec = tween(durationMillis = 400, easing = CubicInOutEasing)
-        )
-    }
-    LaunchedEffect(transform.scale) {
-        scaleAnim.animateTo(
-            targetValue = transform.scale,
-            animationSpec = tween(durationMillis = 400, easing = CubicInOutEasing)
-        )
-    }
-    LaunchedEffect(transform.skewY) {
-        skewYAnim.animateTo(
-            targetValue = transform.skewY,
-            animationSpec = tween(durationMillis = 400, easing = CubicInOutEasing)
-        )
-    }
-
     // 将像素位置转换为Dp
-    val xOffsetDp = with(density) { xAnim.value.toDp() }
+    val xOffsetDp = with(density) { transform.x.toDp() }
     val yOffsetDp = with(density) { transform.y.toDp() }
 
-    // 使用 graphicsLayer 实现 3D 效果，使用动画值
+    debugLog("CoverFlowItem") {
+        "Item pos=$position: offset=($xOffsetDp, $yOffsetDp), size=$coverSize, scale=${transform.scale}, alpha=${transform.alpha}"
+    }
+
+    // Phase 4: 使用优化的 graphicsLayer 修饰符
     Box(
         modifier = Modifier
+            .size(coverSize)
             .offset(x = xOffsetDp, y = yOffsetDp)
-            .graphicsLayer {
-                scaleX = scaleAnim.value
-                scaleY = scaleAnim.value
-                rotationY = rotationYAnim.value
-                // 使用rotationX模拟skewY倾斜效果
-                rotationX = skewYAnim.value * 0.5f
-                cameraDistance = 300f
-                transformOrigin = TransformOrigin.Center
-            }
-            .zIndex(transform.zIndex)
-            .alpha(transform.alpha)
+            .coverFlowTransform(transform, layoutCameraDistance)
     ) {
-        // 内部 Box 设置实际大小
-        Box(
-            modifier = Modifier.size(coverSize)
-        ) {
-            // 始终显示图片，加载中时显示上一个图片或透明
-            val displayBitmap = bitmap
-            if (displayBitmap != null) {
-                val reflectedBitmap = remember(displayBitmap) {
-                    createReflectedBitmap(displayBitmap)
-                }
-                Image(
-                    bitmap = reflectedBitmap.asImageBitmap(),
-                    contentDescription = album.title,
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
+        bitmapState?.let { bmp ->
+            // 直接显示图片，不使用动画避免组件重建时的闪烁
+            Image(
+                bitmap = bmp.asImageBitmap(),
+                contentDescription = album.title,
+                modifier = Modifier.fillMaxSize()
+            )
+        } ?: run {
+            // 显示占位符 - 使用深灰色背景
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.DarkGray)
+            )
         }
     }
 }
 
-// CubicInOut缓动函数
-private val CubicInOutEasing: (Float) -> Float = { fraction ->
-    if (fraction < 0.5f) {
-        4f * fraction * fraction * fraction
-    } else {
-        1f - (-2f * fraction + 2f).let { it * it * it } / 2f
-    }
-}
+// Phase 4: 优化的 transform 修饰符 - 避免在重组时重新创建
+private fun Modifier.coverFlowTransform(
+    transform: CoverTransform,
+    cameraDistance: Float
+) = this.then(
+    Modifier.graphicsLayer {
+        scaleX = transform.scale
+        scaleY = transform.scale
+        translationX = transform.translationX
+        translationY = transform.translationY
+        rotationY = transform.rotationY
+        this.cameraDistance = cameraDistance
+    }.zIndex(transform.zIndex).alpha(transform.alpha)
+)
 
 /**
- * CoverFlow占位符 - 用于不足7张专辑时填充
+ * 占位图片组件 - 用于填补不足7张的位置
+ * 显示半透明深灰背景和音乐图标
  */
 @Composable
-private fun CoverFlowPlaceholder(
+private fun PlaceholderCoverFlowItem(
     transform: CoverTransform,
     coverSize: androidx.compose.ui.unit.Dp,
-    position: Int
+    position: Int,
+    layoutCameraDistance: Float = 1200f
 ) {
     val density = LocalDensity.current
 
@@ -534,65 +482,303 @@ private fun CoverFlowPlaceholder(
     val xOffsetDp = with(density) { transform.x.toDp() }
     val yOffsetDp = with(density) { transform.y.toDp() }
 
-    // 使用 graphicsLayer 实现 3D 效果
+    debugLog("CoverFlowItem") {
+        "Placeholder pos=$position: offset=($xOffsetDp, $yOffsetDp), scale=${transform.scale}, alpha=${transform.alpha}"
+    }
+
+    // Phase 4: 使用优化的 transform 修饰符
     Box(
         modifier = Modifier
+            .size(coverSize)
             .offset(x = xOffsetDp, y = yOffsetDp)
-            .graphicsLayer {
-                scaleX = transform.scale
-                scaleY = transform.scale
-                rotationY = transform.rotationY
-                cameraDistance = 800f
-                transformOrigin = TransformOrigin.Center
-            }
-            .zIndex(transform.zIndex)
-            .alpha(transform.alpha)
+            .coverFlowTransform(transform, layoutCameraDistance)
     ) {
-        // 内部 Box 设置实际大小
+        // 占位图样式 - 深灰背景 + 文字
         Box(
             modifier = Modifier
-                .size(coverSize)
-                .background(Color.Transparent)
-        )
+                .fillMaxSize()
+                .background(
+                    color = Color.DarkGray.copy(alpha = 0.5f),
+                    shape = RoundedCornerShape(4.dp)
+                )
+        ) {
+            Text(
+                text = "♪",
+                color = Color.Gray.copy(alpha = 0.5f),
+                fontSize = 48.sp,
+                modifier = Modifier.align(Alignment.Center)
+            )
+        }
     }
 }
 
 /**
- * CoverFlow变换属性数据类
+ * CoverFlow数据类
  */
-private data class CoverTransform(
-    val x: Float,           // X轴位置（像素，相对于屏幕左侧）
-    val y: Float,           // Y轴位置（像素）
-    val rotationY: Float,   // Y轴旋转角度
-    val skewY: Float,       // Y轴倾斜角度
-    val translationY: Float,// Y轴平移
-    val scale: Float,       // 缩放比例
-    val zIndex: Float,      // 叠放顺序
-    val alpha: Float        // 透明度
+private data class CoverFlowData(
+    val displayPos: Int,
+    val albumIndex: Int,
+    val isPlaceholder: Boolean = false,
+    val transform: CoverTransform
 )
 
-// 常量
-private const val ANIMATION_DURATION_MS = 400
-
-// 全局图片缓存
-private val albumBitmapCache = mutableMapOf<Long, Bitmap?>()
+/**
+ * Phase 5: 缓存的密度相关指标
+ * 避免在每帧重复计算密度转换
+ */
+private data class CoverFlowMetrics(
+    val coverSizeDp: androidx.compose.ui.unit.Dp,
+    val coverSizePx: Float,
+    val screenWidthPx: Float,
+    val screenHeightPx: Float,
+    val itemSpacing: Float,
+    val layoutParams: CoverFlowLayoutParams
+)
 
 /**
- * 加载专辑封面Bitmap（带缓存）
+ * CoverFlow变换属性数据类
+ * 基于CSS的iPod CoverFlow 3D效果实现
  */
-private suspend fun loadAlbumBitmap(context: Context, albumId: Long): Bitmap? {
-    // 先检查缓存
-    albumBitmapCache[albumId]?.let { return it }
-    
-    // 加载图片
-    return try {
-        val bitmap = MediaUtil.getAlbumImage(albumId)
-        // 存入缓存
-        albumBitmapCache[albumId] = bitmap
-        bitmap
-    } catch (e: Exception) {
-        null
+private data class CoverTransform(
+    val x: Float,
+    val y: Float,
+    val rotationY: Float,
+    val skewY: Float,
+    val translationY: Float,
+    val scale: Float,
+    val zIndex: Float,
+    val alpha: Float,
+    val transformOriginX: Float = 0.5f,  // X轴变换原点：0.5=50%(中心)，0.8=80%(左侧图片)，0.2=20%(右侧图片)
+    val transformOriginY: Float = 0.5f,  // Y轴变换原点：始终为50%(垂直居中)
+    val translationX: Float = 0f         // X轴偏移：用于深度效果，侧边封面向外推
+)
+
+/**
+ * CoverFlow 布局参数 - 集中管理所有可调参数
+ *
+ * 设计原则：
+ * 1. 中心位置固定：中心元素始终在屏幕中心
+ * 2. 两侧对称：左右两侧元素位置对称
+ * 3. 弧形排列：侧边元素向外推移形成弧形
+ * 4. 可调参数：所有布局参数集中在一处，方便调整
+ * 5. 边界安全：确保元素不会超出屏幕
+ */
+private data class CoverFlowLayoutParams(
+    // 封面尺寸（像素）
+    val coverSizePx: Float,
+
+    // 屏幕尺寸（像素）
+    val screenWidthPx: Float,
+    val screenHeightPx: Float,
+
+    // 布局参数
+    val itemSpacing: Float = 120f,           // 元素之间的基础间距（px）
+    val arcStrength: Float = 0.3f,           // 弧形强度：0=平铺, 1=强弧形
+    val maxSideCount: Int = 3,               // 每侧显示的最大元素数量
+
+    // 旋转参数
+    val maxRotation: Float = 60f,            // 最大旋转角度（度）
+    val rotationCurve: Float = 1.0f,         // 旋转曲线：1=线性, >1=缓动
+
+    // 缩放参数
+    val minScale: Float = 0.85f,             // 最小缩放比例
+    val maxScale: Float = 1.0f,              // 最大缩放比例
+    val scaleCurve: Float = 1.0f,            // 缩放曲线
+
+    // 透明度参数
+    val minAlpha: Float = 0.6f,              // 最小透明度
+    val maxAlpha: Float = 1.0f,              // 最大透明度
+
+    // 3D 参数
+    val cameraDistance: Float = 1200f,       // 相机距离
+    val perspectiveStrength: Float = 0.3f    // 透视强度
+) {
+    // 计算中心位置
+    val centerX: Float get() = screenWidthPx / 2f
+    val centerY: Float get() = screenHeightPx * 0.4f
+
+    // 总显示数量
+    val displayCount: Int get() = maxSideCount * 2 + 1
+    val centerOffset: Int get() = displayCount / 2
+
+    // 验证参数
+    init {
+        require(itemSpacing > 0) { "itemSpacing must be positive" }
+        require(maxSideCount > 0) { "maxSideCount must be positive" }
+        require(minScale in 0f..1f) { "minScale must be in [0, 1]" }
+        require(maxScale in 0f..1f) { "maxScale must be in [0, 1]" }
+        require(minAlpha in 0f..1f) { "minAlpha must be in [0, 1]" }
+        require(maxAlpha in 0f..1f) { "maxAlpha must be in [0, 1]" }
     }
+}
+
+/**
+ * 计算弧形偏移量
+ * 距离中心越远，推移越多，形成弧形效果
+ */
+private fun calculateArcOffset(offset: Float, params: CoverFlowLayoutParams): Float {
+    val absOffset = abs(offset)
+    if (absOffset < 0.1f) return 0f
+
+    // 简化的弧形算法：根据距离向两侧推移
+    val pushAmount = params.itemSpacing * params.arcStrength * absOffset
+    return pushAmount * kotlin.math.sign(offset)
+}
+
+/**
+ * 计算旋转角度
+ * 使用缓动曲线让旋转更平滑
+ */
+private fun calculateRotation(offset: Float, params: CoverFlowLayoutParams): Float {
+    val absOffset = abs(offset)
+    if (absOffset < 0.1f) return 0f
+
+    // 使用缓动曲线让旋转更平滑
+    val t = (absOffset / params.maxSideCount).coerceIn(0f, 1f)
+    val easedT = t.pow(params.rotationCurve)
+    val rotation = easedT * params.maxRotation
+
+    return rotation * kotlin.math.sign(offset)
+}
+
+/**
+ * 计算缩放比例
+ * 中心最大，向两侧逐渐缩小
+ */
+private fun calculateScale(offset: Float, params: CoverFlowLayoutParams): Float {
+    val absOffset = abs(offset)
+    if (absOffset < 0.1f) return params.maxScale
+
+    val t = (absOffset / params.maxSideCount).coerceIn(0f, 1f)
+    val easedT = t.pow(params.scaleCurve)
+    val scaleRange = params.maxScale - params.minScale
+
+    return params.maxScale - (easedT * scaleRange)
+}
+
+/**
+ * 计算透明度
+ * 中心最不透明，向两侧逐渐变透明
+ */
+private fun calculateAlpha(offset: Float, params: CoverFlowLayoutParams): Float {
+    val absOffset = abs(offset)
+    if (absOffset < 0.1f) return params.maxAlpha
+
+    val t = (absOffset / params.maxSideCount).coerceIn(0f, 1f)
+    val alphaRange = params.maxAlpha - params.minAlpha
+
+    return params.maxAlpha - (t * alphaRange)
+}
+
+/**
+ * 计算单个 CoverFlow 项的位置和变换
+ *
+ * @param displayPos 显示位置（0 到 displayCount-1）
+ * @param centerOffset 中心偏移量（通常是 3）
+ * @param animatedIndex 动画索引（浮点数）
+ * @param displayIndex 当前显示的索引（整数）
+ * @param params 布局参数
+ * @param albumsSize 专辑列表大小
+ * @return CoverFlowData 包含位置和变换信息
+ */
+private fun calculateCoverFlowItem(
+    displayPos: Int,
+    centerOffset: Int,
+    animatedIndex: Float,
+    displayIndex: Int,
+    params: CoverFlowLayoutParams,
+    albumsSize: Int
+): CoverFlowData {
+    // 调试日志 - 仅在第一次调用时打印参数
+    debugLog("CoverFlowCalc") {
+        if (displayPos == 0) {
+            """
+            === calculateCoverFlowItem params ===
+            centerX=${params.centerX.toInt()}px, centerY=${params.centerY.toInt()}px
+            coverSize=${params.coverSizePx.toInt()}px, screenWidth=${params.screenWidthPx.toInt()}px
+            itemSpacing=${params.itemSpacing.toInt()}px, arcStrength=${params.arcStrength}
+            maxSideCount=${params.maxSideCount}, displayCount=${params.displayCount}
+            animatedIndex=$animatedIndex, displayIndex=$displayIndex
+            =================================
+            """.trimIndent()
+        } else ""
+    }
+
+    // 1. 计算专辑索引
+    val rawAlbumIndex = displayIndex + displayPos - centerOffset
+    val inBounds = rawAlbumIndex >= 0 && rawAlbumIndex < albumsSize
+    val albumIndex = rawAlbumIndex.coerceIn(0, (albumsSize - 1).coerceAtLeast(0))
+    val isPlaceholder = !inBounds
+
+    // 2. 计算连续偏移（带小数的偏移量）
+    val continuousOffset = (displayPos - centerOffset) - (animatedIndex - displayIndex)
+
+    // 3. 计算基础 X 位置（线性分布）
+    // 减去半个封面宽度，使封面中心对齐到屏幕中心
+    val baseX = (params.centerX - params.coverSizePx / 2f) + (continuousOffset * params.itemSpacing)
+
+    // 4. 计算弧形偏移（向两侧推移）
+    val arcOffset = calculateArcOffset(continuousOffset, params)
+
+    // 5. 最终 X 位置（应用边界限制）
+    // 所有元素（包括占位图）都应该在屏幕内
+    val rawFinalX = baseX + arcOffset
+    val finalX = rawFinalX.coerceIn(
+        minimumValue = 0f,
+        maximumValue = params.screenWidthPx - params.coverSizePx
+    )
+
+    // 调试日志 - 详细记录位置计算过程
+    debugLog("CoverFlowCalc") {
+        if (displayPos == 4 || displayPos == 5) {
+            "pos=$displayPos: continuousOffset=${continuousOffset.toFloat()}, " +
+            "baseX=${baseX.toInt()}px, arcOffset=${arcOffset.toInt()}px, " +
+            "rawFinalX=${rawFinalX.toInt()}px, " +
+            "finalX=${finalX.toInt()}px, " +
+            "isPlaceholder=$isPlaceholder"
+        } else ""
+    }
+
+    // 6. 计算 Y 位置
+    val finalY = params.centerY - params.coverSizePx / 2f
+
+    // 7. 计算旋转
+    val rotationY = calculateRotation(continuousOffset, params)
+
+    // 8. 计算缩放
+    val scale = calculateScale(continuousOffset, params)
+
+    // 9. 计算透明度
+    val baseAlpha = calculateAlpha(continuousOffset, params)
+    val alpha = if (isPlaceholder) baseAlpha * 0.3f else baseAlpha
+
+    // 10. 计算其他变换参数
+    // 统一使用中心旋转，避免边缘旋转导致的视觉偏移
+    val transformOriginX = 0.5f
+    val skewY = -continuousOffset * 5f
+    val zIndex = 100f - abs(continuousOffset) * 10f
+
+    // 11. graphicsLayer 使用的 translationX
+    val translationX = arcOffset
+
+    return CoverFlowData(
+        displayPos = displayPos,
+        albumIndex = albumIndex,
+        isPlaceholder = isPlaceholder,
+        transform = CoverTransform(
+            x = finalX,
+            y = finalY,
+            rotationY = rotationY,
+            skewY = skewY,
+            translationY = 0f,
+            scale = scale,
+            zIndex = zIndex,
+            alpha = alpha,
+            transformOriginX = transformOriginX,
+            transformOriginY = 0.5f,
+            translationX = translationX
+        )
+    )
 }
 
 /**
