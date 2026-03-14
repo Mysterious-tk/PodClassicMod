@@ -14,6 +14,8 @@ import android.util.Log
 import android.widget.FrameLayout
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.EaseInOutCubic
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -35,6 +37,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -108,6 +111,8 @@ class ComposeCoverFlowView(context: Context) : FrameLayout(context), ScreenView 
     private val animatedIndexState = mutableFloatStateOf(
         if (albums.isEmpty()) 0f else 3f.coerceAtMost((albums.size - 1).toFloat())
     )
+    // 记录上次滑动时间戳，用于动态计算动画时长
+    private val lastSlideTimeState = mutableLongStateOf(0L)
 
     private val composeView = androidx.compose.ui.platform.ComposeView(context).apply {
         setContent {
@@ -115,7 +120,8 @@ class ComposeCoverFlowView(context: Context) : FrameLayout(context), ScreenView 
                 albums = albums,
                 currentIndexState = currentIndexState,
                 targetIndexState = targetIndexState,
-                animatedIndexState = animatedIndexState
+                animatedIndexState = animatedIndexState,
+                lastSlideTimeState = lastSlideTimeState
             )
         }
     }
@@ -219,7 +225,8 @@ private fun CoverFlowContent(
     albums: List<MusicList>,
     currentIndexState: androidx.compose.runtime.MutableIntState,
     targetIndexState: androidx.compose.runtime.MutableIntState,
-    animatedIndexState: androidx.compose.runtime.MutableFloatState
+    animatedIndexState: androidx.compose.runtime.MutableFloatState,
+    lastSlideTimeState: androidx.compose.runtime.MutableLongState
 ) {
     val density = LocalDensity.current
     val context = LocalContext.current
@@ -230,18 +237,31 @@ private fun CoverFlowContent(
         derivedStateOf { targetIndexState.intValue }
     }
 
-    // 平滑动画索引 - 使用 spring 动画实现平滑过渡
+    // 根据滑动间隔计算动画时长
+    // 持续滚动时动画加速，离散点击时播放完整动画
+    val currentTime = System.currentTimeMillis()
+    val timeSinceLastSlide = currentTime - lastSlideTimeState.longValue
+    val animationDuration = when {
+        timeSinceLastSlide < 80 -> 0      // 极快连续滚动: 直接跳过动画
+        timeSinceLastSlide < 150 -> 50    // 快速连续滚动: 50ms
+        timeSinceLastSlide < 300 -> 150   // 中速滚动: 150ms
+        else -> 400                       // 离散点击/慢速: 400ms 完整动画
+    }
+
+    // 平滑动画索引 - 使用 tween 动画实现动态时长的平滑过渡
     val animatedIndex by animateFloatAsState(
         targetValue = targetIndex.toFloat(),
-        animationSpec = spring(
-            dampingRatio = 0.7f,  // 阻尼，0.7 = 略带弹性
-            stiffness = 400f      // 刚度，控制速度
+        animationSpec = tween(
+            durationMillis = animationDuration,  // 动态时长
+            easing = EaseInOutCubic
         ),
         label = "coverflow_scroll"
     )
 
     // 同步动画状态到外部状态
     LaunchedEffect(targetIndex) {
+        // 在动画开始时更新时间戳，供下次动画计算使用
+        lastSlideTimeState.longValue = System.currentTimeMillis()
         animatedIndexState.floatValue = animatedIndex
         // 同步 currentIndex 以便点击时选择正确的专辑
         currentIndexState.intValue = targetIndex.coerceIn(0, albums.size - 1)
@@ -856,75 +876,118 @@ private fun calculateCoverFlowItem(
     // 包含动画进度，实现平滑过渡
     // 注意：不再使用params.extraOffsetX，改用动态translationX补偿3D旋转偏移
     val animationOffset = animatedIndex - targetIndex
-    val finalX = centerLeft + (offsetFromCenter - animationOffset) * params.itemSpacing
+
+    // 基础位置：使用线性间距（确保边界正确）
+    val baseX = centerLeft + (offsetFromCenter - animationOffset) * params.itemSpacing
+
+    // 侧边收紧：将左3张(0,1,2)和右3张(4,5,6)向边缘收紧
+    // 通过向边缘平移产生中心留白效果
+    val sideTightenAmount = 20f * density.density  // 20dp 收紧量
+    val sideAdjustment = when {
+        offsetFromCenter <= -1 -> -sideTightenAmount  // 左侧(0,1,2)向左收紧
+        offsetFromCenter >= 1 -> sideTightenAmount   // 右侧(4,5,6)向右收紧
+        else -> 0f                                    // 中心(3)保持
+    }
+    val finalX = baseX + sideAdjustment
 
     // Y位置 = 垂直中心
     val finalY = params.centerY - params.coverSizePx / 2f
 
     // 3. 3D变换参数 - 增强版：添加倾斜、透视压缩、阴影
 
+    // 浮点偏移量（用于变换属性平滑动画）
+    // = 整数偏移 - 动画偏移（与位置计算相同），范围约 -3.5 到 3.5
+    // 这使得旋转、缩放、透明度等变换属性能平滑过渡
+    // 关键：使用与位置计算相同的公式，确保变换与视觉位置同步
+    val floatOffsetFromCenter = offsetFromCenter - animationOffset
+
     // 首先计算绝对偏移量，后续计算会用到
     val absOffsetFromCenter = abs(offsetFromCenter.toFloat())
+    val absFloatOffset = abs(floatOffsetFromCenter)  // 浮点绝对偏移，用于平滑插值
 
-    val rotationY = calculateRotation(offsetFromCenter.toFloat(), params)
-
-    // 新增：X轴旋转（倾斜效果）- 中心轻微前倾5度，增强3D深度感
-    val rotationX = when {
-        absOffsetFromCenter < 0.1f -> 5f   // 中心轻微前倾
-        else -> 2f                          // 侧边轻微前倾
+    // 旋转角度：还原为 70°，适中的透视变形
+    // 近的那条竖线更长，远的那条竖线更短
+    val rotationY = when {
+        floatOffsetFromCenter > 0.1f -> 70f * minOf(absFloatOffset, 1f)
+        floatOffsetFromCenter < -0.1f -> -70f * minOf(absFloatOffset, 1f)
+        else -> 0f
     }
 
-    // 使用渐进式透视距离：中心1200 -> 950 -> 700 -> 450（增强版）
-    val perspectiveDistance = calculateCameraDistance(
-        offsetFromCenter.toFloat(),
-        params
-    )
+    // X轴旋转：中心中性姿态（与0.5f旋转轴对齐），侧边前倾产生深度感
+    // 中心不再后仰，减少突出感，与旋转轴平行
+    val rotationX = when {
+        absFloatOffset < 0.5f -> 0f   // 中心中性姿态（与旋转轴平行）
+        else -> 2f                     // 侧边前倾保持深度感
+    }
+
+    // 增强透视距离差值，产生更明显的梯形效果
+    // 中心1200 -> 边缘250 的更强对比
+    val perspectiveDistance = (params.cameraDistance - absFloatOffset * 350f)
+        .coerceAtLeast(200f)
 
     val skewY = 0f
     val scale = 1.0f  // 基础缩放保持100%
 
     // 新增：独立的X/Y缩放，模拟透视压缩效果
-    // 中心保持原比例，侧边略微压缩X轴，增强透视感
-    val scaleX = when {
-        absOffsetFromCenter < 0.5f -> 1.0f    // 中心100%
-        absOffsetFromCenter < 1.5f -> 0.95f   // 相邻95%
-        else -> 0.88f                         // 边缘88%
-    }
-    val scaleY = when {
-        absOffsetFromCenter < 0.5f -> 1.0f    // 中心100%
-        absOffsetFromCenter < 1.5f -> 0.97f   // 相邻97%
-        else -> 0.92f                         // 边缘92%
-    }
+    // 使用平滑插值：从中心到边缘逐渐压缩
+    // 略微缩小中心缩放，减少突出感
+    val t = minOf(absFloatOffset, 1f)  // 0 到 1 的插值因子
+    val baseScaleX = 0.96f  // 从 1.0 降低到 0.96，减少中心突出感
+    val baseScaleY = 0.98f  // 从 1.0 降低到 0.98，减少中心突出感
+    val scaleX = baseScaleX - t * 0.08f   // 0.96 → 0.88 的平滑插值
+    val scaleY = baseScaleY - t * 0.06f   // 0.98 → 0.92 的平滑插值
 
     // 新增：阴影高度 - 中心无阴影，侧边有阴影增强深度感
-    val shadowElevation = when {
-        absOffsetFromCenter < 0.5f -> 0f      // 中心无阴影
-        absOffsetFromCenter < 1.5f -> 8f      // 相邻8dp
-        else -> 16f                           // 边缘16dp
-    }
+    // 使用平滑插值：从中心到边缘阴影逐渐加深
+    val shadowElevation = t * 16f  // 0 → 16 的平滑插值
 
     // 增强透明度：中心完全不透明，边缘逐渐半透明
+    // 使用平滑插值实现渐变效果
     val alpha = when {
         isPlaceholder -> 0.3f
-        absOffsetFromCenter < 1f -> 1.0f      // 中心完全不透明
-        absOffsetFromCenter < 2f -> 0.85f     // 次边缘85%
-        else -> 0.7f                          // 最边缘70%
+        absFloatOffset < 1f -> 1f
+        absFloatOffset < 2f -> 1f - (absFloatOffset - 1f) * 0.15f  // 1.0 → 0.85
+        else -> 0.7f
     }
-    val zIndex = 100f - absOffsetFromCenter * 10f
+    // z-index 层级计算：进入侧的图片应该有最高层级
+    // 基础层级：靠近中心层级更高
+    val baseZIndex = 100f - absFloatOffset * 10f
 
-    // 统一规则：同一侧使用相同的transformOriginX，确保视觉一致性
-    // 左侧 (positions 0,1,2) 全部绕左边缘旋转 -> 左边缘固定在x=0
-    // 右侧 (positions 4,5,6) 全部绕右边缘旋转 -> 右边缘贴Box右边缘
-    val transformOriginX = when {
-        offsetFromCenter < 0 -> 0.0f  // 左侧 (positions 0,1,2): 统一绕左边缘旋转
-        offsetFromCenter > 0 -> 1.0f  // 右侧 (positions 4,5,6): 统一绕右边缘旋转
-        else -> 0.5f                  // 中心 (position 3): 绕中心旋转
+    // 方向加成：进入侧的图片有额外层级加成
+    // 向左滚动（animationOffset > 0）：右侧图片进入 → 右侧图片层级加成
+    // 向右滚动（animationOffset < 0）：左侧图片进入 → 左侧图片层级加成
+    // 使用 animationOffset 作为阈值，只在动画进行中应用加成
+    val directionBonus = when {
+        animationOffset > 0.5f && floatOffsetFromCenter > 0 -> {
+            // 向左滚动 + 右侧图片：越靠右加成越大 (8, 16, 24...)
+            minOf(floatOffsetFromCenter, 3f) * 8f
+        }
+        animationOffset < -0.5f && floatOffsetFromCenter < 0 -> {
+            // 向右滚动 + 左侧图片：越靠左加成越大 (8, 16, 24...)
+            minOf(absFloatOffset, 3f) * 8f
+        }
+        else -> 0f
     }
 
-    // 简化：移除translationX补偿，因为transformOriginX统一规则已处理边缘对齐
-    // 左侧 (0,1,2) 绕左边缘旋转，左边缘自然固定在x=0
-    // 右侧 (4,5,6) 绕右边缘旋转，右边缘自然贴Box右边缘
-    val translationX = 0f
+    val zIndex = baseZIndex + directionBonus
+
+    // 统一使用中心轴旋转，所有唱片绕自身中心旋转
+    // 产生更强的悬浮感和立体效果
+    val transformOriginX = 0.5f
+
+    // 统一中心轴旋转时的translationX补偿
+    // 左侧项目向左平移（负值），右侧项目向右平移（正值），使视觉边缘贴齐
+    // 计算公式：width/2 * (1 - cos(rotationY))
+    // 当rotationY=70°时，cos(70°)≈0.342，补偿量≈width/2 * 0.658
+    val coverHalfWidth = params.coverSizePx / 2f
+    val rotationCos = cos(Math.toRadians(abs(rotationY).toDouble())).toFloat()
+    val translationX = when {
+        floatOffsetFromCenter < -0.1f -> -coverHalfWidth * (1f - rotationCos)  // 左侧向左
+        floatOffsetFromCenter > 0.1f -> coverHalfWidth * (1f - rotationCos)   // 右侧向右
+        else -> 0f  // 中心无平移
+    }
+
+    // Y轴位置调整：所有图片保持在同一水平位置（无Y轴偏移）
     val translationY = 0f
 
     // Debug logging for position 0 and 1
