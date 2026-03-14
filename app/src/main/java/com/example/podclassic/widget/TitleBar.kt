@@ -84,6 +84,7 @@ class TitleBar : FrameLayout {
     override fun onConfigurationChanged(newConfig: android.content.res.Configuration?) {
         super.onConfigurationChanged(newConfig)
         updateLayoutForOrientation()
+        battery.updateBatteryStatus()  // 配置变化时更新电池状态
     }
     
     private fun updateLayoutForOrientation() {
@@ -130,6 +131,7 @@ class TitleBar : FrameLayout {
         MediaPresenter.playState.addObserver(observer, onDataChangeListener)
 
         registerBatteryBroadcastReceiver()
+        battery.updateBatteryStatus()  // 主动查询当前电池状态
         if (showTime) {
             registerTimeBroadcastReceiver()
         }
@@ -327,6 +329,26 @@ class TitleBar : FrameLayout {
 
         fun refreshBattery() {
             invalidate()
+        }
+
+        fun updateBatteryStatus() {
+            val batteryStatus: Intent? = try {
+                context.registerReceiver(
+                    null,
+                    IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+                )
+            } catch (e: Exception) {
+                null
+            }
+
+            batteryStatus?.let {
+                batteryLevel = it.getIntExtra(BatteryManager.EXTRA_LEVEL, 100) *
+                    100 / it.getIntExtra(BatteryManager.EXTRA_SCALE, 100)
+                isCharging = (it.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1) != 0).or(
+                    it.getIntExtra(BatteryManager.EXTRA_STATUS, -1) == BatteryManager.BATTERY_STATUS_CHARGING
+                )
+                refreshBattery()
+            }
         }
     }
 }
