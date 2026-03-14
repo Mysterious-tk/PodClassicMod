@@ -42,8 +42,10 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
     private val listView = RecyclerListView(context)
     // 图片容器（可见区域）
     private val coverContainer = FrameLayout(context)
-    // 图片视图（比容器大，在容器内飘动）
-    private val coverImageView = ImageView(context)
+    // 专辑封面动画图片视图 - 在容器内缓慢飘动展示
+    private val coverImageView = ImageView(context).apply {
+        contentDescription = "Animated Album Cover"
+    }
     // 分割线视图
     private lateinit var dividerView: View
 
@@ -448,8 +450,13 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
         val dividerParams = dividerView.layoutParams as LayoutParams
         dividerParams.leftMargin = dividerPosition - 2
         dividerView.layoutParams = dividerParams
-        
+
         android.util.Log.d("MainView", "Layout updated for orientation: landscape=$isLandscape, parent=${parentWidth}x${parentHeight}, container=${savedContainerWidth}x${savedContainerHeight}, divider=$dividerPosition")
+
+        // 横竖屏切换后重新计算图片位置和尺寸
+        coverContainer.post {
+            resetCoverPosition()
+        }
     }
 
     private fun updateCoverImage() {
@@ -463,6 +470,10 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
             if (coverBitmap != null) {
                 coverImageView.setImageBitmap(coverBitmap)
                 android.util.Log.d("MainView", "Bitmap set to coverImageView")
+                // 延迟重置位置，确保 drawable 完全更新
+                coverContainer.postDelayed({
+                    resetCoverPosition()
+                }, 50)
             } else {
                 // 随机选一个图片当封面
                 android.util.Log.d("MainView", "No cover bitmap, using random cover")
@@ -479,21 +490,30 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
         // 使用父容器提供的尺寸（在updateLayoutForOrientation中已设置）
         val containerWidth = savedContainerWidth
         val containerHeight = savedContainerHeight
-        
-        // 获取图片实际尺寸
+
+        // 获取图片实际尺寸 - 确保 Bitmap 已就绪
         val drawable = coverImageView.drawable
         if (drawable == null) {
-            android.util.Log.d("MainView", "Drawable not ready yet, retrying...")
-            coverContainer.post { resetCoverPosition() }
+            android.util.Log.w("MainView", "Drawable not ready, scheduling retry...")
+            coverContainer.postDelayed({ resetCoverPosition() }, 50)
             return
         }
-        
+
         val bitmapWidth = drawable.intrinsicWidth
         val bitmapHeight = drawable.intrinsicHeight
-        
-        if (containerWidth == 0 || containerHeight == 0 || bitmapWidth == 0 || bitmapHeight == 0) {
-            android.util.Log.d("MainView", "Size not initialized yet, retrying...")
-            coverContainer.post { resetCoverPosition() }
+
+        // 增加更严格的尺寸检查
+        if (containerWidth <= 0 || containerHeight <= 0) {
+            android.util.Log.w("MainView", "Container size invalid: ${containerWidth}x${containerHeight}, retrying...")
+            updateLayoutForOrientation()
+            coverContainer.postDelayed({ resetCoverPosition() }, 50)
+            return
+        }
+
+        if (bitmapWidth <= 0 || bitmapHeight <= 0) {
+            android.util.Log.w("MainView", "Bitmap size invalid: ${bitmapWidth}x${bitmapHeight}, reloading image...")
+            updateCoverImage()  // 重新加载图片
+            coverContainer.postDelayed({ resetCoverPosition() }, 100)
             return
         }
         
