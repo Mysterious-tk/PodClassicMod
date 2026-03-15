@@ -28,4 +28,6 @@ interface ScreenView {
     fun getObserver(): Observer? {
         return null
     }
+
+    fun onConfigurationChanged() {}
 }

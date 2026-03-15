@@ -216,6 +216,9 @@ object Core {
             }
         }
         activity?.setColor(Colors.screen)
+
+        // 通知当前视图配置已变化（横竖屏切换）
+        screen.get().onConfigurationChanged()
     }
 
     fun setNightMode() {

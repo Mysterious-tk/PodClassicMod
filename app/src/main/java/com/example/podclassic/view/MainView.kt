@@ -403,6 +403,13 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
         return observer
     }
 
+    override fun onConfigurationChanged() {
+        android.util.Log.d("MainView", "onConfigurationChanged() called")
+        updateLayoutForOrientation()
+        // 强制重新布局，确保新尺寸生效
+        requestLayout()
+    }
+
     override fun onViewAdd() {
         android.util.Log.d("MainView", "onViewAdd() called")
         if (MediaPresenter.getCurrent() == null) {
@@ -426,14 +433,14 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
             // 尺寸已测量，直接初始化
             updateLayoutForOrientation()
             updateCoverImage()
-            resetCoverPosition()
+            // resetCoverPosition() 已由 updateCoverImage() 在内部调度
             startCoverAnimation()
         } else {
             // 延迟一帧等待测量
             post {
                 updateLayoutForOrientation()
                 updateCoverImage()
-                resetCoverPosition()
+                // resetCoverPosition() 已由 updateCoverImage() 在内部调度
                 startCoverAnimation()
             }
         }
@@ -497,6 +504,12 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
 
         android.util.Log.d("MainView", "Layout updated for orientation: landscape=$isLandscape, parent=${parentWidth}x${parentHeight}, container=${savedContainerWidth}x${savedContainerHeight}, divider=$dividerPosition")
 
+        // 强制重新布局，确保新尺寸生效
+        listView.requestLayout()
+        coverContainer.requestLayout()
+        dividerView.requestLayout()
+        requestLayout()
+
         // 横竖屏切换后重新计算图片位置和尺寸
         coverContainer.post {
             resetCoverPosition()
@@ -513,9 +526,10 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
             android.util.Log.d("MainView", "coverBitmap: ${coverBitmap != null}, size: ${coverBitmap?.width}x${coverBitmap?.height}")
             if (coverBitmap != null) {
                 coverImageView.setImageBitmap(coverBitmap)
-                android.util.Log.d("MainView", "Bitmap set to coverImageView")
+                android.util.Log.d("MainView", "Bitmap set to coverImageView, scheduling resetCoverPosition in 50ms")
                 // 延迟重置位置，确保 drawable 完全更新
                 coverContainer.postDelayed({
+                    android.util.Log.d("MainView", "Delayed resetCoverPosition() executing...")
                     resetCoverPosition()
                 }, 50)
             } else {
@@ -687,20 +701,26 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
             val bitmap = android.graphics.BitmapFactory.decodeStream(inputStream)
             if (bitmap != null) {
                 coverImageView.setImageBitmap(bitmap)
-                // 图片加载完成后重置位置
-                resetCoverPosition()
+                // 图片加载完成后延迟重置位置，确保 drawable 被测量
+                coverContainer.postDelayed({
+                    resetCoverPosition()
+                }, 50)
             } else {
                 // 如果解码失败，使用默认图片
                 coverImageView.setImageResource(android.R.drawable.ic_media_play)
-                // 重置位置
-                resetCoverPosition()
+                // 延迟重置位置，确保 drawable 被测量
+                coverContainer.postDelayed({
+                    resetCoverPosition()
+                }, 50)
             }
             inputStream.close()
         } catch (e: Exception) {
             // 如果发生异常，使用默认图片
             coverImageView.setImageResource(android.R.drawable.ic_media_play)
-            // 重置位置
-            resetCoverPosition()
+            // 延迟重置位置，确保 drawable 被测量
+            coverContainer.postDelayed({
+                resetCoverPosition()
+            }, 50)
         }
     }
 
