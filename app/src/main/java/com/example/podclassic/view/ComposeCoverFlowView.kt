@@ -339,57 +339,45 @@ private fun CoverFlowContent(
             val screenWidthPx = with(density) { containerWidth.toPx() }
             val screenHeightPx = with(density) { containerHeight.toPx() }
 
-            // 间距计算：根据平铺模式使用不同的逻辑
+            // ✅ 间距计算：基于布局宽度（ImageView的实际尺寸）
             val maxOffset = 3f
-            val calculatedSpacing = if (CoverFlowNativeView.FLAT_MODE) {
-                // 平铺模式：使用原始封面尺寸，禁用3D效果
-                // 间距与3D模式相同，只是移除旋转和Z轴深度
-                // 图片重叠是 CoverFlow 的设计特性（侧边图片部分遮挡）
-                val spacing = (screenWidthPx - coverSizePx) / (maxOffset * 2f)
-                debugLog("CoverFlowMetrics") { "Flat mode spacing: $spacing (screenWidth=$screenWidthPx, coverSize=$coverSizePx)" }
-                spacing
-            } else {
-                // 3D模式：基于70°旋转后的可见宽度
-                val rotationDegrees = 70f
-                val visibleWidthRotated = coverSizePx * cos(rotationDegrees * PI / 180f).toFloat()
-                kotlin.math.round((screenWidthPx - visibleWidthRotated) / (maxOffset * 2f))
-            }
+            val calculatedSpacing = (screenWidthPx - coverSizePx) / (maxOffset * 2f)
 
             // Debug log metrics calculation
             debugLog("CoverFlowMetrics") {
-                val modeStr = if (CoverFlowNativeView.FLAT_MODE) "FLAT" else "3D_ROTATION"
                 """Metrics Calculation:
                    | containerWidth (dp): $containerWidth
                    | containerHeight (dp): $containerHeight
                    | orientation: ${configuration.orientation}
                    | density: ${density.density}
-                   | coverSizePx: $coverSizePx
+                   | coverSizePx: $coverSizePx (150dp)
                    | screenWidthPx: $screenWidthPx
                    | screenHeightPx: $screenHeightPx
-                   | mode: $modeStr
                    | calculatedSpacing: $calculatedSpacing
-                   | Expected centerLeft: ${maxOffset * calculatedSpacing}
-                   | Expected gap between images: $calculatedSpacing
+                   | maxOffset: 3f
+                   | Formula: (screenWidth - coverSizePx) / (maxOffset * 2) = ($screenWidthPx - $coverSizePx) / 6
                 """.trimMargin()
             }
 
             CoverFlowMetrics(
                 coverSizeDp = coverSize,
-                coverSizePx = coverSizePx,  // 恢复使用原始封面尺寸
+                coverSizePx = coverSizePx,
                 screenWidthPx = screenWidthPx,
                 screenHeightPx = screenHeightPx,
                 itemSpacing = calculatedSpacing,
                 layoutParams = CoverFlowLayoutParams(
-                    coverSizePx = coverSizePx,  // 恢复使用原始封面尺寸
+                    coverSizePx = coverSizePx,  // ✅ 使用原始 coverSizePx (150dp)
                     screenWidthPx = screenWidthPx,
                     screenHeightPx = screenHeightPx,
                     itemSpacing = calculatedSpacing,
                     arcStrength = 0f,
-                    maxRotation = 60f,
+                    maxRotation = 30f,  // 与rotationY保持一致，iOS风格30°
                     minScale = 0.85f,
                     maxSideCount = 3,
-                    cameraDistance = 1200f,
-                    rotationCorrectionFactor = 0.6f  // 校准系数，根据实际效果调整
+                    cameraDistance = 6000f,
+                    rotationCorrectionFactor = 0.6f,  // 校准系数，根据实际效果调整
+                    sideToSideSpacing = 0.9f,   // 侧边图片之间的间距，增大到0.9f以减少边缘留白
+                    sideToCenterSpacing = 1.9f  // 侧边到中心的间距，增大到1.9f以避免旋转边缘遮挡中心图片
                 )
             )
         }
@@ -478,9 +466,9 @@ private fun CoverFlowContent(
                         }
 
                         // 计算原生变换参数
-                        // 计算显示缩放：将600px的bitmap缩放到150dp显示尺寸
-                        // 600px (bitmap) × displayScale = coverSizePx (display size)
-                        val displayScale = cachedMetrics.coverSizePx / 600f
+                        // ✅ ImageView的布局尺寸已经是150dp (412.5px)
+                        // scaleType = FIT_XY 会自动将bitmap拉伸到布局尺寸
+                        // 不需要额外的displayScale缩放因子
 
                         val transform = CoverFlowNativeView.TransformData(
                             bitmap = bitmap,
@@ -488,8 +476,8 @@ private fun CoverFlowContent(
                             y = data.transform.y,
                             rotationY = data.transform.rotationY,
                             translationZ = data.transform.translationZ ?: 0f, // Z轴深度！
-                            scaleX = data.transform.scaleX * data.transform.scale * displayScale,
-                            scaleY = data.transform.scaleY * data.transform.scale * displayScale,
+                            scaleX = data.transform.scaleX * data.transform.scale,
+                            scaleY = data.transform.scaleY * data.transform.scale,
                             translationX = data.transform.translationX,
                             translationY = data.transform.translationY,
                             alpha = data.transform.alpha,
@@ -497,7 +485,9 @@ private fun CoverFlowContent(
                             rotationX = data.transform.rotationX,
                             cameraDistance = data.transform.cameraDistance,
                             transformOriginX = data.transform.transformOriginX,
-                            transformOriginY = data.transform.transformOriginY
+                            transformOriginY = data.transform.transformOriginY,
+                            // ✅ 3D模式缩放补偿：恢复正常值 (1.0f = 无额外缩放)
+                            modeScaleCompensation = 1.0f
                         )
 
                         nativeView.updateImage(data.displayPos, albumId, transform)
@@ -630,7 +620,13 @@ private data class CoverFlowLayoutParams(
     // 3D 参数
     val cameraDistance: Float = 1200f,       // 相机距离
     val perspectiveStrength: Float = 0.3f,   // 透视强度
-    val rotationCorrectionFactor: Float = 0.6f  // 3D旋转偏移校正系数
+    val rotationCorrectionFactor: Float = 0.6f,  // 3D旋转偏移校正系数
+
+    // ✅ 新增：非对称间距配置
+    // 侧边图片之间的间距倍数（pos0↔pos1, pos1↔pos2, pos4↔pos5, pos5↔pos6）
+    val sideToSideSpacing: Float = 0.7f,
+    // 侧边到中心的间距倍数（pos2↔pos3, pos3↔pos4）
+    val sideToCenterSpacing: Float = 1.5f
 ) {
     // 计算中心位置
     val centerX: Float get() = screenWidthPx / 2f
@@ -689,9 +685,10 @@ private fun calculateRotation(offset: Float, params: CoverFlowLayoutParams): Flo
  * - 中心图片使用默认透视距离（正常透视）
  * - 侧边图片逐级减小透视距离，增强3D深度感
  *
- * 增强效果：
- * - 增大递减幅度（200f -> 250f），透视效果更强
- * - offset=1: 950f, offset=2: 700f, offset=3: 450f
+ * 优化效果（2026-03-16）：
+ * - 增大基础距离（3000f -> 6000f），透视效果更自然
+ * - 减小递减幅度（150f × offset），避免边缘透视过强
+ * - offset=0: 6000f, offset=1: 5850f, offset=2: 5700f, offset=3: 5550f -> 1000f
  *
  * @param offset 距离中心的偏移量（-3 到 3）
  * @param params 布局参数
@@ -701,14 +698,15 @@ private fun calculateCameraDistance(offset: Float, params: CoverFlowLayoutParams
     val absOffset = abs(offset)
     if (absOffset < 0.1f) return params.cameraDistance  // 中心使用默认值
 
-    // 基础距离
-    val baseDistance = params.cameraDistance  // 1200f
+    // 基础距离 (现在使用 6000f)
+    val baseDistance = params.cameraDistance
 
-    // 增强透视：更大幅度的递减
-    // offset=1: -250, offset=2: -500, offset=3: -750
-    val distanceReduction = absOffset * 250f  // 从200f增加到250f
+    // 减小透视：使用更温和的递减幅度，提高最小值
+    // 之前: offset=3时降至300f (极强透视)
+    // 之后: offset=3时降至1000f+ (温和透视)
+    val distanceReduction = absOffset * 150f  // 减小递减幅度
 
-    return (baseDistance - distanceReduction).coerceAtLeast(300f)
+    return (baseDistance - distanceReduction).coerceAtLeast(1000f)  // 提高最小值
 }
 
 /**
@@ -772,79 +770,77 @@ private fun calculateCoverFlowItem(
     // 相对于中心的偏移：-3, -2, -1, 0, 1, 2, 3
     val offsetFromCenter = displayPos - centerOffset
 
-    // 重新计算centerLeft，实现边缘对齐布局（而不是中心对齐）
-    // 使位置0贴左边缘(x=0)，位置6贴右边缘(x=screenWidthPx-coverSizePx)
-    val maxOffset = params.maxSideCount.toFloat()
-    val centerLeft = maxOffset * params.itemSpacing
-    // 等价于: (screenWidthPx - coverSizePx) / 2f
-    // 推导: itemSpacing = (screenWidthPx - coverSizePx) / (maxOffset * 2)
-    //       centerLeft = maxOffset * itemSpacing = maxOffset * (screenWidthPx - coverSizePx) / (maxOffset * 2)
-    //                 = (screenWidthPx - coverSizePx) / 2
-
-    // 添加调试日志 - 验证间距计算
-    debugLog("CoverFlowSpacing") {
-        """Spacing Verification (displayPos=$displayPos):
-           | screenWidthPx: ${params.screenWidthPx}
-           | coverSizePx: ${params.coverSizePx}
-           | maxOffset: $maxOffset
-           | itemSpacing: ${params.itemSpacing}
-           | centerLeft: $centerLeft
-           | Expected pos0 x: ${centerLeft - maxOffset * params.itemSpacing}
-           | Expected pos6 x: ${centerLeft + maxOffset * params.itemSpacing}
-           | Expected pos6 right edge: ${centerLeft + maxOffset * params.itemSpacing + params.coverSizePx}
-        """.trimMargin()
-    }
-
-    // X位置 = 中心左边缘 + (偏移 - 动画进度) * 间距
-    // pos=0(offset=-3): x=0 (最左，贴屏幕左边缘)
-    // pos=3(offset=0): x=centerLeft≈267px (屏幕中心)
-    // pos=6(offset=3): x=screenWidthPx-coverSize (最右，贴屏幕右边缘)
+    // ✅ 以屏幕中心为基准，直接计算每张图片的位置
+    // 这样确保中心图片在屏幕正中央，其他图片向两边均匀分布
     // 包含动画进度，实现平滑过渡
-    // 注意：不再使用params.extraOffsetX，改用动态translationX补偿3D旋转偏移
     val animationOffset = animatedIndex - targetIndex
 
-    // 基础位置：使用线性间距（确保边界正确）
-    val finalX = centerLeft + (offsetFromCenter - animationOffset) * params.itemSpacing
-
-    // 添加调试日志 - 每个位置的实际X坐标
-    debugLog("CoverFlowPosition") {
-        "displayPos=$displayPos, offsetFromCenter=$offsetFromCenter, finalX=$finalX"
+    // X位置 = 屏幕中心 - 图片半宽 + (偏移 - 动画进度) * 间距
+    // pos=0(offset=-3): 靠左侧
+    // pos=3(offset=0): 屏幕中心
+    // pos=6(offset=3): 靠右侧
+    // ✅ 使用非对称间距：侧边到中心的间距更大，让中心图片更突出
+    // 修复：使用累积间距模式而非偏移乘数模式，确保相邻图片间距均匀
+    val effectiveOffset = (offsetFromCenter - animationOffset).toInt()
+    val baseX = if (effectiveOffset == 0) {
+        // 中心位置
+        params.screenWidthPx / 2f - params.coverSizePx / 2f
+    } else if (effectiveOffset > 0) {
+        // 右侧：从中心累积计算间距
+        var x = params.screenWidthPx / 2f - params.coverSizePx / 2f
+        for (i in 0 until effectiveOffset) {
+            val spacingMult = if (i == 0) params.sideToCenterSpacing else params.sideToSideSpacing
+            x += params.itemSpacing * spacingMult
+        }
+        x
+    } else {
+        // 左侧：从中心累积计算间距
+        var x = params.screenWidthPx / 2f - params.coverSizePx / 2f
+        for (i in effectiveOffset until 0) {
+            val spacingMult = if (i == -1) params.sideToCenterSpacing else params.sideToSideSpacing
+            x -= params.itemSpacing * spacingMult
+        }
+        x
     }
-
-    // Y位置 = 垂直中心
-    val finalY = params.centerY - params.coverSizePx / 2f
 
     // 3. 3D变换参数 - 增强版：添加倾斜、透视压缩、阴影
 
     // 浮点偏移量（用于变换属性平滑动画）
     // = 整数偏移 - 动画偏移（与位置计算相同），范围约 -3.5 到 3.5
     // 这使得旋转、缩放、透明度等变换属性能平滑过渡
-    // 关键：使用与位置计算相同的公式，确保变换与视觉位置同步
     val floatOffsetFromCenter = offsetFromCenter - animationOffset
+
+    // ✅ 直接使用 baseX 作为最终 X 位置，无需额外补偿
+    val finalX = baseX
+
+
+    // Y位置 = 垂直中心
+    val finalY = params.centerY - params.coverSizePx / 2f
 
     // 首先计算绝对偏移量，后续计算会用到
     val absOffsetFromCenter = abs(offsetFromCenter.toFloat())
     val absFloatOffset = abs(floatOffsetFromCenter)  // 浮点绝对偏移，用于平滑插值
 
-    // 旋转角度：还原为 70°，适中的透视变形
-    // 近的那条竖线更长，远的那条竖线更短
-    val rotationY = when {
-        floatOffsetFromCenter > 0.1f -> 70f * minOf(absFloatOffset, 1f)
-        floatOffsetFromCenter < -0.1f -> -70f * minOf(absFloatOffset, 1f)
-        else -> 0f
-    }
+    // ✅ 所有位置都有3D效果，只是旋转点不同
+    val isLeftPivot = displayPos < 3  // 左侧旋转点 (0,1,2)
+    val isCenterPivot = displayPos == 3
+    val isRightPivot = displayPos >= 4 // 右侧旋转点 (4,5,6)
 
-    // X轴旋转：中心中性姿态（与0.5f旋转轴对齐），侧边前倾产生深度感
-    // 中心不再后仰，减少突出感，与旋转轴平行
-    val rotationX = when {
-        absFloatOffset < 0.5f -> 0f   // 中心中性姿态（与旋转轴平行）
-        else -> 2f                     // 侧边前倾保持深度感
+    // 旋转角度：所有位置都使用70度旋转
+    val rotationReg = when {
+        isLeftPivot -> 70f
+        isCenterPivot -> 0f
+        else -> -70f
     }
+    val rotationY = rotationReg * minOf(absFloatOffset, 1f)  // 所有位置: 70度旋转
 
-    // 适度的透视距离差值，产生自然的3D效果
-    // 中心1200 -> 边缘750 的适度对比
-    val perspectiveDistance = (params.cameraDistance - absFloatOffset * 150f)
-        .coerceAtLeast(800f)
+    // X轴旋转：所有位置都保持倾斜
+    val rotationX = 2f  // 所有位置: 保持倾斜
+
+    // iOS风格的温和透视距离差值，避免夸张的3D效果
+    // 中心6000 -> 边缘5910 -> 最小1000 的温和对比
+    val perspectiveDistance = (params.cameraDistance - absFloatOffset * 30f)
+        .coerceAtLeast(1000f)
 
     val skewY = 0f
     val scale = 1.0f  // 基础缩放保持100%
@@ -889,9 +885,14 @@ private fun calculateCoverFlowItem(
 
     val zIndex = baseZIndex + directionBonus
 
-    // 统一使用中心轴旋转，所有唱片绕自身中心旋转
-    // 产生更强的悬浮感和立体效果
-    val transformOriginX = 0.5f
+    // ✅ Transform origin：所有位置使用边缘旋转点
+    // 左侧 (0,1,2,3)：绕左边缘旋转 (pivotX = 0)，左边缘固定，右边缘后退
+    // 右侧 (4,5,6)：绕右边缘旋转 (pivotX = 1)，右边缘固定，左边缘后退
+    val transformOriginX = when {
+        isLeftPivot -> 0f   // 左侧旋转点: 绕左边缘旋转
+        isRightPivot -> 1f  // 右侧旋转点: 绕右边缘旋转
+        else -> 0.5f        // (不会执行)
+    }
 
     // translationX补偿已禁用：finalX已正确计算间距，无需额外补偿
     // 注：保留translationX字段用于可能的未来调整
@@ -900,21 +901,24 @@ private fun calculateCoverFlowItem(
     // Y轴位置调整：所有图片保持在同一水平位置（无Y轴偏移）
     val translationY = 0f
 
-    // ✅ 新增：Z 轴深度计算（原生 View 专用）
-    // 越靠边的图片越"远"，增强3D深度感
+    // ✅ Z 轴深度计算（原生 View 专用）
+    // 越靠边的图片越"远"，增强3D深度感（iOS风格温和深度）
     // 类似 MusicPlayerView3rd 中的: image.z = abs(temp * 3)
-    val translationZ = absFloatOffset * 300f  // 偏移越大，Z轴越深
+    val translationZ = absFloatOffset * 40f  // 偏移越大，Z轴越深（更温和的40px倍数）
 
-    // Debug logging for position 0 and 1
-    if (displayPos <= 1 && ENABLE_DEBUG_LOGGING) {
+    // Debug logging for all positions
+    if (ENABLE_DEBUG_LOGGING) {
         val d = density.density
         Log.d("CoverFlowTranslation", """
             Position $displayPos Debug:
             | offsetFromCenter: $offsetFromCenter
+            | effectiveOffset: $effectiveOffset (cumulative spacing mode)
+            | sideToCenterSpacing: ${params.sideToCenterSpacing}x
+            | sideToSideSpacing: ${params.sideToSideSpacing}x
             | rotationY: $rotationY°
             | transformOriginX: $transformOriginX
+            | translationZ: $translationZ
             | finalX: $finalX (${finalX / d}dp)
-            | Expected x (relative to Box): ${finalX / d}dp
         """.trimIndent())
     }
 
