@@ -377,7 +377,8 @@ private fun CoverFlowContent(
                     cameraDistance = 6000f,
                     rotationCorrectionFactor = 0.6f,  // 校准系数，根据实际效果调整
                     sideToSideSpacing = 0.9f,   // 侧边图片之间的间距，增大到0.9f以减少边缘留白
-                    sideToCenterSpacing = 1.9f  // 侧边到中心的间距，增大到1.9f以避免旋转边缘遮挡中心图片
+                    sideToCenterSpacing = 1.9f,  // 侧边到中心的间距，增大到1.9f以避免旋转边缘遮挡中心图片
+                    unifiedSpacingMultiplier = 1.2f  // 新增：统一间距倍数
                 )
             )
         }
@@ -626,7 +627,9 @@ private data class CoverFlowLayoutParams(
     // 侧边图片之间的间距倍数（pos0↔pos1, pos1↔pos2, pos4↔pos5, pos5↔pos6）
     val sideToSideSpacing: Float = 0.7f,
     // 侧边到中心的间距倍数（pos2↔pos3, pos3↔pos4）
-    val sideToCenterSpacing: Float = 1.5f
+    val sideToCenterSpacing: Float = 1.5f,
+    // 统一间距倍数，用于简化公式
+    val unifiedSpacingMultiplier: Float = 1.2f
 ) {
     // 计算中心位置
     val centerX: Float get() = screenWidthPx / 2f
@@ -775,40 +778,22 @@ private fun calculateCoverFlowItem(
     // 包含动画进度，实现平滑过渡
     val animationOffset = animatedIndex - targetIndex
 
-    // X位置 = 屏幕中心 - 图片半宽 + (偏移 - 动画进度) * 间距
-    // pos=0(offset=-3): 靠左侧
-    // pos=3(offset=0): 屏幕中心
-    // pos=6(offset=3): 靠右侧
-    // ✅ 使用非对称间距：侧边到中心的间距更大，让中心图片更突出
-    // 修复：使用累积间距模式而非偏移乘数模式，确保相邻图片间距均匀
-    val effectiveOffset = (offsetFromCenter - animationOffset).toInt()
-    val baseX = if (effectiveOffset == 0) {
-        // 中心位置
-        params.screenWidthPx / 2f - params.coverSizePx / 2f
-    } else if (effectiveOffset > 0) {
-        // 右侧：从中心累积计算间距
-        var x = params.screenWidthPx / 2f - params.coverSizePx / 2f
-        for (i in 0 until effectiveOffset) {
-            val spacingMult = if (i == 0) params.sideToCenterSpacing else params.sideToSideSpacing
-            x += params.itemSpacing * spacingMult
-        }
-        x
-    } else {
-        // 左侧：从中心累积计算间距
-        var x = params.screenWidthPx / 2f - params.coverSizePx / 2f
-        for (i in effectiveOffset until 0) {
-            val spacingMult = if (i == -1) params.sideToCenterSpacing else params.sideToSideSpacing
-            x -= params.itemSpacing * spacingMult
-        }
-        x
-    }
-
-    // 3. 3D变换参数 - 增强版：添加倾斜、透视压缩、阴影
-
     // 浮点偏移量（用于变换属性平滑动画）
     // = 整数偏移 - 动画偏移（与位置计算相同），范围约 -3.5 到 3.5
     // 这使得旋转、缩放、透明度等变换属性能平滑过渡
     val floatOffsetFromCenter = offsetFromCenter - animationOffset
+
+    // X位置 = 屏幕中心 - 图片半宽 + (偏移 - 动画进度) * 间距
+    // pos=0(offset=-3): 靠左侧
+    // pos=3(offset=0): 屏幕中心
+    // pos=6(offset=3): 靠右侧
+    // ✅ 修复：使用浮点偏移量 + 统一间距倍数
+    // unifiedSpacingMultiplier ≈ 1.2f 使总跨度约等于原始累积模式
+    // 所有位置使用统一的计算方式，避免分支导致的动画跳帧
+    val baseX = params.screenWidthPx / 2f - params.coverSizePx / 2f +
+        floatOffsetFromCenter * params.itemSpacing * params.unifiedSpacingMultiplier
+
+    // 3. 3D变换参数 - 增强版：添加倾斜、透视压缩、阴影
 
     // ✅ 直接使用 baseX 作为最终 X 位置，无需额外补偿
     val finalX = baseX
@@ -912,9 +897,8 @@ private fun calculateCoverFlowItem(
         Log.d("CoverFlowTranslation", """
             Position $displayPos Debug:
             | offsetFromCenter: $offsetFromCenter
-            | effectiveOffset: $effectiveOffset (cumulative spacing mode)
-            | sideToCenterSpacing: ${params.sideToCenterSpacing}x
-            | sideToSideSpacing: ${params.sideToSideSpacing}x
+            | floatOffsetFromCenter: $floatOffsetFromCenter (unified spacing mode)
+            | unifiedSpacingMultiplier: ${params.unifiedSpacingMultiplier}x
             | rotationY: $rotationY°
             | transformOriginX: $transformOriginX
             | translationZ: $translationZ
