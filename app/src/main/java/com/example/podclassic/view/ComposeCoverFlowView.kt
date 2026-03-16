@@ -830,11 +830,12 @@ private fun calculateCoverFlowItem(
     val skewY = 0f
     val scale = 1.0f  // 基础缩放保持100%
 
-    // 保持一致的缩放，避免视觉"聚集"效果
-    // 参考 MusicPlayerView3rd：所有项目使用统一缩放
+    // ✅ 动态缩放：中心图片完整大小 (1.0)，边缘图片逐渐缩小 (0.85)
+    // 为中心图片切换添加缩放动画，增强视觉流畅性
     val t = minOf(absFloatOffset, 1f)  // 0 到 1 的插值因子（用于阴影等效果）
-    val scaleX = 1.0f
-    val scaleY = 1.0f
+    val scaleAmount = 1.0f - absFloatOffset * 0.05f  // 1.0 → 0.85 的平滑缩放
+    val scaleX = scaleAmount
+    val scaleY = scaleAmount
 
     // 新增：阴影高度 - 中心无阴影，侧边有阴影增强深度感
     // 使用平滑插值：从中心到边缘阴影逐渐加深
