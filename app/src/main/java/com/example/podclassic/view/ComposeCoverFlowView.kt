@@ -16,8 +16,8 @@ import android.view.MotionEvent
 import android.view.View
 import android.widget.FrameLayout
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.EaseInOutCubic
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -74,7 +74,7 @@ import kotlin.math.sin
 
 // Conditional debug logging - Phase 1: Quick Wins
 // Set to false to disable debug logging in production builds
-private const val ENABLE_DEBUG_LOGGING = true
+private const val ENABLE_DEBUG_LOGGING = false
 
 private inline fun debugLog(tag: String, lazyMessage: () -> String) {
     if (ENABLE_DEBUG_LOGGING) {
@@ -299,17 +299,21 @@ private fun CoverFlowContent(
     }
 
     // 根据滑动间隔判断是否快速滚动
-    // 只分两档：快速滚动跳过动画，正常滚动 400ms
+    // 用于调整弹簧参数：快速滚动减少弹性，提高响应速度
     val currentTime = System.currentTimeMillis()
     val timeSinceLastSlide = currentTime - lastSlideTimeState.longValue
-    val animationDuration = if (timeSinceLastSlide < 100) 0 else 400
+    val isFastScroll = timeSinceLastSlide < 100
 
-    // 平滑动画索引 - 使用 tween 动画实现动态时长的平滑过渡
+    // 响应式弹簧动画 - 使用 spring 替代 tween 实现更自然的物理感觉
+    // 弹簧自动适应目标距离：滚动距离越远，动画时间越长
     val animatedIndex by animateFloatAsState(
         targetValue = targetIndex.toFloat(),
-        animationSpec = tween(
-            durationMillis = animationDuration,  // 动态时长
-            easing = EaseInOutCubic
+        animationSpec = spring(
+            // 阻尼比：0.5 = 中等弹性，快速滚动时减少弹性避免过度晃动
+            dampingRatio = if (isFastScroll) 0.6f else Spring.DampingRatioMediumBouncy,
+
+            // 刚度：快速滚动时增加硬度，慢速滚动时保持柔和
+            stiffness = if (isFastScroll) Spring.StiffnessMedium else Spring.StiffnessMediumLow
         ),
         label = "coverflow_scroll"
     )
