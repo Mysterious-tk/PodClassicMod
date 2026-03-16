@@ -906,21 +906,35 @@ private fun calculateCoverFlowItem(
         else -> 0.5f
     }
 
-    // ✅ 在过渡区使用连续插值
-    // 左侧过渡区 (offset -0.75 ~ 0): 0 → 0.5
-    // 右侧过渡区 (offset 0 ~ 0.75): 0.5 → 1
+    // ✅ 动态旋转轴：中心位置完全跟随滚动方向
+    // animationOffset > 0: 向左滚（显示上一张），transformOriginX → 1（绕右边缘）
+    // animationOffset < 0: 向右滚（显示下一张），transformOriginX → 0（绕左边缘）
+    // animationOffset ≈ 0: 静止，transformOriginX = 0.5（绕中心）
+
+    // 计算方向系数：-1（右滚）~ 0（静止）~ 1（左滚）
+    val directionFactor = animationOffset.coerceIn(-1f, 1f)
+
+    // 中心位置的动态旋转轴：根据方向直接计算
+    // directionFactor = -1 → 0.0（左边缘）
+    // directionFactor = 0 → 0.5（中心）
+    // directionFactor = 1 → 1.0（右边缘）
+    val centerPivotX = 0.5f + directionFactor * 0.5f
+
     val transformOriginX = when {
-        floatOffsetFromCenter < -0.75f -> 0f   // 左侧区：固定外边缘
-        floatOffsetFromCenter > 0.75f -> 1f   // 右侧区：固定外边缘
+        // 侧边固定区（不受滚动方向影响）
+        floatOffsetFromCenter < -0.75f -> 0f
+        floatOffsetFromCenter > 0.75f -> 1f
+
+        // 左侧过渡区：0 → 中心动态值
         floatOffsetFromCenter < 0 -> {
-            // 左侧过渡区：0 → 0.5
             val t = (floatOffsetFromCenter + 0.75f) / 0.75f
-            0f + t * 0.5f  // 0 → 0.5
+            0f + t * centerPivotX  // 0 → centerPivotX
         }
+
+        // 右侧过渡区：中心动态值 → 1
         else -> {
-            // 右侧过渡区：0.5 → 1
             val t = floatOffsetFromCenter / 0.75f
-            0.5f + t * 0.5f  // 0.5 → 1
+            centerPivotX + t * (1f - centerPivotX)  // centerPivotX → 1
         }
     }
 
@@ -943,6 +957,9 @@ private fun calculateCoverFlowItem(
             Position $displayPos Debug:
             | offsetFromCenter: $offsetFromCenter
             | floatOffsetFromCenter: $floatOffsetFromCenter
+            | animationOffset: $animationOffset
+            | directionFactor: $directionFactor
+            | centerPivotX: $centerPivotX
             | isLeftPivot: $isLeftPivot, isCenterPivot: $isCenterPivot, isRightPivot: $isRightPivot
             | baseTransformOriginX: $baseTransformOriginX
             | baseRotationReg: $baseRotationReg°
