@@ -806,18 +806,38 @@ private fun calculateCoverFlowItem(
     val absOffsetFromCenter = abs(offsetFromCenter.toFloat())
     val absFloatOffset = abs(floatOffsetFromCenter)  // 浮点绝对偏移，用于平滑插值
 
-    // ✅ 所有位置都有3D效果，只是旋转点不同
-    val isLeftPivot = displayPos < 3  // 左侧旋转点 (0,1,2)
-    val isCenterPivot = displayPos == 3
-    val isRightPivot = displayPos >= 4 // 右侧旋转点 (4,5,6)
+    // ✅ 保留离散 displayPos 用于确定"基准"旋转方向和轴
+    // pos0-2: 左侧，+70度旋转
+    // pos3: 中心，0度旋转
+    // pos4-6: 右侧，-70度旋转
+    val isLeftPivot = displayPos < 3      // pos0,1,2 → 左侧
+    val isCenterPivot = displayPos == 3   // pos3 → 中心
+    val isRightPivot = displayPos >= 4    // pos4,5,6 → 右侧
 
-    // 旋转角度：所有位置都使用70度旋转
-    val rotationReg = when {
+    // ✅ 基准旋转角度：保持离散值用于确定方向
+    val baseRotationReg = when {
         isLeftPivot -> 70f
         isCenterPivot -> 0f
         else -> -70f
     }
-    val rotationY = rotationReg * minOf(absFloatOffset, 1f)  // 所有位置: 70度旋转
+
+    // ✅ 在过渡区使用连续 floatOffsetFromCenter 进行平滑插值
+    // 左侧过渡区 (offset -0.75 ~ 0): 70° → 0°
+    // 右侧过渡区 (offset 0 ~ 0.75): 0° → -70°
+    val rotationY = when {
+        floatOffsetFromCenter < -0.75f -> 70f
+        floatOffsetFromCenter > 0.75f -> -70f
+        floatOffsetFromCenter < 0 -> {
+            // 左侧过渡区：线性插值 70° → 0°
+            val t = (floatOffsetFromCenter + 0.75f) / 0.75f  // 0 到 1
+            70f * (1f - t)  // 70° → 0°
+        }
+        else -> {
+            // 右侧过渡区：线性插值 0° → -70°
+            val t = floatOffsetFromCenter / 0.75f  // 0 到 1
+            -70f * t  // 0° → -70°
+        }
+    }
 
     // X轴旋转：所有位置都保持倾斜
     val rotationX = 2f  // 所有位置: 保持倾斜
@@ -871,13 +891,37 @@ private fun calculateCoverFlowItem(
 
     val zIndex = baseZIndex + directionBonus
 
-    // ✅ Transform origin：所有位置使用边缘旋转点
-    // 左侧 (0,1,2,3)：绕左边缘旋转 (pivotX = 0)，左边缘固定，右边缘后退
-    // 右侧 (4,5,6)：绕右边缘旋转 (pivotX = 1)，右边缘固定，左边缘后退
+    // ✅ Transform origin：保留离散基准值 + 平滑插值修复瞬切
+    // pos0-2 (左侧): 绕左边缘旋转 (pivotX = 0)
+    // pos3 (中心): 绕中心旋转 (pivotX = 0.5)
+    // pos4-6 (右侧): 绕右边缘旋转 (pivotX = 1)
+    //
+    // 关键修复：在过渡区 (-0.75 ~ +0.75) 使用连续插值
+    // 避免 displayPos 离散跳变导致的瞬切
+
+    // 基准 pivotX：保持原始离散值
+    val baseTransformOriginX = when {
+        isLeftPivot -> 0f
+        isRightPivot -> 1f
+        else -> 0.5f
+    }
+
+    // ✅ 在过渡区使用连续插值
+    // 左侧过渡区 (offset -0.75 ~ 0): 0 → 0.5
+    // 右侧过渡区 (offset 0 ~ 0.75): 0.5 → 1
     val transformOriginX = when {
-        isLeftPivot -> 0f   // 左侧旋转点: 绕左边缘旋转
-        isRightPivot -> 1f  // 右侧旋转点: 绕右边缘旋转
-        else -> 0.5f        // (不会执行)
+        floatOffsetFromCenter < -0.75f -> 0f   // 左侧区：固定外边缘
+        floatOffsetFromCenter > 0.75f -> 1f   // 右侧区：固定外边缘
+        floatOffsetFromCenter < 0 -> {
+            // 左侧过渡区：0 → 0.5
+            val t = (floatOffsetFromCenter + 0.75f) / 0.75f
+            0f + t * 0.5f  // 0 → 0.5
+        }
+        else -> {
+            // 右侧过渡区：0.5 → 1
+            val t = floatOffsetFromCenter / 0.75f
+            0.5f + t * 0.5f  // 0.5 → 1
+        }
     }
 
     // translationX补偿已禁用：finalX已正确计算间距，无需额外补偿
@@ -898,10 +942,12 @@ private fun calculateCoverFlowItem(
         Log.d("CoverFlowTranslation", """
             Position $displayPos Debug:
             | offsetFromCenter: $offsetFromCenter
-            | floatOffsetFromCenter: $floatOffsetFromCenter (unified spacing mode)
-            | unifiedSpacingMultiplier: ${params.unifiedSpacingMultiplier}x
-            | rotationY: $rotationY°
+            | floatOffsetFromCenter: $floatOffsetFromCenter
+            | isLeftPivot: $isLeftPivot, isCenterPivot: $isCenterPivot, isRightPivot: $isRightPivot
+            | baseTransformOriginX: $baseTransformOriginX
+            | baseRotationReg: $baseRotationReg°
             | transformOriginX: $transformOriginX
+            | rotationY: $rotationY°
             | translationZ: $translationZ
             | finalX: $finalX (${finalX / d}dp)
         """.trimIndent())
