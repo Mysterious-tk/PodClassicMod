@@ -80,6 +80,63 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
     private var globalLayoutListener: android.view.ViewTreeObserver.OnGlobalLayoutListener? = null
     private var isLayoutPending = false
 
+    // Orientation change handling - prevent rapid consecutive orientation changes
+    private var orientationChangeHandler: Runnable? = null
+    private val orientationChangeLock = java.util.concurrent.atomic.AtomicBoolean(false)
+    private var lastKnownParentWidth = 0
+    private var lastKnownOrientation = Configuration.ORIENTATION_PORTRAIT
+    private val handler = Handler(Looper.getMainLooper())
+
+    /**
+     * 获取实际的可见容器高度
+     * 布局结构: Screen -> [TitleBar(weight=1), screenLayout(weight=9)] -> MainView -> coverContainer
+     * screenLayout 已经占 Screen 的 90%，coverContainer 是 MATCH_PARENT
+     */
+    private fun getActualContainerHeight(): Int {
+        // 优先级1: 使用实际测量的容器高度 - 这是最准确的值
+        if (coverContainer.height > 0) {
+            android.util.Log.d("MainView", "Using actual measured height: ${coverContainer.height}")
+            return coverContainer.height
+        }
+
+        // 优先级2: 基于父容器（ScreenLayout）计算 - 直接使用，不需要 * 0.9
+        // 因为 screenLayout 本身就是 90% of Screen，coverContainer 是 MATCH_PARENT
+        val parent = parent as? android.view.ViewGroup
+        if (parent != null && parent.height > 0) {
+            android.util.Log.d("MainView", "Using parent height: ${parent.height}")
+            return parent.height
+        }
+
+        // 优先级3: 基于Screen组件计算 - 需要使用 90%
+        val screen = (parent?.parent as? android.view.ViewGroup)
+        if (screen != null && screen.height > 0) {
+            val estimatedHeight = (screen.height * 0.9).toInt()
+            android.util.Log.d("MainView", "Using Screen-based estimate: $estimatedHeight (screen: ${screen.height})")
+            return estimatedHeight
+        }
+
+        // 优先级4: 使用全屏高度并减去系统UI和标题栏估算
+        val screenHeight = resources.displayMetrics.heightPixels
+        val statusBarHeight = getStatusBarHeight()
+        val titleBarEstimate = (screenHeight * 0.1).toInt()
+        val estimatedHeight = screenHeight - statusBarHeight - titleBarEstimate
+
+        android.util.Log.d("MainView", "Using fallback estimate: $estimatedHeight")
+        return maxOf(estimatedHeight, (screenHeight * 0.8).toInt())
+    }
+
+    /**
+     * 获取状态栏高度
+     */
+    private fun getStatusBarHeight(): Int {
+        var result = 0
+        val resourceId = resources.getIdentifier("status_bar_height", "dimen", "android")
+        if (resourceId > 0) {
+            result = resources.getDimensionPixelSize(resourceId)
+        }
+        return result
+    }
+
     init {
         // 启用硬件加速
         coverImageView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
@@ -117,18 +174,26 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
     init {
         // 检查是否是横屏模式
         val isLandscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-        
+
+        // 使用屏幕宽度，避免依赖可能不稳定的 parent
+        val screenWidth = resources.displayMetrics.widthPixels
+
         // 计算分割线位置（ListView宽度）
         val dividerPosition = if (isLandscape) {
-            (resources.displayMetrics.widthPixels * 0.45).toInt() // 横屏时占45%
+            (screenWidth * 0.45).toInt() // 横屏时占45%
         } else {
-            (resources.displayMetrics.widthPixels * 0.30).toInt() // 竖屏时占30%
+            (screenWidth * 0.30).toInt() // 竖屏时占30%
         }
-        
+
         // 设置图片容器（可见区域）- 从分割线右侧开始到屏幕右边
-        savedContainerWidth = resources.displayMetrics.widthPixels - dividerPosition
-        // 使用全屏高度作为初始估算，后续会通过 updateLayoutForOrientation 校正
-        savedContainerHeight = resources.displayMetrics.heightPixels
+        savedContainerWidth = screenWidth - dividerPosition
+        // 使用智能高度估算（考虑标题栏和系统UI）
+        savedContainerHeight = getActualContainerHeight()
+
+        // 保存初始状态
+        lastKnownParentWidth = screenWidth
+        lastKnownOrientation = if (isLandscape) Configuration.ORIENTATION_LANDSCAPE else Configuration.ORIENTATION_PORTRAIT
+
         val containerParams = LayoutParams(savedContainerWidth, LayoutParams.MATCH_PARENT)
         containerParams.addRule(RelativeLayout.ALIGN_PARENT_RIGHT)
         containerParams.addRule(RelativeLayout.ALIGN_PARENT_TOP)
@@ -409,9 +474,39 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
 
     override fun onConfigurationChanged() {
         android.util.Log.d("MainView", "onConfigurationChanged() called")
-        updateLayoutForOrientation()
-        // 强制重新布局，确保新尺寸生效
-        requestLayout()
+
+        // 移除之前的待处理切换
+        orientationChangeHandler?.let {
+            handler?.removeCallbacks(it)
+        }
+
+        // 检查方向是否真的改变了
+        val newOrientation = if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
+            Configuration.ORIENTATION_LANDSCAPE
+        } else {
+            Configuration.ORIENTATION_PORTRAIT
+        }
+
+        if (newOrientation == lastKnownOrientation) {
+            android.util.Log.d("MainView", "Orientation unchanged, skipping update")
+            return
+        }
+
+        // 如果已经在处理切换，等待后重试
+        if (orientationChangeLock.get()) {
+            android.util.Log.d("MainView", "Orientation change already in progress, will retry")
+            orientationChangeHandler = Runnable {
+                updateLayoutForOrientation()
+            }
+            handler?.postDelayed(orientationChangeHandler!!, 300)
+            return
+        }
+
+        // 防抖：延迟执行以避免快速连续切换
+        orientationChangeHandler = Runnable {
+            updateLayoutForOrientation()
+        }
+        handler?.postDelayed(orientationChangeHandler!!, 200)
     }
 
     override fun onViewAdd() {
@@ -432,20 +527,28 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
         // 检查父容器尺寸是否已测量
         val parentWidth = (parent as? android.view.ViewGroup)?.width ?: 0
         val parentHeight = (parent as? android.view.ViewGroup)?.height ?: 0
-        
+
         if (parentWidth > 0 && parentHeight > 0) {
             // 尺寸已测量，直接初始化
             updateLayoutForOrientation()
             updateCoverImage()
-            // resetCoverPosition() 已由 updateCoverImage() 在内部调度
-            startCoverAnimation()
+            // startCoverAnimation() 将由 resetCoverPosition() 在完成后调用
         } else {
             // 延迟一帧等待测量
             post {
                 updateLayoutForOrientation()
                 updateCoverImage()
-                // resetCoverPosition() 已由 updateCoverImage() 在内部调度
-                startCoverAnimation()
+                // startCoverAnimation() 将由 resetCoverPosition() 在完成后调用
+            }
+        }
+
+        // 强制重新测量容器高度（修复从MusicPlayerView返回时的失真）
+        if (coverContainer.height == 0 || kotlin.math.abs(coverContainer.height - getActualContainerHeight()) > 100) {
+            android.util.Log.d("MainView", "Container height mismatch, forcing remeasure...")
+            waitForLayout {
+                val actualHeight = getActualContainerHeight()
+                android.util.Log.d("MainView", "After layout: container=${coverContainer.width}x${coverContainer.height}, estimated=$actualHeight")
+                resetCoverPosition()
             }
         }
     }
@@ -469,55 +572,71 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
      * 根据当前屏幕方向更新布局参数
      */
     private fun updateLayoutForOrientation() {
-        // 检查当前屏幕方向
-        val isLandscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-        
-        // 获取父容器（ScreenView）的尺寸
-        val rawParentWidth = (parent as? android.view.ViewGroup)?.width ?: 0
-        val rawParentHeight = (parent as? android.view.ViewGroup)?.height ?: 0
-
-        // 使用实际屏幕尺寸作为fallback，而非不准确的百分比
-        val parentWidth = if (rawParentWidth > 0) rawParentWidth else resources.displayMetrics.widthPixels
-        val parentHeight = if (rawParentHeight > 0) rawParentHeight else resources.displayMetrics.heightPixels
-        
-        // 计算分割线位置（ListView宽度）
-        val dividerPosition = if (isLandscape) {
-            (parentWidth * 0.45).toInt() // 横屏时占45%
-        } else {
-            (parentWidth * 0.30).toInt() // 竖屏时占30%
+        // 设置锁，防止并发执行
+        if (!orientationChangeLock.compareAndSet(false, true)) {
+            android.util.Log.w("MainView", "Orientation update already in progress, skipping")
+            return
         }
-        
-        // 更新图片容器尺寸 - 基于父容器尺寸
-        savedContainerWidth = parentWidth - dividerPosition
-        savedContainerHeight = parentHeight
-        
-        // 更新容器布局参数
-        val containerParams = coverContainer.layoutParams as LayoutParams
-        containerParams.width = savedContainerWidth
-        coverContainer.layoutParams = containerParams
-        
-        // 更新ListView宽度
-        val listParams = listView.layoutParams as LayoutParams
-        listParams.width = dividerPosition
-        listView.layoutParams = listParams
-        
-        // 更新分割线位置
-        val dividerParams = dividerView.layoutParams as LayoutParams
-        dividerParams.leftMargin = dividerPosition - 2
-        dividerView.layoutParams = dividerParams
 
-        android.util.Log.d("MainView", "Layout updated for orientation: landscape=$isLandscape, parent=${parentWidth}x${parentHeight}, container=${savedContainerWidth}x${savedContainerHeight}, divider=$dividerPosition")
+        try {
+            val isLandscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
-        // 强制重新布局，确保新尺寸生效
-        listView.requestLayout()
-        coverContainer.requestLayout()
-        dividerView.requestLayout()
-        requestLayout()
+            // 优先使用屏幕宽度作为基准，避免使用可能不稳定的 parent.width
+            val screenWidth = resources.displayMetrics.widthPixels
+            val screenHeight = resources.displayMetrics.heightPixels
 
-        // 横竖屏切换后重新计算图片位置和尺寸
-        // 使用 waitForLayout 替代 post，确保布局实际完成后再重置图片位置
-        waitForLayout {
-            resetCoverPosition()
+            // 使用屏幕尺寸而非 parent 尺寸，因为 parent 可能在快速切换时返回错误值
+            val parentWidth = screenWidth
+            val parentHeight = screenHeight
+
+            // 计算分割线位置
+            val dividerPosition = if (isLandscape) {
+                (parentWidth * 0.45).toInt()
+            } else {
+                (parentWidth * 0.30).toInt()
+            }
+
+            // 更新保存的值
+            savedContainerWidth = parentWidth - dividerPosition
+            savedContainerHeight = getActualContainerHeight()
+            lastKnownParentWidth = parentWidth
+            lastKnownOrientation = if (isLandscape) Configuration.ORIENTATION_LANDSCAPE else Configuration.ORIENTATION_PORTRAIT
+
+            // 更新容器布局参数
+            val containerParams = coverContainer.layoutParams as LayoutParams
+            containerParams.width = savedContainerWidth
+            coverContainer.layoutParams = containerParams
+
+            // 更新ListView宽度
+            val listParams = listView.layoutParams as LayoutParams
+            listParams.width = dividerPosition
+            listView.layoutParams = listParams
+
+            // 更新分割线位置
+            val dividerParams = dividerView.layoutParams as LayoutParams
+            dividerParams.leftMargin = dividerPosition - 2
+            dividerView.layoutParams = dividerParams
+
+            android.util.Log.d("MainView", "Layout updated: landscape=$isLandscape, parent=${parentWidth}x${parentHeight}, container=${savedContainerWidth}x${savedContainerHeight}, divider=$dividerPosition")
+
+            // 强制重新布局，确保新尺寸生效
+            listView.requestLayout()
+            coverContainer.requestLayout()
+            dividerView.requestLayout()
+            requestLayout()
+
+            // 立即限制当前位置，防止在布局完成前出现黑边
+            clampCurrentPositionToBounds()
+
+            // 横竖屏切换后重新计算图片位置和尺寸
+            waitForLayout {
+                resetCoverPosition()
+            }
+        } finally {
+            // 延迟释放锁
+            handler?.postDelayed({
+                orientationChangeLock.set(false)
+            }, 500)
         }
     }
 
@@ -575,10 +694,50 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
         }
     }
 
+    /**
+     * 立即将当前图片位置限制在有效边界内，防止露出黑边
+     * 在横竖屏切换时调用，确保图片位置始终有效
+     */
+    private fun clampCurrentPositionToBounds() {
+        val containerWidth = if (coverContainer.width > 0) coverContainer.width else savedContainerWidth
+        val containerHeight = getActualContainerHeight()
+        val imageWidth = coverImageView.width
+        val imageHeight = coverImageView.height
+
+        if (containerWidth <= 0 || containerHeight <= 0 || imageWidth <= 0 || imageHeight <= 0) {
+            return
+        }
+
+        // 计算有效边界（图片不能露出黑边）
+        val minX = if (imageWidth > containerWidth) (containerWidth - imageWidth).toFloat() else 0f
+        val maxX = 0f
+        val minY = if (imageHeight > containerHeight) (containerHeight - imageHeight).toFloat() else 0f
+        val maxY = 0f
+
+        // 获取当前位置
+        val currentX = coverImageView.x
+        val currentY = coverImageView.y
+
+        // 限制在边界内
+        val clampedX = kotlin.math.max(minX, kotlin.math.min(maxX, currentX))
+        val clampedY = kotlin.math.max(minY, kotlin.math.min(maxY, currentY))
+
+        // 如果位置需要调整，立即应用（取消当前动画）
+        if (clampedX != currentX || clampedY != currentY) {
+            stopCoverAnimation()
+            coverImageView.x = clampedX
+            coverImageView.y = clampedY
+            android.util.Log.d("MainView", "Position clamped: ($currentX, $currentY) -> ($clampedX, $clampedY), bounds: x[$minX,$maxX], y[$minY,$maxY]")
+        }
+    }
+
     private fun resetCoverPosition() {
+        // 优先立即限制当前位置，防止黑边
+        clampCurrentPositionToBounds()
+
         // 优先使用实际测量的容器尺寸
         val containerWidth = if (coverContainer.width > 0) coverContainer.width else savedContainerWidth
-        val containerHeight = if (coverContainer.height > 0) coverContainer.height else savedContainerHeight
+        val containerHeight = getActualContainerHeight()
 
         android.util.Log.d("MainView", "resetCoverPosition() - container: ${containerWidth}x${containerHeight}")
 
@@ -687,6 +846,9 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
         coverImageView.x = initialPos.first
         coverImageView.y = initialPos.second
         android.util.Log.d("MainView", "Initial position: (${coverImageView.x}, ${coverImageView.y})")
+
+        // 启动动画（确保在所有尺寸计算完成后）
+        startCoverAnimation()
     }
     
     /**
@@ -695,7 +857,7 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
     private fun calculateGridPosition(gridX: Int, gridY: Int, movableWidth: Int, movableHeight: Int): Pair<Float, Float> {
         // 使用最新的容器和图片尺寸重新计算可移动范围
         val containerWidth = if (coverContainer.width > 0) coverContainer.width else savedContainerWidth
-        val containerHeight = if (coverContainer.height > 0) coverContainer.height else savedContainerHeight
+        val containerHeight = getActualContainerHeight()
         val imageWidth = coverImageView.width
         val imageHeight = coverImageView.height
         
@@ -767,7 +929,7 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
     private fun animateToNextPosition() {
         // 使用实际测量的容器尺寸
         val containerWidth = if (coverContainer.width > 0) coverContainer.width else savedContainerWidth
-        val containerHeight = if (coverContainer.height > 0) coverContainer.height else savedContainerHeight
+        val containerHeight = getActualContainerHeight()
         val imageWidth = savedImageWidth
         val imageHeight = savedImageHeight
 
@@ -909,6 +1071,11 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
         globalLayoutListener?.let {
             coverContainer.viewTreeObserver.removeOnGlobalLayoutListener(it)
             globalLayoutListener = null
+        }
+        // 清理方向变化处理器
+        orientationChangeHandler?.let {
+            handler?.removeCallbacks(it)
+            orientationChangeHandler = null
         }
         isLayoutPending = false
         isAnimating = false
