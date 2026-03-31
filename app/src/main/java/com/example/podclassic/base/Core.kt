@@ -256,7 +256,7 @@ object Core {
         Strings.init()
     }
 
-    private const val DELAY = 10000L
+    private const val DELAY = 120000L  // 2 minutes
 
     private var timer = com.example.podclassic.util.Timer(DELAY) {
         if (MediaPresenter.isPlaying() && screen.currentView !is com.example.podclassic.view.MusicPlayerView && screen.currentView !is com.example.podclassic.view.MusicPlayerView3rd && activity != null) {
