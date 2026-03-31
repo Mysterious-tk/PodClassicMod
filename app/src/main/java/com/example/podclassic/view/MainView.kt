@@ -76,6 +76,10 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
     private var isHorizontalScan = true // 是否以横向扫描为主
     private val visitedGrids = mutableSetOf<Pair<Int, Int>>() // 记录已访问的网格
 
+    // Global layout listener to track layout completion
+    private var globalLayoutListener: android.view.ViewTreeObserver.OnGlobalLayoutListener? = null
+    private var isLayoutPending = false
+
     init {
         // 启用硬件加速
         coverImageView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
@@ -123,8 +127,8 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
         
         // 设置图片容器（可见区域）- 从分割线右侧开始到屏幕右边
         savedContainerWidth = resources.displayMetrics.widthPixels - dividerPosition
-        // 估算容器高度（屏幕高度减去状态栏和标题栏）
-        savedContainerHeight = (resources.displayMetrics.heightPixels * 0.85).toInt()
+        // 使用全屏高度作为初始估算，后续会通过 updateLayoutForOrientation 校正
+        savedContainerHeight = resources.displayMetrics.heightPixels
         val containerParams = LayoutParams(savedContainerWidth, LayoutParams.MATCH_PARENT)
         containerParams.addRule(RelativeLayout.ALIGN_PARENT_RIGHT)
         containerParams.addRule(RelativeLayout.ALIGN_PARENT_TOP)
@@ -471,10 +475,10 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
         // 获取父容器（ScreenView）的尺寸
         val rawParentWidth = (parent as? android.view.ViewGroup)?.width ?: 0
         val rawParentHeight = (parent as? android.view.ViewGroup)?.height ?: 0
-        
-        // 如果父容器尺寸为0，使用默认值（基于屏幕尺寸估算）
+
+        // 使用实际屏幕尺寸作为fallback，而非不准确的百分比
         val parentWidth = if (rawParentWidth > 0) rawParentWidth else resources.displayMetrics.widthPixels
-        val parentHeight = if (rawParentHeight > 0) rawParentHeight else (resources.displayMetrics.heightPixels * 0.35).toInt()
+        val parentHeight = if (rawParentHeight > 0) rawParentHeight else resources.displayMetrics.heightPixels
         
         // 计算分割线位置（ListView宽度）
         val dividerPosition = if (isLandscape) {
@@ -511,9 +515,36 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
         requestLayout()
 
         // 横竖屏切换后重新计算图片位置和尺寸
-        coverContainer.post {
+        // 使用 waitForLayout 替代 post，确保布局实际完成后再重置图片位置
+        waitForLayout {
             resetCoverPosition()
         }
+    }
+
+    /**
+     * 等待布局完成后执行回调
+     * 使用 ViewTreeObserver.OnGlobalLayoutListener 确保布局实际完成
+     */
+    private fun waitForLayout(callback: () -> Unit) {
+        // 移除旧监听器
+        globalLayoutListener?.let {
+            coverContainer.viewTreeObserver.removeOnGlobalLayoutListener(it)
+        }
+
+        // 创建新监听器
+        globalLayoutListener = android.view.ViewTreeObserver.OnGlobalLayoutListener {
+            if (coverContainer.width > 0 && coverContainer.height > 0) {
+                coverContainer.viewTreeObserver.removeOnGlobalLayoutListener(globalLayoutListener)
+                globalLayoutListener = null
+                isLayoutPending = false
+                android.util.Log.d("MainView", "Layout completed: ${coverContainer.width}x${coverContainer.height}")
+                callback()
+            }
+        }
+
+        coverContainer.viewTreeObserver.addOnGlobalLayoutListener(globalLayoutListener)
+        isLayoutPending = true
+        coverContainer.requestLayout()
     }
 
     private fun updateCoverImage() {
@@ -526,12 +557,12 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
             android.util.Log.d("MainView", "coverBitmap: ${coverBitmap != null}, size: ${coverBitmap?.width}x${coverBitmap?.height}")
             if (coverBitmap != null) {
                 coverImageView.setImageBitmap(coverBitmap)
-                android.util.Log.d("MainView", "Bitmap set to coverImageView, scheduling resetCoverPosition in 50ms")
-                // 延迟重置位置，确保 drawable 完全更新
-                coverContainer.postDelayed({
-                    android.util.Log.d("MainView", "Delayed resetCoverPosition() executing...")
+                android.util.Log.d("MainView", "Bitmap set to coverImageView, scheduling resetCoverPosition after layout")
+                // 使用 waitForLayout 替代 postDelayed，确保布局完成后再重置位置
+                waitForLayout {
+                    android.util.Log.d("MainView", "Layout completed, executing resetCoverPosition()...")
                     resetCoverPosition()
-                }, 50)
+                }
             } else {
                 // 随机选一个图片当封面
                 android.util.Log.d("MainView", "No cover bitmap, using random cover")
@@ -545,15 +576,20 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
     }
 
     private fun resetCoverPosition() {
-        // 使用父容器提供的尺寸（在updateLayoutForOrientation中已设置）
-        val containerWidth = savedContainerWidth
-        val containerHeight = savedContainerHeight
+        // 优先使用实际测量的容器尺寸
+        val containerWidth = if (coverContainer.width > 0) coverContainer.width else savedContainerWidth
+        val containerHeight = if (coverContainer.height > 0) coverContainer.height else savedContainerHeight
+
+        android.util.Log.d("MainView", "resetCoverPosition() - container: ${containerWidth}x${containerHeight}")
 
         // 获取图片实际尺寸 - 确保 Bitmap 已就绪
         val drawable = coverImageView.drawable
         if (drawable == null) {
             android.util.Log.w("MainView", "Drawable not ready, scheduling retry...")
-            coverContainer.postDelayed({ resetCoverPosition() }, 50)
+            // 使用 waitForLayout 替代 postDelayed
+            waitForLayout {
+                resetCoverPosition()
+            }
             return
         }
 
@@ -562,17 +598,15 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
 
         // 增加更严格的尺寸检查
         if (containerWidth <= 0 || containerHeight <= 0) {
-            android.util.Log.w("MainView", "Container size invalid: ${containerWidth}x${containerHeight}, retrying...")
+            android.util.Log.w("MainView", "Container size invalid: ${containerWidth}x${containerHeight}, waiting for layout...")
             updateLayoutForOrientation()
-            coverContainer.postDelayed({ resetCoverPosition() }, 50)
-            return
+            return  // waitForLayout 会调用 resetCoverPosition
         }
 
         if (bitmapWidth <= 0 || bitmapHeight <= 0) {
             android.util.Log.w("MainView", "Bitmap size invalid: ${bitmapWidth}x${bitmapHeight}, reloading image...")
             updateCoverImage()  // 重新加载图片
-            coverContainer.postDelayed({ resetCoverPosition() }, 100)
-            return
+            return  // updateCoverImage 会通过 waitForLayout 调用 resetCoverPosition
         }
         
         // 计算缩放比例：确保图片填满整个容器（不露出黑色背景）
@@ -701,26 +735,26 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
             val bitmap = android.graphics.BitmapFactory.decodeStream(inputStream)
             if (bitmap != null) {
                 coverImageView.setImageBitmap(bitmap)
-                // 图片加载完成后延迟重置位置，确保 drawable 被测量
-                coverContainer.postDelayed({
+                // 使用 waitForLayout 替代 postDelayed，确保布局完成后再重置位置
+                waitForLayout {
                     resetCoverPosition()
-                }, 50)
+                }
             } else {
                 // 如果解码失败，使用默认图片
                 coverImageView.setImageResource(android.R.drawable.ic_media_play)
-                // 延迟重置位置，确保 drawable 被测量
-                coverContainer.postDelayed({
+                // 使用 waitForLayout 替代 postDelayed
+                waitForLayout {
                     resetCoverPosition()
-                }, 50)
+                }
             }
             inputStream.close()
         } catch (e: Exception) {
             // 如果发生异常，使用默认图片
             coverImageView.setImageResource(android.R.drawable.ic_media_play)
-            // 延迟重置位置，确保 drawable 被测量
-            coverContainer.postDelayed({
+            // 使用 waitForLayout 替代 postDelayed
+            waitForLayout {
                 resetCoverPosition()
-            }, 50)
+            }
         }
     }
 
@@ -868,5 +902,17 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
         stopCoverAnimation()
+    }
+
+    override fun onViewRemove() {
+        // 清理布局监听器
+        globalLayoutListener?.let {
+            coverContainer.viewTreeObserver.removeOnGlobalLayoutListener(it)
+            globalLayoutListener = null
+        }
+        isLayoutPending = false
+        isAnimating = false
+        xAnimator?.cancel()
+        yAnimator?.cancel()
     }
 }
