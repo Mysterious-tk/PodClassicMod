@@ -309,4 +309,32 @@ object MediaPresenter {
     fun applyTubeAmpPreset(preset: com.example.podclassic.media.TubeAmpPreset) {
         sendMessage(MediaService.ACTION_SET_TUBE_AMP_PRESET, preset)
     }
+
+    // DC Phase Linearizer 相关方法
+    fun setDCPhaseEnabled() {
+        sendMessage(MediaService.ACTION_SET_DC_PHASE_ENABLED)
+    }
+
+    fun setDCPhaseParameters(
+        strength: Float? = null,
+        lowDelay: Float? = null,
+        midDelay: Float? = null,
+        highDelay: Float? = null,
+        crossover: Float? = null,
+        highCrossover: Float? = null
+    ) {
+        val params = mapOf(
+            "strength" to strength,
+            "lowDelay" to lowDelay,
+            "midDelay" to midDelay,
+            "highDelay" to highDelay,
+            "crossover" to crossover,
+            "highCrossover" to highCrossover
+        )
+        sendMessage(MediaService.ACTION_SET_DC_PHASE_PARAMETERS, params, null)
+    }
+
+    fun applyDCPhasePreset(preset: com.example.podclassic.media.DCPhasePreset) {
+        sendMessage(MediaService.ACTION_SET_DC_PHASE_PRESET, preset)
+    }
 }  

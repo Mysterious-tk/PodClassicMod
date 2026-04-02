@@ -81,4 +81,32 @@
     <string name="prev">上一首</string>
     <string name="next">下一首</string>
     <string name="pause">暫停</string>
+    <!-- 膽機音效相關 -->
+    <string name="tube_amp">膽機音效</string>
+    <string name="tube_amp_enabled">膽機音效開關</string>
+    <string name="tube_amp_settings">膽機音效設置</string>
+    <string name="tube_amp_preset">預設模式</string>
+    <string name="tube_amp_warmth">溫暖度</string>
+    <string name="tube_amp_saturation">飽和度</string>
+    <string name="tube_amp_harmonics">諧波含量</string>
+    <string name="tube_amp_preset_none">關閉</string>
+    <string name="tube_amp_preset_warm">溫暖</string>
+    <string name="tube_amp_preset_smooth">醇厚</string>
+    <string name="tube_amp_preset_vintage">復古</string>
+    <string name="tube_amp_preset_dynamic">動態</string>
+    <!-- DC Phase Linearizer 相關 -->
+    <string name="dc_phase">DC相位線性器</string>
+    <string name="dc_phase_enabled">DC相位線性器開關</string>
+    <string name="dc_phase_settings">DC相位線性器設置</string>
+    <string name="dc_phase_preset">預設模式</string>
+    <string name="dc_phase_strength">校正強度</string>
+    <string name="dc_phase_low_delay">低頻延遲</string>
+    <string name="dc_phase_mid_delay">中頻延遲</string>
+    <string name="dc_phase_high_delay">高頻延遲</string>
+    <string name="dc_phase_crossover">分頻點</string>
+    <string name="dc_phase_preset_none">關閉</string>
+    <string name="dc_phase_preset_natural">自然</string>
+    <string name="dc_phase_preset_precise">精確</string>
+    <string name="dc_phase_preset_spatial">空間</string>
+    <string name="dc_phase_preset_custom">自定義</string>
 </resources>

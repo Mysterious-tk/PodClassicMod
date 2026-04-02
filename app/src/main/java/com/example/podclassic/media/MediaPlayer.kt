@@ -183,6 +183,55 @@ class MediaPlayer<E>(context: Context, private val mediaAdapter: MediaAdapter<E>
         return tomSteadyProcessor?.getTubeAmpProcessor()
     }
 
+    // DC Phase Linearizer 相关
+    var dcPhaseEnabled: Boolean
+        get() = tomSteadyProcessor?.dcPhaseEnabled ?: false
+        set(value) {
+            // 确保TomSteadyProcessor已初始化
+            if (tomSteadyProcessor == null) {
+                initTomSteadyProcessor()
+            }
+            tomSteadyProcessor?.dcPhaseEnabled = value
+            SPManager.setBoolean(SPManager.SP_DC_PHASE_ENABLED, value)
+            onDataChangeListener?.onDCPhaseChange()
+        }
+
+    fun setDCPhaseParameters(
+        strength: Float? = null,
+        lowDelay: Float? = null,
+        midDelay: Float? = null,
+        highDelay: Float? = null,
+        crossover: Float? = null,
+        highCrossover: Float? = null
+    ) {
+        tomSteadyProcessor?.setDCPhaseParameters(
+            strength = strength,
+            lowDelay = lowDelay,
+            midDelay = midDelay,
+            highDelay = highDelay,
+            crossover = crossover,
+            highCrossover = highCrossover
+        )
+
+        // 保存参数到SharedPreferences
+        strength?.let { SPManager.setFloat(SPManager.SP_DC_PHASE_STRENGTH, it) }
+        lowDelay?.let { SPManager.setFloat(SPManager.SP_DC_PHASE_LOW_DELAY, it) }
+        midDelay?.let { SPManager.setFloat(SPManager.SP_DC_PHASE_MID_DELAY, it) }
+        highDelay?.let { SPManager.setFloat(SPManager.SP_DC_PHASE_HIGH_DELAY, it) }
+        crossover?.let { SPManager.setFloat(SPManager.SP_DC_PHASE_CROSSOVER, it) }
+        onDataChangeListener?.onDCPhaseChange()
+    }
+
+    fun applyDCPhasePreset(preset: DCPhasePreset) {
+        tomSteadyProcessor?.applyDCPhasePreset(preset)
+        SPManager.setInt(SPManager.SP_DC_PHASE_PRESET, preset.ordinal)
+        onDataChangeListener?.onDCPhaseChange()
+    }
+
+    fun getDCPhaseProcessor(): DCPhaseLinearizerProcessor? {
+        return tomSteadyProcessor?.getDCPhaseProcessor()
+    }
+
     /**
      * 获取TomSteady参考电平
      */
@@ -237,6 +286,7 @@ class MediaPlayer<E>(context: Context, private val mediaAdapter: MediaAdapter<E>
         fun onAgcChange() {}
         fun onTomSteadyChange() {}
         fun onTubeAmpChange() {}
+        fun onDCPhaseChange() {}
         fun onAudioManagerChange() {}
         fun onStopTimeChange() {}
 

@@ -622,6 +622,197 @@ class SettingsView(context: Context) : RecyclerListView(context), ScreenView {
                 }
             }, true),
 
+            SwitchBar(
+                "DC相位线性器",
+                SPManager.SP_DC_PHASE_ENABLED,
+                false,
+                object : OnSwitchListener {
+                    override fun onSwitch() {
+                        MediaPresenter.setDCPhaseEnabled()
+                    }
+                }),
+
+            Item("DC相位线性器设置", object : OnItemClickListener {
+                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                    val itemList = arrayListOf(
+                        Item(
+                            "预设模式",
+                            object : OnItemClickListener {
+                                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                                    val presets = com.example.podclassic.media.DCPhasePreset.values()
+                                    val currentPresetIndex = SPManager.getInt(SPManager.SP_DC_PHASE_PRESET)
+                                    val nextPresetIndex = (currentPresetIndex + 1) % presets.size
+                                    val nextPreset = presets[nextPresetIndex]
+                                    SPManager.setInt(SPManager.SP_DC_PHASE_PRESET, nextPresetIndex)
+                                    MediaPresenter.applyDCPhasePreset(nextPreset)
+                                    listView.getCurrentItem().rightText = nextPreset.displayName
+                                    return true
+                                }
+                            },
+                            com.example.podclassic.media.DCPhasePreset.values()[
+                                SPManager.getInt(SPManager.SP_DC_PHASE_PRESET)
+                                    .coerceIn(0, com.example.podclassic.media.DCPhasePreset.values().size - 1)
+                            ].displayName
+                        ),
+                        Item(
+                            "校正强度",
+                            object : OnItemClickListener {
+                                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                                    // 循环切换校正强度值
+                                    val currentValue = SPManager.getFloat(SPManager.SP_DC_PHASE_STRENGTH, 0.5f)
+                                    val values = arrayOf(0.2f, 0.4f, 0.5f, 0.6f, 0.8f)
+                                    val currentIndex = values.indexOfFirst { it == currentValue }
+                                    val nextIndex = (currentIndex + 1) % values.size
+                                    val nextValue = values[nextIndex]
+                                    SPManager.setFloat(SPManager.SP_DC_PHASE_STRENGTH, nextValue)
+                                    MediaPresenter.setDCPhaseParameters(strength = nextValue)
+                                    listView.getCurrentItem().rightText = when (nextValue) {
+                                        0.2f -> "低"
+                                        0.4f -> "中低"
+                                        0.5f -> "中"
+                                        0.6f -> "中高"
+                                        0.8f -> "高"
+                                        else -> nextValue.toString()
+                                    }
+                                    return true
+                                }
+                            },
+                            when (SPManager.getFloat(SPManager.SP_DC_PHASE_STRENGTH, 0.5f)) {
+                                0.2f -> "低"
+                                0.4f -> "中低"
+                                0.5f -> "中"
+                                0.6f -> "中高"
+                                0.8f -> "高"
+                                else -> "中"
+                            }
+                        ),
+                        Item(
+                            "低频延迟",
+                            object : OnItemClickListener {
+                                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                                    // 循环切换低频延迟值
+                                    val currentValue = SPManager.getFloat(SPManager.SP_DC_PHASE_LOW_DELAY, 0.3f)
+                                    val values = arrayOf(0.1f, 0.2f, 0.3f, 0.4f, 0.5f)
+                                    val currentIndex = values.indexOfFirst { it == currentValue }
+                                    val nextIndex = (currentIndex + 1) % values.size
+                                    val nextValue = values[nextIndex]
+                                    SPManager.setFloat(SPManager.SP_DC_PHASE_LOW_DELAY, nextValue)
+                                    MediaPresenter.setDCPhaseParameters(lowDelay = nextValue)
+                                    listView.getCurrentItem().rightText = when (nextValue) {
+                                        0.1f -> "短"
+                                        0.2f -> "中短"
+                                        0.3f -> "中"
+                                        0.4f -> "中长"
+                                        0.5f -> "长"
+                                        else -> nextValue.toString()
+                                    }
+                                    return true
+                                }
+                            },
+                            when (SPManager.getFloat(SPManager.SP_DC_PHASE_LOW_DELAY, 0.3f)) {
+                                0.1f -> "短"
+                                0.2f -> "中短"
+                                0.3f -> "中"
+                                0.4f -> "中长"
+                                0.5f -> "长"
+                                else -> "中"
+                            }
+                        ),
+                        Item(
+                            "中频延迟",
+                            object : OnItemClickListener {
+                                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                                    // 循环切换中频延迟值
+                                    val currentValue = SPManager.getFloat(SPManager.SP_DC_PHASE_MID_DELAY, 0.2f)
+                                    val values = arrayOf(0.05f, 0.1f, 0.2f, 0.3f, 0.4f)
+                                    val currentIndex = values.indexOfFirst { it == currentValue }
+                                    val nextIndex = (currentIndex + 1) % values.size
+                                    val nextValue = values[nextIndex]
+                                    SPManager.setFloat(SPManager.SP_DC_PHASE_MID_DELAY, nextValue)
+                                    MediaPresenter.setDCPhaseParameters(midDelay = nextValue)
+                                    listView.getCurrentItem().rightText = when (nextValue) {
+                                        0.05f -> "极短"
+                                        0.1f -> "短"
+                                        0.2f -> "中"
+                                        0.3f -> "中长"
+                                        0.4f -> "长"
+                                        else -> nextValue.toString()
+                                    }
+                                    return true
+                                }
+                            },
+                            when (SPManager.getFloat(SPManager.SP_DC_PHASE_MID_DELAY, 0.2f)) {
+                                0.05f -> "极短"
+                                0.1f -> "短"
+                                0.2f -> "中"
+                                0.3f -> "中长"
+                                0.4f -> "长"
+                                else -> "中"
+                            }
+                        ),
+                        Item(
+                            "高频延迟",
+                            object : OnItemClickListener {
+                                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                                    // 循环切换高频延迟值
+                                    val currentValue = SPManager.getFloat(SPManager.SP_DC_PHASE_HIGH_DELAY, 0.1f)
+                                    val values = arrayOf(0.0f, 0.05f, 0.1f, 0.15f, 0.2f)
+                                    val currentIndex = values.indexOfFirst { it == currentValue }
+                                    val nextIndex = (currentIndex + 1) % values.size
+                                    val nextValue = values[nextIndex]
+                                    SPManager.setFloat(SPManager.SP_DC_PHASE_HIGH_DELAY, nextValue)
+                                    MediaPresenter.setDCPhaseParameters(highDelay = nextValue)
+                                    listView.getCurrentItem().rightText = when (nextValue) {
+                                        0.0f -> "无"
+                                        0.05f -> "极短"
+                                        0.1f -> "短"
+                                        0.15f -> "中"
+                                        0.2f -> "长"
+                                        else -> nextValue.toString()
+                                    }
+                                    return true
+                                }
+                            },
+                            when (SPManager.getFloat(SPManager.SP_DC_PHASE_HIGH_DELAY, 0.1f)) {
+                                0.0f -> "无"
+                                0.05f -> "极短"
+                                0.1f -> "短"
+                                0.15f -> "中"
+                                0.2f -> "长"
+                                else -> "短"
+                            }
+                        ),
+                        Item(
+                            "分频点",
+                            object : OnItemClickListener {
+                                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                                    // 循环切换分频点值
+                                    val currentValue = SPManager.getFloat(SPManager.SP_DC_PHASE_CROSSOVER, 500.0f)
+                                    val values = arrayOf(300.0f, 400.0f, 500.0f, 600.0f, 800.0f)
+                                    val currentIndex = values.indexOfFirst { it == currentValue }
+                                    val nextIndex = (currentIndex + 1) % values.size
+                                    val nextValue = values[nextIndex]
+                                    SPManager.setFloat(SPManager.SP_DC_PHASE_CROSSOVER, nextValue)
+                                    MediaPresenter.setDCPhaseParameters(crossover = nextValue)
+                                    listView.getCurrentItem().rightText = nextValue.toInt().toString() + "Hz"
+                                    return true
+                                }
+                            },
+                            SPManager.getFloat(SPManager.SP_DC_PHASE_CROSSOVER, 500.0f).toInt().toString() + "Hz"
+                        )
+                    )
+                    Core.addView(
+                        ItemListView(
+                            context,
+                            itemList,
+                            "DC相位线性器设置",
+                            null
+                        )
+                    )
+                    return true
+                }
+            }, true),
+
             Item(Strings.RESET_ALL_SETTINGS, object : OnItemClickListener {
                 override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                     Core.addView(

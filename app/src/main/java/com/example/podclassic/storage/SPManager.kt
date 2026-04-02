@@ -35,6 +35,15 @@ object SPManager {
     const val SP_TUBE_AMP_SATURATION = "tube_amp_saturation"
     const val SP_TUBE_AMP_HARMONICS = "tube_amp_harmonics"
 
+    // DC Phase Linearizer 相关
+    const val SP_DC_PHASE_ENABLED = "dc_phase_enabled"
+    const val SP_DC_PHASE_PRESET = "dc_phase_preset"
+    const val SP_DC_PHASE_STRENGTH = "dc_phase_strength"
+    const val SP_DC_PHASE_LOW_DELAY = "dc_phase_low_delay"
+    const val SP_DC_PHASE_MID_DELAY = "dc_phase_mid_delay"
+    const val SP_DC_PHASE_HIGH_DELAY = "dc_phase_high_delay"
+    const val SP_DC_PHASE_CROSSOVER = "dc_phase_crossover"
+
     private val sharedPreferences =
         PreferenceManager.getDefaultSharedPreferences(BaseApplication.context)
 
@@ -100,6 +109,13 @@ object SPManager {
         setString(SP_TUBE_AMP_WARMTH, "0.5")
         setString(SP_TUBE_AMP_SATURATION, "0.6")
         setString(SP_TUBE_AMP_HARMONICS, "0.3")
+        setBoolean(SP_DC_PHASE_ENABLED, false)
+        setInt(SP_DC_PHASE_PRESET, 0)
+        setString(SP_DC_PHASE_STRENGTH, "0.5")
+        setString(SP_DC_PHASE_LOW_DELAY, "0.3")
+        setString(SP_DC_PHASE_MID_DELAY, "0.2")
+        setString(SP_DC_PHASE_HIGH_DELAY, "0.1")
+        setString(SP_DC_PHASE_CROSSOVER, "500.0")
         var resetCount = getInt(SP_RESET_COUNT)
         resetCount++
         setInt(SP_RESET_COUNT, resetCount)

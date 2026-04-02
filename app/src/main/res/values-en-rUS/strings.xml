@@ -94,4 +94,19 @@
     <string name="tube_amp_preset_smooth">Smooth</string>
     <string name="tube_amp_preset_vintage">Vintage</string>
     <string name="tube_amp_preset_dynamic">Dynamic</string>
+    <!-- DC Phase Linearizer -->
+    <string name="dc_phase">DC Phase Linearizer</string>
+    <string name="dc_phase_enabled">DC Phase Linearizer Enabled</string>
+    <string name="dc_phase_settings">DC Phase Linearizer Settings</string>
+    <string name="dc_phase_preset">Preset</string>
+    <string name="dc_phase_strength">Correction Strength</string>
+    <string name="dc_phase_low_delay">Low Freq Delay</string>
+    <string name="dc_phase_mid_delay">Mid Freq Delay</string>
+    <string name="dc_phase_high_delay">High Freq Delay</string>
+    <string name="dc_phase_crossover">Crossover Freq</string>
+    <string name="dc_phase_preset_none">Off</string>
+    <string name="dc_phase_preset_natural">Natural</string>
+    <string name="dc_phase_preset_precise">Precise</string>
+    <string name="dc_phase_preset_spatial">Spatial</string>
+    <string name="dc_phase_preset_custom">Custom</string>
 </resources>

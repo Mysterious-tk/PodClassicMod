@@ -7,6 +7,7 @@ import java.nio.ByteBuffer
 class TomSteadyProcessor(audioSessionId: Int) {
     private val tomSteadyAGC = TomSteadyAGC()
     private var tubeAmpProcessor: TubeAmpProcessor? = null
+    private var dcPhaseProcessor: DCPhaseLinearizerProcessor? = null
     private var audioBufferSize = 0
     var tubeAmpEnabled: Boolean = false
         set(value) {
@@ -16,6 +17,16 @@ class TomSteadyProcessor(audioSessionId: Int) {
                 tubeAmpProcessor = TubeAmpProcessor()
             }
             tubeAmpProcessor?.enabled = value
+        }
+
+    var dcPhaseEnabled: Boolean = false
+        set(value) {
+            field = value
+            // 初始化 DC Phase Linearizer（首次启用时）
+            if (value && dcPhaseProcessor == null) {
+                dcPhaseProcessor = DCPhaseLinearizerProcessor()
+            }
+            dcPhaseProcessor?.enabled = value
         }
 
     /**
@@ -49,6 +60,11 @@ class TomSteadyProcessor(audioSessionId: Int) {
         // 应用胆机音效
         if (tubeAmpEnabled && tubeAmpProcessor != null) {
             processed = tubeAmpProcessor!!.processAudio(processed, size)
+        }
+
+        // 应用 DC Phase Linearizer
+        if (dcPhaseEnabled && dcPhaseProcessor != null) {
+            processed = dcPhaseProcessor!!.processAudio(processed, size)
         }
 
         return processed
@@ -148,6 +164,7 @@ class TomSteadyProcessor(audioSessionId: Int) {
     fun reset() {
         tomSteadyAGC.reset()
         tubeAmpProcessor?.reset()
+        dcPhaseProcessor?.reset()
     }
 
     /**
@@ -249,5 +266,50 @@ class TomSteadyProcessor(audioSessionId: Int) {
         tubeAmpProcessor?.applyPreset(preset)
         // 更新启用状态
         tubeAmpEnabled = preset != TubeAmpPreset.NONE
+    }
+
+    /**
+     * 获取DCPhaseLinearizerProcessor实例
+     */
+    fun getDCPhaseProcessor(): DCPhaseLinearizerProcessor? {
+        return dcPhaseProcessor
+    }
+
+    /**
+     * 设置DC Phase Linearizer参数
+     */
+    fun setDCPhaseParameters(
+        strength: Float? = null,
+        lowDelay: Float? = null,
+        midDelay: Float? = null,
+        highDelay: Float? = null,
+        crossover: Float? = null,
+        highCrossover: Float? = null
+    ) {
+        // 确保DC Phase处理器已初始化
+        if (dcPhaseProcessor == null) {
+            dcPhaseProcessor = DCPhaseLinearizerProcessor()
+        }
+        dcPhaseProcessor?.let {
+            strength?.let { v -> it.correctionStrength = v }
+            lowDelay?.let { v -> it.lowFreqDelay = v }
+            midDelay?.let { v -> it.midFreqDelay = v }
+            highDelay?.let { v -> it.highFreqDelay = v }
+            crossover?.let { v -> it.crossoverFreq = v }
+            highCrossover?.let { v -> it.highCrossoverFreq = v }
+        }
+    }
+
+    /**
+     * 应用DC Phase Linearizer预设
+     */
+    fun applyDCPhasePreset(preset: DCPhasePreset) {
+        // 确保DC Phase处理器已初始化
+        if (dcPhaseProcessor == null) {
+            dcPhaseProcessor = DCPhaseLinearizerProcessor()
+        }
+        dcPhaseProcessor?.applyPreset(preset)
+        // 更新启用状态
+        dcPhaseEnabled = preset != DCPhasePreset.NONE
     }
 }

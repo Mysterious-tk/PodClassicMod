@@ -87,6 +87,11 @@ class MediaService : Service() {
         const val ACTION_SET_TUBE_AMP_PRESET = "action_set_tube_amp_preset"
         const val ACTION_SET_TUBE_AMP_PARAMETERS = "action_set_tube_amp_parameters"
 
+        // DC Phase Linearizer 相关
+        const val ACTION_SET_DC_PHASE_ENABLED = "action_set_dc_phase_enabled"
+        const val ACTION_SET_DC_PHASE_PRESET = "action_set_dc_phase_preset"
+        const val ACTION_SET_DC_PHASE_PARAMETERS = "action_set_dc_phase_parameters"
+
         // 进度更新间隔（毫秒）
         const val PROGRESS_UPDATE_INTERVAL = 1000L
     }
@@ -275,6 +280,10 @@ class MediaService : Service() {
 
         override fun onTubeAmpChange() {
             // 胆机音效变化时的回调（可扩展）
+        }
+
+        override fun onDCPhaseChange() {
+            // DC Phase Linearizer 变化时的回调（可扩展）
         }
     }
 
@@ -584,6 +593,7 @@ class MediaService : Service() {
         updateAgcEnabled()
         updateTomSteadyEnabled()
         updateTubeAmpEnabled()
+        updateDCPhaseEnabled()
 
         android.util.Log.d("MediaService", "MediaPlayer initialized")
     }
@@ -803,6 +813,36 @@ class MediaService : Service() {
                         )
                     }
                 }
+                ACTION_SET_DC_PHASE_ENABLED -> {
+                    updateDCPhaseEnabled()
+                }
+                ACTION_SET_DC_PHASE_PRESET -> {
+                    // 处理 DC Phase 预设
+                    if (arg1 is com.example.podclassic.media.DCPhasePreset) {
+                        mediaPlayer.applyDCPhasePreset(arg1)
+                    }
+                }
+                ACTION_SET_DC_PHASE_PARAMETERS -> {
+                    // 处理 DC Phase 参数设置
+                    if (arg1 is Map<*, *>) {
+                        val params = arg1
+                        val strength = params["strength"] as? Float
+                        val lowDelay = params["lowDelay"] as? Float
+                        val midDelay = params["midDelay"] as? Float
+                        val highDelay = params["highDelay"] as? Float
+                        val crossover = params["crossover"] as? Float
+                        val highCrossover = params["highCrossover"] as? Float
+
+                        mediaPlayer.setDCPhaseParameters(
+                            strength = strength,
+                            lowDelay = lowDelay,
+                            midDelay = midDelay,
+                            highDelay = highDelay,
+                            crossover = crossover,
+                            highCrossover = highCrossover
+                        )
+                    }
+                }
                 else -> {
                     throw IllegalArgumentException("unknown action")
                 }
@@ -835,6 +875,10 @@ class MediaService : Service() {
 
     private fun updateTubeAmpEnabled() {
         mediaPlayer.tubeAmpEnabled = SPManager.getBoolean(SPManager.SP_TUBE_AMP_ENABLED)
+    }
+
+    private fun updateDCPhaseEnabled() {
+        mediaPlayer.dcPhaseEnabled = SPManager.getBoolean(SPManager.SP_DC_PHASE_ENABLED)
     }
 
     data class Action(val action: String, val arg1: Any?, val arg2: Any?)

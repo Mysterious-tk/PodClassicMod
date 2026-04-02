@@ -94,4 +94,19 @@
     <string name="tube_amp_preset_smooth">醇厚</string>
     <string name="tube_amp_preset_vintage">复古</string>
     <string name="tube_amp_preset_dynamic">动态</string>
+    <!-- DC Phase Linearizer 相关 -->
+    <string name="dc_phase">DC相位线性器</string>
+    <string name="dc_phase_enabled">DC相位线性器开关</string>
+    <string name="dc_phase_settings">DC相位线性器设置</string>
+    <string name="dc_phase_preset">预设模式</string>
+    <string name="dc_phase_strength">校正强度</string>
+    <string name="dc_phase_low_delay">低频延迟</string>
+    <string name="dc_phase_mid_delay">中频延迟</string>
+    <string name="dc_phase_high_delay">高频延迟</string>
+    <string name="dc_phase_crossover">分频点</string>
+    <string name="dc_phase_preset_none">关闭</string>
+    <string name="dc_phase_preset_natural">自然</string>
+    <string name="dc_phase_preset_precise">精确</string>
+    <string name="dc_phase_preset_spatial">空间</string>
+    <string name="dc_phase_preset_custom">自定义</string>
 </resources>
