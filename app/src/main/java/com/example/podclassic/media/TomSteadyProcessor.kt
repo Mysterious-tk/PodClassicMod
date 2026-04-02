@@ -6,7 +6,17 @@ import java.nio.ByteBuffer
 
 class TomSteadyProcessor(audioSessionId: Int) {
     private val tomSteadyAGC = TomSteadyAGC()
+    private var tubeAmpProcessor: TubeAmpProcessor? = null
     private var audioBufferSize = 0
+    var tubeAmpEnabled: Boolean = false
+        set(value) {
+            field = value
+            // 初始化胆机处理器（首次启用时）
+            if (value && tubeAmpProcessor == null) {
+                tubeAmpProcessor = TubeAmpProcessor()
+            }
+            tubeAmpProcessor?.enabled = value
+        }
 
     /**
      * 初始化处理器
@@ -30,11 +40,18 @@ class TomSteadyProcessor(audioSessionId: Int) {
      * @param size 数据大小
      */
     fun processAudio(buffer: ShortArray, size: Int): ShortArray {
-        return if (tomSteadyAGC.enabled) {
+        var processed = if (tomSteadyAGC.enabled) {
             tomSteadyAGC.processAudio(buffer, size)
         } else {
             buffer
         }
+
+        // 应用胆机音效
+        if (tubeAmpEnabled && tubeAmpProcessor != null) {
+            processed = tubeAmpProcessor!!.processAudio(processed, size)
+        }
+
+        return processed
     }
 
     /**
@@ -130,6 +147,7 @@ class TomSteadyProcessor(audioSessionId: Int) {
      */
     fun reset() {
         tomSteadyAGC.reset()
+        tubeAmpProcessor?.reset()
     }
 
     /**
@@ -184,5 +202,52 @@ class TomSteadyProcessor(audioSessionId: Int) {
         attackTime?.let { tomSteadyAGC.attackTime = it }
         releaseTime?.let { tomSteadyAGC.releaseTime = it }
         enabled?.let { tomSteadyAGC.enabled = it }
+    }
+
+    /**
+     * 获取TubeAmpProcessor实例
+     */
+    fun getTubeAmpProcessor(): TubeAmpProcessor? {
+        return tubeAmpProcessor
+    }
+
+    /**
+     * 设置胆机音效参数
+     */
+    fun setTubeAmpParameters(
+        gain: Float? = null,
+        saturation: Float? = null,
+        harmonics: Float? = null,
+        ratio: Float? = null,
+        attack: Float? = null,
+        release: Float? = null,
+        warmth: Float? = null
+    ) {
+        // 确保胆机处理器已初始化
+        if (tubeAmpProcessor == null) {
+            tubeAmpProcessor = TubeAmpProcessor()
+        }
+        tubeAmpProcessor?.let {
+            gain?.let { v -> it.tubeGain = v }
+            saturation?.let { v -> it.saturationAmount = v }
+            harmonics?.let { v -> it.harmonicContent = v }
+            ratio?.let { v -> it.compressionRatio = v }
+            attack?.let { v -> it.attackTimeMs = v }
+            release?.let { v -> it.releaseTimeMs = v }
+            warmth?.let { v -> it.updateWarmth(v) }
+        }
+    }
+
+    /**
+     * 应用胆机预设
+     */
+    fun applyTubeAmpPreset(preset: TubeAmpPreset) {
+        // 确保胆机处理器已初始化
+        if (tubeAmpProcessor == null) {
+            tubeAmpProcessor = TubeAmpProcessor()
+        }
+        tubeAmpProcessor?.applyPreset(preset)
+        // 更新启用状态
+        tubeAmpEnabled = preset != TubeAmpPreset.NONE
     }
 }

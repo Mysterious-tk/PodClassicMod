@@ -471,9 +471,150 @@ class SettingsView(context: Context) : RecyclerListView(context), ScreenView {
                     )
                     Core.addView(
                         ItemListView(
-                            context, 
-                            itemList, 
-                            "TomSteady设置", 
+                            context,
+                            itemList,
+                            "TomSteady设置",
+                            null
+                        )
+                    )
+                    return true
+                }
+            }, true),
+
+            SwitchBar(
+                "胆机音效",
+                SPManager.SP_TUBE_AMP_ENABLED,
+                false,
+                object : OnSwitchListener {
+                    override fun onSwitch() {
+                        MediaPresenter.setTubeAmpEnabled()
+                    }
+                }),
+
+            Item("胆机音效设置", object : OnItemClickListener {
+                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                    val itemList = arrayListOf(
+                        Item(
+                            "预设模式",
+                            object : OnItemClickListener {
+                                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                                    val presets = com.example.podclassic.media.TubeAmpPreset.values()
+                                    val currentPresetIndex = SPManager.getInt(SPManager.SP_TUBE_AMP_PRESET)
+                                    val nextPresetIndex = (currentPresetIndex + 1) % presets.size
+                                    val nextPreset = presets[nextPresetIndex]
+                                    SPManager.setInt(SPManager.SP_TUBE_AMP_PRESET, nextPresetIndex)
+                                    MediaPresenter.applyTubeAmpPreset(nextPreset)
+                                    listView.getCurrentItem().rightText = nextPreset.displayName
+                                    return true
+                                }
+                            },
+                            com.example.podclassic.media.TubeAmpPreset.values()[
+                                SPManager.getInt(SPManager.SP_TUBE_AMP_PRESET)
+                                    .coerceIn(0, com.example.podclassic.media.TubeAmpPreset.values().size - 1)
+                            ].displayName
+                        ),
+                        Item(
+                            "温暖度",
+                            object : OnItemClickListener {
+                                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                                    // 循环切换温暖度值
+                                    val currentValue = SPManager.getFloat(SPManager.SP_TUBE_AMP_WARMTH, 0.5f)
+                                    val values = arrayOf(0.0f, 0.25f, 0.5f, 0.75f, 1.0f)
+                                    val currentIndex = values.indexOfFirst { it == currentValue }
+                                    val nextIndex = (currentIndex + 1) % values.size
+                                    val nextValue = values[nextIndex]
+                                    SPManager.setFloat(SPManager.SP_TUBE_AMP_WARMTH, nextValue)
+                                    MediaPresenter.setTubeAmpParameters(warmth = nextValue)
+                                    listView.getCurrentItem().rightText = when (nextValue) {
+                                        0.0f -> "关闭"
+                                        0.25f -> "轻度"
+                                        0.5f -> "中等"
+                                        0.75f -> "高度"
+                                        1.0f -> "最大"
+                                        else -> nextValue.toString()
+                                    }
+                                    return true
+                                }
+                            },
+                            when (SPManager.getFloat(SPManager.SP_TUBE_AMP_WARMTH, 0.5f)) {
+                                0.0f -> "关闭"
+                                0.25f -> "轻度"
+                                0.5f -> "中等"
+                                0.75f -> "高度"
+                                1.0f -> "最大"
+                                else -> "中等"
+                            }
+                        ),
+                        Item(
+                            "饱和度",
+                            object : OnItemClickListener {
+                                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                                    // 循环切换饱和度值
+                                    val currentValue = SPManager.getFloat(SPManager.SP_TUBE_AMP_SATURATION, 0.6f)
+                                    val values = arrayOf(0.2f, 0.4f, 0.6f, 0.8f, 1.0f)
+                                    val currentIndex = values.indexOfFirst { it == currentValue }
+                                    val nextIndex = (currentIndex + 1) % values.size
+                                    val nextValue = values[nextIndex]
+                                    SPManager.setFloat(SPManager.SP_TUBE_AMP_SATURATION, nextValue)
+                                    MediaPresenter.setTubeAmpParameters(saturation = nextValue)
+                                    listView.getCurrentItem().rightText = when (nextValue) {
+                                        0.2f -> "低"
+                                        0.4f -> "中低"
+                                        0.6f -> "中"
+                                        0.8f -> "中高"
+                                        1.0f -> "高"
+                                        else -> nextValue.toString()
+                                    }
+                                    return true
+                                }
+                            },
+                            when (SPManager.getFloat(SPManager.SP_TUBE_AMP_SATURATION, 0.6f)) {
+                                0.2f -> "低"
+                                0.4f -> "中低"
+                                0.6f -> "中"
+                                0.8f -> "中高"
+                                1.0f -> "高"
+                                else -> "中"
+                            }
+                        ),
+                        Item(
+                            "谐波含量",
+                            object : OnItemClickListener {
+                                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                                    // 循环切换谐波含量值
+                                    val currentValue = SPManager.getFloat(SPManager.SP_TUBE_AMP_HARMONICS, 0.3f)
+                                    val values = arrayOf(0.1f, 0.2f, 0.3f, 0.4f, 0.5f)
+                                    val currentIndex = values.indexOfFirst { it == currentValue }
+                                    val nextIndex = (currentIndex + 1) % values.size
+                                    val nextValue = values[nextIndex]
+                                    SPManager.setFloat(SPManager.SP_TUBE_AMP_HARMONICS, nextValue)
+                                    MediaPresenter.setTubeAmpParameters(harmonics = nextValue)
+                                    listView.getCurrentItem().rightText = when (nextValue) {
+                                        0.1f -> "低"
+                                        0.2f -> "中低"
+                                        0.3f -> "中"
+                                        0.4f -> "中高"
+                                        0.5f -> "高"
+                                        else -> nextValue.toString()
+                                    }
+                                    return true
+                                }
+                            },
+                            when (SPManager.getFloat(SPManager.SP_TUBE_AMP_HARMONICS, 0.3f)) {
+                                0.1f -> "低"
+                                0.2f -> "中低"
+                                0.3f -> "中"
+                                0.4f -> "中高"
+                                0.5f -> "高"
+                                else -> "中"
+                            }
+                        )
+                    )
+                    Core.addView(
+                        ItemListView(
+                            context,
+                            itemList,
+                            "胆机音效设置",
                             null
                         )
                     )

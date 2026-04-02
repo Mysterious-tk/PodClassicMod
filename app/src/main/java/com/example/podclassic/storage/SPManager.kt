@@ -27,6 +27,14 @@ object SPManager {
     const val SP_TOM_STEADY_MAX_GAIN = "tom_steady_max_gain"
     const val SP_TOM_STEADY_ATTACK_TIME = "tom_steady_attack_time"
     const val SP_TOM_STEADY_RELEASE_TIME = "tom_steady_release_time"
+
+    // 胆机音效相关
+    const val SP_TUBE_AMP_ENABLED = "tube_amp_enabled"
+    const val SP_TUBE_AMP_PRESET = "tube_amp_preset"
+    const val SP_TUBE_AMP_WARMTH = "tube_amp_warmth"
+    const val SP_TUBE_AMP_SATURATION = "tube_amp_saturation"
+    const val SP_TUBE_AMP_HARMONICS = "tube_amp_harmonics"
+
     private val sharedPreferences =
         PreferenceManager.getDefaultSharedPreferences(BaseApplication.context)
 
@@ -87,6 +95,11 @@ object SPManager {
         setString(SP_TOM_STEADY_MAX_GAIN, "20.0")
         setString(SP_TOM_STEADY_ATTACK_TIME, "50.0")
         setString(SP_TOM_STEADY_RELEASE_TIME, "200.0")
+        setBoolean(SP_TUBE_AMP_ENABLED, false)
+        setInt(SP_TUBE_AMP_PRESET, 0)
+        setString(SP_TUBE_AMP_WARMTH, "0.5")
+        setString(SP_TUBE_AMP_SATURATION, "0.6")
+        setString(SP_TUBE_AMP_HARMONICS, "0.3")
         var resetCount = getInt(SP_RESET_COUNT)
         resetCount++
         setInt(SP_RESET_COUNT, resetCount)

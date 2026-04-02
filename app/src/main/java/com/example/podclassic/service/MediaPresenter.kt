@@ -279,4 +279,34 @@ object MediaPresenter {
     fun initTomSteadyProcessor() {
         sendMessage(MediaService.ACTION_INIT_TOM_STEADY)
     }
+
+    // 胆机音效相关方法
+    fun setTubeAmpEnabled() {
+        sendMessage(MediaService.ACTION_SET_TUBE_AMP_ENABLED)
+    }
+
+    fun setTubeAmpParameters(
+        gain: Float? = null,
+        saturation: Float? = null,
+        harmonics: Float? = null,
+        ratio: Float? = null,
+        attack: Float? = null,
+        release: Float? = null,
+        warmth: Float? = null
+    ) {
+        val params = mapOf(
+            "gain" to gain,
+            "saturation" to saturation,
+            "harmonics" to harmonics,
+            "ratio" to ratio,
+            "attack" to attack,
+            "release" to release,
+            "warmth" to warmth
+        )
+        sendMessage(MediaService.ACTION_SET_TUBE_AMP_PARAMETERS, params, null)
+    }
+
+    fun applyTubeAmpPreset(preset: com.example.podclassic.media.TubeAmpPreset) {
+        sendMessage(MediaService.ACTION_SET_TUBE_AMP_PRESET, preset)
+    }
 }  

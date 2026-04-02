@@ -81,7 +81,12 @@ class MediaService : Service() {
         const val ACTION_SET_TOM_STEADY_ENABLED = "action_set_tom_steady_enabled"
         const val ACTION_SET_TOM_STEADY_PARAMETERS = "action_set_tom_steady_parameters"
         const val ACTION_INIT_TOM_STEADY = "action_init_tom_steady"
-        
+
+        // 胆机音效相关
+        const val ACTION_SET_TUBE_AMP_ENABLED = "action_set_tube_amp_enabled"
+        const val ACTION_SET_TUBE_AMP_PRESET = "action_set_tube_amp_preset"
+        const val ACTION_SET_TUBE_AMP_PARAMETERS = "action_set_tube_amp_parameters"
+
         // 进度更新间隔（毫秒）
         const val PROGRESS_UPDATE_INTERVAL = 1000L
     }
@@ -176,16 +181,19 @@ class MediaService : Service() {
             mediaPlayer.isPrepared -> PlaybackStateCompat.STATE_PAUSED
             else -> PlaybackStateCompat.STATE_STOPPED
         }
-        
+
         val position = mediaPlayer.getProgress().toLong()
         val playbackSpeed = 1.0f
-        
+        val duration = mediaPlayer.getDuration().toLong()
+
         mediaSessionCompat.setPlaybackState(
             playbackStateCompatBuilder
                 .setState(state, position, playbackSpeed)
-                .setBufferedPosition(mediaPlayer.getDuration().toLong())
+                .setBufferedPosition(duration)
                 .build()
         )
+
+        android.util.Log.d("MediaService", "PlaybackState updated: state=$state, position=$position, duration=$duration, isActive=${mediaSessionCompat.isActive}")
     }
 
     /**
@@ -207,18 +215,30 @@ class MediaService : Service() {
                 .putString(MediaMetadataCompat.METADATA_KEY_TITLE, current.title)
                 .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, current.artist)
                 .putString(MediaMetadataCompat.METADATA_KEY_ALBUM, current.album)
+                .putString(MediaMetadataCompat.METADATA_KEY_ALBUM_ARTIST, current.artist)
                 .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, current.duration)
                 .putString(MediaMetadataCompat.METADATA_KEY_ALBUM_ART_URI, current.albumId?.toString() ?: "")
-            
+                .putString(MediaMetadataCompat.METADATA_KEY_AUTHOR, current.artist)
+                .putString(MediaMetadataCompat.METADATA_KEY_WRITER, current.artist)
+                .putString(MediaMetadataCompat.METADATA_KEY_COMPOSER, current.artist)
+                .putLong(MediaMetadataCompat.METADATA_KEY_NUM_TRACKS, mediaPlayer.getPlaylist().size.toLong())
+                .putLong(MediaMetadataCompat.METADATA_KEY_TRACK_NUMBER, (mediaPlayer.getIndex() + 1).toLong())
+                // 添加应用包名，帮助系统识别
+                .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_TITLE, current.title)
+                .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_SUBTITLE, current.artist)
+                .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_DESCRIPTION, current.album)
+
             // 添加专辑封面（如果有）
             current.image?.let {
                 metadataBuilder.putBitmap(MediaMetadataCompat.METADATA_KEY_ART, it)
                 metadataBuilder.putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, it)
+                metadataBuilder.putBitmap(MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON, it)
             }
-            
+
             mediaSessionCompat.setMetadata(metadataBuilder.build())
-            
-            android.util.Log.d("MediaService", "Media metadata updated: ${current.title} - ${current.artist}")
+
+            android.util.Log.d("MediaService", "Metadata set - Title: ${current.title}, Artist: ${current.artist}, Album: ${current.album}, Duration: ${current.duration}")
+            android.util.Log.d("MediaService", "MediaSession isActive: ${mediaSessionCompat.isActive}")
         }
 
         override fun onPlaybackStateChange(mediaPlayer: MediaPlayer<Music>) {
@@ -251,6 +271,10 @@ class MediaService : Service() {
 
         override fun onStopTimeChange() {
             MediaPresenter.stopTime.set(mediaPlayer.stopTime)
+        }
+
+        override fun onTubeAmpChange() {
+            // 胆机音效变化时的回调（可扩展）
         }
     }
 
@@ -314,22 +338,26 @@ class MediaService : Service() {
      */
     private fun sendNotification() {
         val music = mediaPlayer.getCurrent()
+        android.util.Log.d("MediaService", "sendNotification: music=$music, isForeground=$isForeground")
         if (music == null) {
+            android.util.Log.w("MediaService", "No music to show, stopping foreground")
             stopForeground(true)
             isForeground = false
             stopProgressUpdate()
             return
         }
         if (notificationBuilding) {
+            android.util.Log.d("MediaService", "Notification already building, skipping")
             return
         }
         notificationBuilding = true
-        
+
         val position = mediaPlayer.getProgress()
         val duration = mediaPlayer.getDuration()
-        
+
+        android.util.Log.d("MediaService", "Creating notification for: ${music.title}, isPlaying=${mediaPlayer.isPlaying}")
         val notification = notificationManager.buildNotification(
-            music, 
+            music,
             mediaPlayer.isPlaying,
             position,
             duration
@@ -337,7 +365,9 @@ class MediaService : Service() {
         startForeground(NotificationManager.NOTIFICATION_ID, notification)
         isForeground = true
         notificationBuilding = false
-        
+
+        android.util.Log.d("MediaService", "Notification created and foreground started")
+
         // 如果正在播放，启动进度更新
         if (mediaPlayer.isPlaying) {
             startProgressUpdate()
@@ -397,35 +427,12 @@ class MediaService : Service() {
     // 标记服务是否在前台运行
     private var isForeground = false
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        android.util.Log.d("MediaService", "onStartCommand() called with action: ${intent?.action}, isForeground=$isForeground")
-
-        // 确保服务在前台运行（Android 8.0+ 要求）
-        if (!isForeground) {
-            android.util.Log.d("MediaService", "Service not in foreground, starting foreground")
-            startForegroundWithNotification()
-        }
-
-        val action = intent?.action
-        if (action != null) {
-            android.util.Log.d("MediaService", "Handling action: $action")
-            handleAction(action, null, null)
-        } else {
-            android.util.Log.d("MediaService", "No action, just updating notification")
-        }
-
-        // 更新通知
-        updateNotification()
-        
-        // 返回 START_STICKY 确保服务被杀死后能自动重启
-        return START_STICKY
-    }
-    
     /**
      * 启动前台服务并显示通知
      */
     private fun startForegroundWithNotification() {
         val music = mediaPlayer.getCurrent()
+        android.util.Log.d("MediaService", "startForegroundWithNotification: music=$music, isPlaying=${mediaPlayer.isPlaying}")
         if (music != null) {
             val notification = notificationManager.buildNotification(
                 music,
@@ -435,6 +442,9 @@ class MediaService : Service() {
             )
             startForeground(NotificationManager.NOTIFICATION_ID, notification)
             isForeground = true
+            android.util.Log.d("MediaService", "Foreground notification started successfully")
+        } else {
+            android.util.Log.w("MediaService", "No music to display in notification")
         }
     }
     
@@ -466,8 +476,41 @@ class MediaService : Service() {
 
         // 初始化后台处理线程
         initHandlerThread()
-        
+
+        // 确保MediaSession初始状态正确
+        updatePlaybackState()
+
         android.util.Log.d("MediaService", "Service initialized successfully")
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        android.util.Log.d("MediaService", "onStartCommand() called with action: ${intent?.action}, isForeground=$isForeground")
+
+        // 确保MediaSession始终处于激活状态
+        if (!mediaSessionCompat.isActive) {
+            mediaSessionCompat.isActive = true
+            android.util.Log.d("MediaService", "Reactivated MediaSession")
+        }
+
+        // 确保服务在前台运行（Android 8.0+ 要求）
+        if (!isForeground) {
+            android.util.Log.d("MediaService", "Service not in foreground, starting foreground")
+            startForegroundWithNotification()
+        }
+
+        val action = intent?.action
+        if (action != null) {
+            android.util.Log.d("MediaService", "Handling action: $action")
+            handleAction(action, null, null)
+        } else {
+            android.util.Log.d("MediaService", "No action, just updating notification")
+        }
+
+        // 更新通知
+        updateNotification()
+
+        // 返回 START_STICKY 确保服务被杀死后能自动重启
+        return START_STICKY
     }
     
     /**
@@ -515,7 +558,9 @@ class MediaService : Service() {
         
         // 设置初始播放状态
         mediaSessionCompat.setPlaybackState(playbackStateCompatBuilder.build())
-        
+
+        android.util.Log.d("MediaService", "MediaSession token: ${mediaSessionCompat.sessionToken}")
+        android.util.Log.d("MediaService", "MediaSession isActive: ${mediaSessionCompat.isActive}")
         android.util.Log.d("MediaService", "MediaSession initialized")
     }
     
@@ -538,7 +583,8 @@ class MediaService : Service() {
         updateAudioFocus()
         updateAgcEnabled()
         updateTomSteadyEnabled()
-        
+        updateTubeAmpEnabled()
+
         android.util.Log.d("MediaService", "MediaPlayer initialized")
     }
     
@@ -725,6 +771,38 @@ class MediaService : Service() {
                     // 初始化TomSteady处理器
                     mediaPlayer.initTomSteadyProcessor()
                 }
+                ACTION_SET_TUBE_AMP_ENABLED -> {
+                    updateTubeAmpEnabled()
+                }
+                ACTION_SET_TUBE_AMP_PRESET -> {
+                    // 处理胆机预设
+                    if (arg1 is com.example.podclassic.media.TubeAmpPreset) {
+                        mediaPlayer.applyTubeAmpPreset(arg1)
+                    }
+                }
+                ACTION_SET_TUBE_AMP_PARAMETERS -> {
+                    // 处理胆机参数设置
+                    if (arg1 is Map<*, *>) {
+                        val params = arg1
+                        val gain = params["gain"] as? Float
+                        val saturation = params["saturation"] as? Float
+                        val harmonics = params["harmonics"] as? Float
+                        val ratio = params["ratio"] as? Float
+                        val attack = params["attack"] as? Float
+                        val release = params["release"] as? Float
+                        val warmth = params["warmth"] as? Float
+
+                        mediaPlayer.setTubeAmpParameters(
+                            gain = gain,
+                            saturation = saturation,
+                            harmonics = harmonics,
+                            ratio = ratio,
+                            attack = attack,
+                            release = release,
+                            warmth = warmth
+                        )
+                    }
+                }
                 else -> {
                     throw IllegalArgumentException("unknown action")
                 }
@@ -753,6 +831,10 @@ class MediaService : Service() {
 
     private fun updateTomSteadyEnabled() {
         mediaPlayer.tomSteadyEnabled = SPManager.getBoolean(SPManager.SP_TOM_STEADY_ENABLED)
+    }
+
+    private fun updateTubeAmpEnabled() {
+        mediaPlayer.tubeAmpEnabled = SPManager.getBoolean(SPManager.SP_TUBE_AMP_ENABLED)
     }
 
     data class Action(val action: String, val arg1: Any?, val arg2: Any?)

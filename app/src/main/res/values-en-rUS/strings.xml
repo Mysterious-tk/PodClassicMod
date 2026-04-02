@@ -81,4 +81,17 @@
     <string name="prev">Previous</string>
     <string name="next">Next</string>
     <string name="pause">Pause</string>
+    <!-- Tube Amp Audio Effect -->
+    <string name="tube_amp">Tube Amp</string>
+    <string name="tube_amp_enabled">Tube Amp Enabled</string>
+    <string name="tube_amp_settings">Tube Amp Settings</string>
+    <string name="tube_amp_preset">Preset</string>
+    <string name="tube_amp_warmth">Warmth</string>
+    <string name="tube_amp_saturation">Saturation</string>
+    <string name="tube_amp_harmonics">Harmonics</string>
+    <string name="tube_amp_preset_none">Off</string>
+    <string name="tube_amp_preset_warm">Warm</string>
+    <string name="tube_amp_preset_smooth">Smooth</string>
+    <string name="tube_amp_preset_vintage">Vintage</string>
+    <string name="tube_amp_preset_dynamic">Dynamic</string>
 </resources>

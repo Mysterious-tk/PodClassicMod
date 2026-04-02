@@ -81,4 +81,17 @@
     <string name="prev">上一首</string>
     <string name="next">下一首</string>
     <string name="pause">暂停</string>
+    <!-- 胆机音效相关 -->
+    <string name="tube_amp">胆机音效</string>
+    <string name="tube_amp_enabled">胆机音效开关</string>
+    <string name="tube_amp_settings">胆机音效设置</string>
+    <string name="tube_amp_preset">预设模式</string>
+    <string name="tube_amp_warmth">温暖度</string>
+    <string name="tube_amp_saturation">饱和度</string>
+    <string name="tube_amp_harmonics">谐波含量</string>
+    <string name="tube_amp_preset_none">关闭</string>
+    <string name="tube_amp_preset_warm">温暖</string>
+    <string name="tube_amp_preset_smooth">醇厚</string>
+    <string name="tube_amp_preset_vintage">复古</string>
+    <string name="tube_amp_preset_dynamic">动态</string>
 </resources>

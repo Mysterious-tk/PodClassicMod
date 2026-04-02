@@ -49,12 +49,14 @@ class NotificationManager(context: Context, sessionToken: MediaSessionCompat.Tok
      * 创建通知渠道（Android 8.0+ 必需）
      */
     private fun createNotificationChannel() {
-        val channel = NotificationChannelCompat.Builder(CHANNEL_ID, NotificationManagerCompat.IMPORTANCE_LOW)
+        val channel = NotificationChannelCompat.Builder(CHANNEL_ID, NotificationManagerCompat.IMPORTANCE_HIGH)
             .setName(CHANNEL_NAME)
             .setDescription("音乐播放控制通知")
-            .setShowBadge(false)
+            .setShowBadge(true)
+            .setLightColor(Colors.color_primary)
             .build()
         systemNotificationManagerCompat.createNotificationChannel(channel)
+        android.util.Log.d("NotificationManager", "Notification channel created: $CHANNEL_ID with IMPORTANCE_HIGH")
     }
 
     /**
@@ -139,7 +141,7 @@ class NotificationManager(context: Context, sessionToken: MediaSessionCompat.Tok
      * 基础通知构建器配置
      */
     private val notificationBuilder = NotificationCompat.Builder(appContext, CHANNEL_ID)
-        .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+        .setPriority(NotificationCompat.PRIORITY_HIGH)
         .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
         .setSmallIcon(R.drawable.ic_play_arrow_grey_800_36dp)
         .setShowWhen(false)
@@ -148,6 +150,7 @@ class NotificationManager(context: Context, sessionToken: MediaSessionCompat.Tok
         .setContentIntent(contentIntent)
         .setColor(Colors.color_primary)
         .setCategory(NotificationCompat.CATEGORY_TRANSPORT)
+        .setOngoing(true)
         .setStyle(
             androidx.media.app.NotificationCompat.MediaStyle()
                 .setMediaSession(sessionToken)
@@ -166,11 +169,12 @@ class NotificationManager(context: Context, sessionToken: MediaSessionCompat.Tok
      * @return 构建好的通知对象
      */
     fun buildNotification(
-        music: Music, 
+        music: Music,
         isPlaying: Boolean,
         position: Int = 0,
         duration: Int = 0
     ): Notification {
+        android.util.Log.d("NotificationManager", "Building notification: ${music.title} - ${music.artist}, isPlaying=$isPlaying")
         // 获取专辑封面，如果没有则使用默认图标
         val largeIcon = music.image ?: Icons.EMPTY
 
@@ -201,16 +205,13 @@ class NotificationManager(context: Context, sessionToken: MediaSessionCompat.Tok
             .setContentTitle(music.title)
             .setContentText("${music.artist} - ${music.album}")
             .setSubText(formatDuration(duration))
-            .setOngoing(isPlaying)
+            .setOngoing(true) // 始终保持为持续通知
             .setProgress(duration, position, false) // 添加进度条
+            .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
             .build()
 
-        // 设置通知标志
-        notification.flags = if (isPlaying) {
-            Notification.FLAG_ONGOING_EVENT or Notification.FLAG_FOREGROUND_SERVICE
-        } else {
-            Notification.FLAG_FOREGROUND_SERVICE
-        }
+        // 设置通知标志 - 始终保持为持续事件
+        notification.flags = Notification.FLAG_ONGOING_EVENT or Notification.FLAG_FOREGROUND_SERVICE
 
         return notification
     }

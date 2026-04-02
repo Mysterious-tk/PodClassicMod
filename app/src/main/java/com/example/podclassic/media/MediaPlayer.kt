@@ -14,6 +14,7 @@ import android.media.audiofx.Equalizer
 import android.media.audiofx.NoiseSuppressor
 import android.os.Handler
 import android.os.Looper
+import com.example.podclassic.storage.SPManager
 import java.util.*
 import kotlin.math.max
 import kotlin.math.min
@@ -133,6 +134,55 @@ class MediaPlayer<E>(context: Context, private val mediaAdapter: MediaAdapter<E>
         return tomSteadyProcessor?.isPreAnalysisComplete() ?: false
     }
 
+    // 胆机音效相关
+    var tubeAmpEnabled: Boolean
+        get() = tomSteadyProcessor?.tubeAmpEnabled ?: false
+        set(value) {
+            // 确保TomSteadyProcessor已初始化
+            if (tomSteadyProcessor == null) {
+                initTomSteadyProcessor()
+            }
+            tomSteadyProcessor?.tubeAmpEnabled = value
+            SPManager.setBoolean(SPManager.SP_TUBE_AMP_ENABLED, value)
+            onDataChangeListener?.onTubeAmpChange()
+        }
+
+    fun setTubeAmpParameters(
+        gain: Float? = null,
+        saturation: Float? = null,
+        harmonics: Float? = null,
+        ratio: Float? = null,
+        attack: Float? = null,
+        release: Float? = null,
+        warmth: Float? = null
+    ) {
+        tomSteadyProcessor?.setTubeAmpParameters(
+            gain = gain,
+            saturation = saturation,
+            harmonics = harmonics,
+            ratio = ratio,
+            attack = attack,
+            release = release,
+            warmth = warmth
+        )
+
+        // 保存参数到SharedPreferences
+        warmth?.let { SPManager.setFloat(SPManager.SP_TUBE_AMP_WARMTH, it) }
+        saturation?.let { SPManager.setFloat(SPManager.SP_TUBE_AMP_SATURATION, it) }
+        harmonics?.let { SPManager.setFloat(SPManager.SP_TUBE_AMP_HARMONICS, it) }
+        onDataChangeListener?.onTubeAmpChange()
+    }
+
+    fun applyTubeAmpPreset(preset: TubeAmpPreset) {
+        tomSteadyProcessor?.applyTubeAmpPreset(preset)
+        SPManager.setInt(SPManager.SP_TUBE_AMP_PRESET, preset.ordinal)
+        onDataChangeListener?.onTubeAmpChange()
+    }
+
+    fun getTubeAmpProcessor(): TubeAmpProcessor? {
+        return tomSteadyProcessor?.getTubeAmpProcessor()
+    }
+
     /**
      * 获取TomSteady参考电平
      */
@@ -186,6 +236,7 @@ class MediaPlayer<E>(context: Context, private val mediaAdapter: MediaAdapter<E>
         fun onEqualizerChange() {}
         fun onAgcChange() {}
         fun onTomSteadyChange() {}
+        fun onTubeAmpChange() {}
         fun onAudioManagerChange() {}
         fun onStopTimeChange() {}
 
