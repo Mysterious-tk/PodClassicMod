@@ -4,7 +4,9 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.LinearGradient
 import android.graphics.Paint
+import android.graphics.RadialGradient
 import android.graphics.RenderEffect
 import android.graphics.Shader
 import android.os.Build
@@ -43,6 +45,13 @@ class SlideController : View {
     constructor(context: Context?, attributeSet: AttributeSet?) : super(context, attributeSet)
 
     private val paint = Paint()
+    private val glassPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val glassEdgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+    }
+    private var redGlassBaseShader: Shader? = null
+    private var redGlassHighlightShader: Shader? = null
+    private var redGlassEdgeShader: Shader? = null
 
     var enable = true
         set(value) {
@@ -91,17 +100,80 @@ class SlideController : View {
 
         minR = maxR / 16 * 5
 
+        updateRedGlassShaders(density)
+
         setMeasuredDimension(x, y)
+    }
+
+    private fun updateRedGlassShaders(density: Float) {
+        if (maxR <= 0f) return
+
+        // Roughly 40–60% red opacity: the black U2 body remains visible through
+        // the wheel while the tonal variation keeps the surface from looking flat.
+        redGlassBaseShader = RadialGradient(
+            centerX - maxR * 0.24f,
+            centerY - maxR * 0.30f,
+            maxR * 1.42f,
+            intArrayOf(
+                Color.argb(150, 255, 80, 92),
+                Color.argb(138, 225, 10, 28),
+                Color.argb(118, 145, 0, 18)
+            ),
+            floatArrayOf(0f, 0.56f, 1f),
+            Shader.TileMode.CLAMP
+        )
+
+        redGlassHighlightShader = LinearGradient(
+            centerX - maxR * 0.70f,
+            centerY - maxR,
+            centerX + maxR * 0.46f,
+            centerY + maxR * 0.72f,
+            intArrayOf(
+                Color.argb(88, 255, 255, 255),
+                Color.argb(38, 255, 164, 174),
+                Color.TRANSPARENT,
+                Color.argb(26, 92, 0, 12)
+            ),
+            floatArrayOf(0f, 0.22f, 0.58f, 1f),
+            Shader.TileMode.CLAMP
+        )
+
+        redGlassEdgeShader = LinearGradient(
+            centerX,
+            centerY - maxR,
+            centerX,
+            centerY + maxR,
+            intArrayOf(
+                Color.argb(185, 255, 226, 230),
+                Color.argb(108, 255, 72, 88),
+                Color.argb(150, 92, 0, 14)
+            ),
+            floatArrayOf(0f, 0.48f, 1f),
+            Shader.TileMode.CLAMP
+        )
+        glassEdgePaint.strokeWidth = 1.25f * density
     }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
 
         paint.isAntiAlias = true
-        paint.color = colorController//Colors.controller
-        canvas.drawCircle(centerX, centerY, maxR, paint)
+        if (colorController == Color.RED) {
+            drawRedLiquidGlassWheel(canvas)
+        } else {
+            paint.style = Paint.Style.FILL
+            paint.shader = null
+            paint.color = colorController//Colors.controller
+            canvas.drawCircle(centerX, centerY, maxR, paint)
+        }
+        paint.style = Paint.Style.FILL
+        paint.shader = null
         paint.color = colorButton//Colors.color_primary
         canvas.drawCircle(centerX, centerY, minR, paint)
+
+        if (colorController == Color.RED) {
+            drawRedGlassInnerEdge(canvas)
+        }
 
         val r = (minR + maxR) / 2
 
@@ -130,6 +202,41 @@ class SlideController : View {
             paint
         )
 
+    }
+
+    private fun drawRedLiquidGlassWheel(canvas: Canvas) {
+        glassPaint.style = Paint.Style.FILL
+        glassPaint.shader = redGlassBaseShader
+        canvas.drawCircle(centerX, centerY, maxR, glassPaint)
+
+        // Broad diagonal reflection matching the highlight language of the glass card.
+        glassPaint.shader = redGlassHighlightShader
+        canvas.drawCircle(centerX, centerY, maxR, glassPaint)
+
+        // A bright-to-dark rim supplies the subtle edge refraction.
+        glassEdgePaint.shader = redGlassEdgeShader
+        canvas.drawCircle(
+            centerX,
+            centerY,
+            maxR - glassEdgePaint.strokeWidth / 2f,
+            glassEdgePaint
+        )
+        glassEdgePaint.shader = null
+    }
+
+    private fun drawRedGlassInnerEdge(canvas: Canvas) {
+        val density = resources.displayMetrics.density
+
+        // Soft inner shadow sits on the glass side of the center opening.
+        glassEdgePaint.shader = null
+        glassEdgePaint.strokeWidth = 3f * density
+        glassEdgePaint.color = Color.argb(74, 34, 0, 5)
+        canvas.drawCircle(centerX, centerY, minR + 1.5f * density, glassEdgePaint)
+
+        // Thin refracted highlight keeps the inner edge crisp without changing geometry.
+        glassEdgePaint.strokeWidth = 0.9f * density
+        glassEdgePaint.color = Color.argb(132, 255, 154, 164)
+        canvas.drawCircle(centerX, centerY, minR + 0.45f * density, glassEdgePaint)
     }
 
     private var startPoint: TouchPoint =

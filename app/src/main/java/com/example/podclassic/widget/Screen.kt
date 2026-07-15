@@ -9,6 +9,7 @@ import android.view.View
 import android.view.ViewOutlineProvider
 import android.widget.LinearLayout
 import com.example.podclassic.base.ScreenView
+import com.example.podclassic.R
 import com.example.podclassic.storage.SPManager
 import com.example.podclassic.view.MainView
 
@@ -70,11 +71,21 @@ class Screen(context: Context, attributeSet: AttributeSet?) : LinearLayout(conte
         setBackgroundColor(Color.TRANSPARENT)
         orientation = VERTICAL
 
-        // 添加标题栏 - 使用weight=1保持原始比例
-        addView(titleBar, LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f))
-
-        // 添加屏幕布局 - 使用weight=9保持原始比例
-        addView(screenLayout, LayoutParams(LayoutParams.MATCH_PARENT, 0, 9f))
+        if (isIpod3rdTheme) {
+            // The 3G status strip is deliberately compact; content receives the
+            // remaining height instead of inheriting the old 1:9 proportion.
+            addView(
+                titleBar,
+                LayoutParams(
+                    LayoutParams.MATCH_PARENT,
+                    resources.getDimensionPixelSize(R.dimen.title_bar_height_ipod_3rd)
+                )
+            )
+            addView(screenLayout, LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f))
+        } else {
+            addView(titleBar, LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f))
+            addView(screenLayout, LayoutParams(LayoutParams.MATCH_PARENT, 0, 9f))
+        }
 
         // 设置圆角裁剪
         outlineProvider = object : ViewOutlineProvider() {

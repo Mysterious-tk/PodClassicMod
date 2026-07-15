@@ -5,13 +5,19 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.LinearGradient
 import android.graphics.Paint
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffColorFilter
+import android.graphics.RadialGradient
+import android.graphics.RectF
+import android.graphics.Shader
+import android.os.SystemClock
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
 import com.example.podclassic.util.ThreadUtil
 import com.example.podclassic.util.VolumeUtil
-import com.example.podclassic.values.Colors
 import com.example.podclassic.values.Icons
 import java.util.*
 import kotlin.math.abs
@@ -29,19 +35,41 @@ class SlideController3rd : View {
         private var maxR = 0f
 
         private const val WHEEL_DIAMETER_DP = 217f
-        private const val WHEEL_BOTTOM_MARGIN_DP = 80f
+        private const val WHEEL_BOTTOM_MARGIN_DP = 64f
+        private const val CONTROL_BUTTON_DIAMETER_DP = 56f
+        private const val BACKLIGHT_DURATION_MS = 2800L
+        private const val BACKLIGHT_HOLD_FRACTION = 0.72f
 
     }
 
     constructor(context: Context?) : super(context)
     constructor(context: Context?, attributeSet: AttributeSet?) : super(context, attributeSet)
 
-    private val paint = Paint()
+    private val glassPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val edgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+    }
+    private val iconPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        colorFilter = PorterDuffColorFilter(
+            Color.argb(224, 242, 244, 248),
+            PorterDuff.Mode.SRC_IN
+        )
+    }
+    private val iconBacklightPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private var wheelBaseShader: Shader? = null
+    private var wheelReflectionShader: Shader? = null
+    private var wheelDepthShader: Shader? = null
+    private var wheelEdgeShader: Shader? = null
+    private var buttonRadius = 0f
+    private var density = 1f
+    private var buttonBacklightStartedAt = 0L
 
     var enable = true
         set(value) {
             if (!value) {
                 cancelTimer()
+                buttonBacklightStartedAt = 0L
+                invalidate()
             }
             field = value
         }
@@ -54,11 +82,11 @@ class SlideController3rd : View {
         val x = MeasureSpec.getSize(widthMeasureSpec)
         val y = MeasureSpec.getSize(heightMeasureSpec)
         centerX = x / 2f
-        val density = resources.displayMetrics.density
+        density = resources.displayMetrics.density
         val requestedRadius = WHEEL_DIAMETER_DP * density / 2f
         val bottomMargin = WHEEL_BOTTOM_MARGIN_DP * density
 
-        // 3G 转盘使用稳定的 217dp 直径，并以约 80dp 的底边距定位。
+        // 3G 转盘保持 217dp 直径，以 64dp 底边距为顶部按钮留出更多呼吸空间。
         // 极窄或极矮的窗口中才缩小，避免转盘被裁切。
         maxR = min(
             requestedRadius,
@@ -68,37 +96,74 @@ class SlideController3rd : View {
 
         minR = maxR / 16 * 5
 
+        buttonRadius = CONTROL_BUTTON_DIAMETER_DP * density / 2f
+        updateGlassShaders()
+
     }
 
-    // 将白色图标转换为橙色图标
-    private fun getOrangeBitmap(bitmap: Bitmap): Bitmap {
-        val orangeBitmap = bitmap.copy(Bitmap.Config.ARGB_8888, true)
-        val width = orangeBitmap.width
-        val height = orangeBitmap.height
-        val pixels = IntArray(width * height)
-        orangeBitmap.getPixels(pixels, 0, width, 0, 0, width, height)
-        
-        for (i in pixels.indices) {
-            val pixel = pixels[i]
-            val alpha = (pixel shr 24) and 0xff
-            if (alpha > 0) {
-                // 将非透明像素改为橙色
-                pixels[i] = (alpha shl 24) or (0xff shl 16) or (0x99 shl 8) or 0x00
-            }
-        }
-        
-        orangeBitmap.setPixels(pixels, 0, width, 0, 0, width, height)
-        return orangeBitmap
+    private fun updateGlassShaders() {
+        if (maxR <= 0f) return
+
+        wheelBaseShader = LinearGradient(
+            centerX - maxR,
+            centerY - maxR,
+            centerX + maxR,
+            centerY + maxR,
+            intArrayOf(
+                Color.argb(218, 93, 0, 13),
+                Color.argb(204, 164, 0, 23),
+                Color.argb(194, 238, 29, 48)
+            ),
+            floatArrayOf(0f, 0.56f, 1f),
+            Shader.TileMode.CLAMP
+        )
+        wheelReflectionShader = LinearGradient(
+            centerX,
+            centerY - maxR,
+            centerX,
+            centerY + maxR,
+            intArrayOf(
+                Color.argb(54, 25, 0, 4),
+                Color.TRANSPARENT,
+                Color.TRANSPARENT,
+                Color.argb(44, 255, 160, 171)
+            ),
+            floatArrayOf(0f, 0.32f, 0.72f, 1f),
+            Shader.TileMode.CLAMP
+        )
+        wheelDepthShader = RadialGradient(
+            centerX,
+            centerY,
+            maxR,
+            intArrayOf(
+                Color.argb(18, 255, 88, 105),
+                Color.TRANSPARENT,
+                Color.argb(82, 35, 0, 6)
+            ),
+            floatArrayOf(0f, 0.68f, 1f),
+            Shader.TileMode.CLAMP
+        )
+        wheelEdgeShader = LinearGradient(
+            centerX,
+            centerY - maxR,
+            centerX,
+            centerY + maxR,
+            intArrayOf(
+                Color.argb(230, 255, 116, 130),
+                Color.argb(218, 177, 0, 25),
+                Color.argb(238, 43, 0, 7)
+            ),
+            floatArrayOf(0f, 0.46f, 1f),
+            Shader.TileMode.CLAMP
+        )
     }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
 
-        paint.isAntiAlias = true
-        paint.color = colorController
-        canvas.drawCircle(centerX, centerY, maxR, paint)
-        paint.color = colorButton
-        canvas.drawCircle(centerX, centerY, minR, paint)
+        drawLiquidGlassWheel(canvas)
+
+        drawRecessedCenterButton(canvas)
 
         // 按钮位置调整：在屏幕顶部，形成一行
         val buttonRowY = maxR * 0.5f // 按钮行位于屏幕顶部，距离圆盘顶部一定距离
@@ -110,32 +175,204 @@ class SlideController3rd : View {
         val button3X = buttonSpacing * 3
         val button4X = buttonSpacing * 4
 
-        // 绘制四个橙色按钮
-        canvas.drawBitmap(
-            getOrangeBitmap(Icons.PREV.bitmap),
-            button1X - Icons.PREV.width / 2,
-            buttonRowY - Icons.PREV.height / 2,
-            paint
-        )
-        canvas.drawBitmap(
-            getOrangeBitmap(Icons.MENU.bitmap),
-            button2X - Icons.MENU.width / 2,
-            buttonRowY - Icons.MENU.height / 2,
-            paint
-        )
-        canvas.drawBitmap(
-            getOrangeBitmap(Icons.PAUSE.bitmap),
-            button3X - Icons.PAUSE.width / 2,
-            buttonRowY - Icons.PAUSE.height / 2,
-            paint
-        )
-        canvas.drawBitmap(
-            getOrangeBitmap(Icons.NEXT.bitmap),
-            button4X - Icons.NEXT.width / 2,
-            buttonRowY - Icons.NEXT.height / 2,
-            paint
-        )
+        drawGlassButton(canvas, button1X, buttonRowY)
+        drawGlassButton(canvas, button2X, buttonRowY)
+        drawGlassButton(canvas, button3X, buttonRowY)
+        drawGlassButton(canvas, button4X, buttonRowY)
 
+        // Keep the existing assets and exact centers; only their finish changes.
+        drawBacklitIcon(canvas, Icons.PREV.bitmap, button1X, buttonRowY)
+        drawBacklitIcon(canvas, Icons.MENU.bitmap, button2X, buttonRowY)
+        drawBacklitIcon(canvas, Icons.PAUSE.bitmap, button3X, buttonRowY)
+        drawBacklitIcon(canvas, Icons.NEXT.bitmap, button4X, buttonRowY)
+
+        if (currentBacklightIntensity() > 0f) {
+            postInvalidateOnAnimation()
+        }
+
+    }
+
+    private fun startButtonBacklight() {
+        buttonBacklightStartedAt = SystemClock.uptimeMillis().coerceAtLeast(1L)
+        postInvalidateOnAnimation()
+    }
+
+    private fun drawBacklitIcon(
+        canvas: Canvas,
+        bitmap: Bitmap,
+        centerX: Float,
+        centerY: Float
+    ) {
+        val left = centerX - bitmap.width / 2f
+        val top = centerY - bitmap.height / 2f
+        val intensity = currentBacklightIntensity()
+        if (intensity <= 0f) {
+            canvas.drawBitmap(bitmap, left, top, iconPaint)
+            return
+        }
+
+        // Keep the feedback confined to the crisp symbol; the glass stays unchanged.
+        val red = 242 + (13f * intensity).toInt()
+        val green = 244 - (82f * intensity).toInt()
+        val blue = 248 - (210f * intensity).toInt()
+        iconBacklightPaint.alpha = 255
+        iconBacklightPaint.maskFilter = null
+        iconBacklightPaint.colorFilter = PorterDuffColorFilter(
+            Color.rgb(red, green, blue),
+            PorterDuff.Mode.SRC_IN
+        )
+        canvas.drawBitmap(bitmap, left, top, iconBacklightPaint)
+        iconBacklightPaint.colorFilter = null
+    }
+
+    private fun currentBacklightIntensity(): Float {
+        val startedAt = buttonBacklightStartedAt
+        if (startedAt == 0L) return 0f
+
+        val elapsed = SystemClock.uptimeMillis() - startedAt
+        if (elapsed >= BACKLIGHT_DURATION_MS) return 0f
+
+        val fraction = elapsed.toFloat() / BACKLIGHT_DURATION_MS
+        return when {
+            fraction < 0.06f -> 0.58f + fraction / 0.06f * 0.42f
+            fraction < BACKLIGHT_HOLD_FRACTION -> {
+                1f - (fraction - 0.06f) / (BACKLIGHT_HOLD_FRACTION - 0.06f) * 0.12f
+            }
+            else -> {
+                val fade = (fraction - BACKLIGHT_HOLD_FRACTION) / (1f - BACKLIGHT_HOLD_FRACTION)
+                0.88f * (1f - fade) * (1f - fade)
+            }
+        }
+    }
+
+    private fun drawLiquidGlassWheel(canvas: Canvas) {
+        val rimWidth = 6f * density
+        val surfaceRadius = (maxR - rimWidth).coerceAtLeast(0f)
+
+        // The outer lip belongs to the raised enclosure surrounding the wheel.
+        glassPaint.style = Paint.Style.FILL
+        glassPaint.shader = wheelEdgeShader
+        canvas.drawCircle(centerX, centerY, maxR, glassPaint)
+
+        glassPaint.shader = wheelBaseShader
+        canvas.drawCircle(centerX, centerY, surfaceRadius, glassPaint)
+        glassPaint.shader = wheelReflectionShader
+        canvas.drawCircle(centerX, centerY, surfaceRadius, glassPaint)
+        glassPaint.shader = wheelDepthShader
+        canvas.drawCircle(centerX, centerY, surfaceRadius, glassPaint)
+        glassPaint.shader = null
+
+        val rimBounds = RectF(
+            centerX - maxR + density,
+            centerY - maxR + density,
+            centerX + maxR - density,
+            centerY + maxR - density
+        )
+        edgePaint.shader = null
+        edgePaint.strokeWidth = 1.6f * density
+        edgePaint.color = Color.argb(190, 255, 184, 194)
+        canvas.drawArc(rimBounds, 185f, 170f, false, edgePaint)
+        edgePaint.color = Color.argb(190, 22, 0, 4)
+        canvas.drawArc(rimBounds, 5f, 170f, false, edgePaint)
+
+        val insetBounds = RectF(
+            centerX - surfaceRadius,
+            centerY - surfaceRadius,
+            centerX + surfaceRadius,
+            centerY + surfaceRadius
+        )
+        edgePaint.strokeWidth = 4.2f * density
+        edgePaint.color = Color.argb(150, 38, 0, 7)
+        canvas.drawArc(insetBounds, 180f, 180f, false, edgePaint)
+        edgePaint.strokeWidth = 1.15f * density
+        edgePaint.color = Color.argb(122, 255, 125, 140)
+        canvas.drawArc(insetBounds, 0f, 180f, false, edgePaint)
+    }
+
+    private fun drawRecessedCenterButton(canvas: Canvas) {
+        val lipWidth = 3.5f * density
+        glassPaint.style = Paint.Style.FILL
+        glassPaint.shader = LinearGradient(
+            centerX,
+            centerY - minR - lipWidth,
+            centerX,
+            centerY + minR + lipWidth,
+            Color.argb(210, 255, 112, 126),
+            Color.argb(230, 48, 0, 8),
+            Shader.TileMode.CLAMP
+        )
+        canvas.drawCircle(centerX, centerY, minR + lipWidth, glassPaint)
+        glassPaint.shader = RadialGradient(
+            centerX + minR * 0.18f,
+            centerY + minR * 0.22f,
+            minR * 1.25f,
+            Color.argb(255, 28, 29, 33),
+            colorButton,
+            Shader.TileMode.CLAMP
+        )
+        canvas.drawCircle(centerX, centerY, minR, glassPaint)
+        glassPaint.shader = null
+
+        val bounds = RectF(centerX - minR, centerY - minR, centerX + minR, centerY + minR)
+        edgePaint.strokeWidth = 3.2f * density
+        edgePaint.color = Color.argb(190, 0, 0, 0)
+        canvas.drawArc(bounds, 180f, 180f, false, edgePaint)
+        edgePaint.strokeWidth = density
+        edgePaint.color = Color.argb(105, 255, 255, 255)
+        canvas.drawArc(bounds, 0f, 180f, false, edgePaint)
+    }
+
+    private fun drawGlassButton(canvas: Canvas, x: Float, y: Float) {
+        val rimWidth = 4f * density
+        val surfaceRadius = buttonRadius - rimWidth
+
+        // Raised surrounding lip: highlight above, shadow below.
+        glassPaint.shader = RadialGradient(
+            x - buttonRadius * 0.28f,
+            y - buttonRadius * 0.34f,
+            buttonRadius * 1.55f,
+            intArrayOf(
+                Color.argb(150, 255, 255, 255),
+                Color.argb(105, 113, 120, 132),
+                Color.argb(145, 18, 20, 25)
+            ),
+            floatArrayOf(0f, 0.52f, 1f),
+            Shader.TileMode.CLAMP
+        )
+        canvas.drawCircle(x, y, buttonRadius, glassPaint)
+
+        // The glass face is lower than the lip and reverses the old convex light.
+        glassPaint.shader = LinearGradient(
+            x,
+            y - surfaceRadius,
+            x,
+            y + surfaceRadius,
+            intArrayOf(
+                Color.argb(116, 35, 39, 47),
+                Color.argb(70, 91, 98, 111),
+                Color.argb(82, 183, 190, 202)
+            ),
+            floatArrayOf(0f, 0.58f, 1f),
+            Shader.TileMode.CLAMP
+        )
+        canvas.drawCircle(x, y, surfaceRadius, glassPaint)
+        glassPaint.shader = null
+
+        val outerBounds = RectF(x - buttonRadius, y - buttonRadius, x + buttonRadius, y + buttonRadius)
+        edgePaint.shader = null
+        edgePaint.strokeWidth = 1.2f * density
+        edgePaint.color = Color.argb(190, 255, 255, 255)
+        canvas.drawArc(outerBounds, 185f, 170f, false, edgePaint)
+        edgePaint.color = Color.argb(170, 0, 0, 0)
+        canvas.drawArc(outerBounds, 5f, 170f, false, edgePaint)
+
+        val insetBounds = RectF(x - surfaceRadius, y - surfaceRadius, x + surfaceRadius, y + surfaceRadius)
+        edgePaint.strokeWidth = 3.2f * density
+        edgePaint.color = Color.argb(175, 8, 10, 14)
+        canvas.drawArc(insetBounds, 180f, 180f, false, edgePaint)
+        edgePaint.strokeWidth = density
+        edgePaint.color = Color.argb(128, 238, 242, 248)
+        canvas.drawArc(insetBounds, 0f, 180f, false, edgePaint)
     }
 
     private var startPoint: TouchPoint = TouchPoint.emptyTouchPoint()
@@ -231,6 +468,7 @@ class SlideController3rd : View {
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
                     if (touchedButtonIndex >= 0) {
+                        startButtonBacklight()
                         buttonLongClickState = touchedButtonIndex
                         setTimer(curPoint, touchedButtonIndex)
                     }
@@ -315,6 +553,7 @@ class SlideController3rd : View {
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
         cancelTimer()
+        buttonBacklightStartedAt = 0L
     }
 
     class TouchPoint constructor(x: Float, y: Float, t: Long) {

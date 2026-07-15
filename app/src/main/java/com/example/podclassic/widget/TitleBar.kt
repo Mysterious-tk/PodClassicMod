@@ -16,6 +16,7 @@ import android.widget.FrameLayout
 import android.widget.ImageView
 import com.example.podclassic.base.Observer
 import com.example.podclassic.service.MediaPresenter
+import com.example.podclassic.storage.SPManager
 import com.example.podclassic.util.LiveData
 import com.example.podclassic.values.Colors
 import com.example.podclassic.values.Icons
@@ -30,10 +31,16 @@ class TitleBar : FrameLayout {
     constructor(context: Context, attributeSet: AttributeSet) : super(context, attributeSet)
 
     private val paint = Paint()
+    private val density = resources.displayMetrics.density
+    private val isIpod3rdTheme =
+        SPManager.getInt(SPManager.Theme.SP_NAME) == SPManager.Theme.IPOD_3RD.id
+    private val batteryVerticalInset =
+        if (isIpod3rdTheme) (3f * density).toInt() else DEFAULT_PADDING / 2
+    private val batteryWidthRatio = if (isIpod3rdTheme) 2.2f else 1.8f
 
     private val title = TextView(context)
     private val playState = ImageView(context)
-    private val battery = BatteryView(context)
+    private val battery = BatteryView(context, isIpod3rdTheme)
 
     private val observer = Observer()
     private val onDataChangeListener = object : LiveData.OnDataChangeListener {
@@ -57,7 +64,7 @@ class TitleBar : FrameLayout {
             battery,
             LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT).apply {
                 gravity = Gravity.END
-                setMargins(0, DEFAULT_PADDING / 2, DEFAULT_PADDING, DEFAULT_PADDING / 2)
+                setMargins(0, batteryVerticalInset, DEFAULT_PADDING, batteryVerticalInset)
             })
         // 播放状态图标在电池左边
         addView(
@@ -68,13 +75,13 @@ class TitleBar : FrameLayout {
             })
 
         // iPod Classic 风格的标题文字
-        title.textSize = 17f
+        title.textSize = if (isIpod3rdTheme) 15f else 17f
         title.setTextColor(Colors.text)
         title.setPadding(
             DEFAULT_PADDING,
-            DEFAULT_PADDING / 2,
+            if (isIpod3rdTheme) 0 else DEFAULT_PADDING / 2,
             DEFAULT_PADDING,
-            DEFAULT_PADDING / 2
+            if (isIpod3rdTheme) 0 else DEFAULT_PADDING / 2
         )
         // 添加微妙的阴影效果
         title.setShadowLayer(0.5f, 0f, 1f, Colors.white)
@@ -94,7 +101,12 @@ class TitleBar : FrameLayout {
         
         // 更新电池布局
         val batteryParams = battery.layoutParams as LayoutParams
-        batteryParams.setMargins(0, DEFAULT_PADDING / 2, if (isLandscape) DEFAULT_PADDING / 2 else DEFAULT_PADDING, DEFAULT_PADDING / 2)
+        batteryParams.setMargins(
+            0,
+            batteryVerticalInset,
+            if (isLandscape) DEFAULT_PADDING / 2 else DEFAULT_PADDING,
+            batteryVerticalInset
+        )
         battery.layoutParams = batteryParams
         updatePlayStateMargin(height)
     }
@@ -111,7 +123,7 @@ class TitleBar : FrameLayout {
         val batteryParams = battery.layoutParams as LayoutParams
         val batteryHeight =
             (titleBarHeight - batteryParams.topMargin - batteryParams.bottomMargin).coerceAtLeast(0)
-        val batteryWidth = (batteryHeight * 1.8f).toInt()
+        val batteryWidth = (batteryHeight * batteryWidthRatio).toInt()
         val playStateParams = playState.layoutParams as LayoutParams
         playStateParams.setMargins(
             0,
@@ -253,7 +265,7 @@ class TitleBar : FrameLayout {
         }
     }
 
-    class BatteryView(context: Context) : View(context) {
+    class BatteryView(context: Context, private val compact: Boolean = false) : View(context) {
 
         private val paint by lazy { Paint(Paint.ANTI_ALIAS_FLAG) }
         private val chargingPath = Path()
@@ -264,7 +276,7 @@ class TitleBar : FrameLayout {
         override fun onDraw(canvas: Canvas) {
             super.onDraw(canvas)
 
-            val padding = height / 5f
+            val padding = height * if (compact) 0.27f else 0.2f
 
             paint.color = Colors.line
             paint.shader =
@@ -364,7 +376,7 @@ class TitleBar : FrameLayout {
             }
              */
             // 使用固定宽度，避免横屏时被拉长
-            setMeasuredDimension((height * 1.8f).toInt(), height)
+            setMeasuredDimension((height * if (compact) 2.2f else 1.8f).toInt(), height)
         }
 
         fun refreshBattery() {

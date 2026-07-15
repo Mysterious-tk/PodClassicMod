@@ -308,11 +308,7 @@ class MainActivity : AppCompatActivity() {
             val topMargin = TOP_MARGIN
             layoutParams.topMargin = topMargin
             val horizontalCardMargin = resources.getDimensionPixelSize(
-                if (isIpod3rdTheme) {
-                    R.dimen.player_card_horizontal_margin_ipod_3rd
-                } else {
-                    R.dimen.padding_1
-                }
+                R.dimen.player_card_horizontal_margin
             )
             layoutParams.leftMargin = horizontalCardMargin
             layoutParams.rightMargin = horizontalCardMargin
