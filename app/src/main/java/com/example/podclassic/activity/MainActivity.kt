@@ -11,6 +11,9 @@ import android.widget.LinearLayout
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import com.example.podclassic.R
 import com.example.podclassic.base.Core
 import com.example.podclassic.fragment.SplashFragment
@@ -264,7 +267,9 @@ class MainActivity : AppCompatActivity() {
         } catch (e: Exception) {
             ""
         }
-        val isCoverFlowView = currentViewName == "CoverFlowView"
+        // CoverFlow 已迁移到 Compose，兼容旧类名以免后续切换实现时布局退化。
+        val isCoverFlowView = currentViewName == "CoverFlowView" ||
+            currentViewName == "ComposeCoverFlowView"
         val isMainView = currentViewName == "MainView"
         val isMusicListView = currentViewName == "MusicListView"
         val shouldFullScreen = isCoverFlowView || isMainView || isMusicListView
@@ -284,19 +289,54 @@ class MainActivity : AppCompatActivity() {
             layoutParams.topMargin = 0
             layoutParams.leftMargin = 0
             layoutParams.rightMargin = 0
+            layoutParams.bottomMargin = 0
             slideControllerParams.height = 0
             slideController3rd.layoutParams.height = 0
+            // 移除 iPod 屏幕容器的圆角底板，避免横屏四周露出黑框。
+            linearLayout.background = null
         } else {
             // 其他情况，保持默认布局
             // 使用dp单位设置高度，确保在不同分辨率屏幕上显示一致
             layoutParams.height = resources.getDimensionPixelSize(R.dimen.layout_rectangle_height)
-            val topMargin = statusBarHeight + TOP_MARGIN
+            // 全局隐藏状态栏，不再为系统栏额外预留高度。
+            val topMargin = TOP_MARGIN
             layoutParams.topMargin = topMargin
             layoutParams.leftMargin = resources.getDimensionPixelSize(R.dimen.padding_1)
             layoutParams.rightMargin = resources.getDimensionPixelSize(R.dimen.padding_1)
+            layoutParams.bottomMargin = 0
             slideControllerParams.height = LinearLayout.LayoutParams.MATCH_PARENT
             slideController3rd.layoutParams.height = LinearLayout.LayoutParams.MATCH_PARENT
+            linearLayout.setBackgroundResource(R.drawable.round_rectangle)
         }
+
+        // 所有页面隐藏顶部状态栏；CoverFlow 横屏进一步隐藏导航栏进入沉浸式全屏。
+        WindowInsetsControllerCompat(window, window.decorView).apply {
+            systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            hide(WindowInsetsCompat.Type.statusBars())
+            if (isLandscape && isCoverFlowView) {
+                hide(WindowInsetsCompat.Type.navigationBars())
+            } else {
+                show(WindowInsetsCompat.Type.navigationBars())
+            }
+        }
+
+        // 将包含屏幕和控制轮的整个主内容放入前摄开孔/刘海安全区。
+        // 这样横屏时位于左侧或右侧的摄像头也不会遮挡控制器。
+        ViewCompat.setOnApplyWindowInsetsListener(linearLayout, null)
+        val contentLayout = linearLayout.parent as ViewGroup
+        ViewCompat.setOnApplyWindowInsetsListener(contentLayout) { view, insets ->
+            val cutout = insets.getInsets(WindowInsetsCompat.Type.displayCutout())
+            if (view.paddingLeft != cutout.left ||
+                view.paddingTop != cutout.top ||
+                view.paddingRight != cutout.right ||
+                view.paddingBottom != cutout.bottom
+            ) {
+                view.setPadding(cutout.left, cutout.top, cutout.right, cutout.bottom)
+            }
+            insets
+        }
+        ViewCompat.requestApplyInsets(contentLayout)
 
         //linearLayout.clipToOutline = true
 
@@ -390,4 +430,3 @@ class MainActivity : AppCompatActivity() {
         Core.refresh()
     }
 }
-

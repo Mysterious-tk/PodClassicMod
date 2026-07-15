@@ -2,6 +2,7 @@ package com.example.podclassic.view
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.LinearGradient
@@ -14,6 +15,7 @@ import android.util.Log
 import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.widget.FrameLayout
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.Spring
@@ -45,7 +47,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
@@ -111,6 +112,11 @@ class ComposeCoverFlowView(context: Context) : FrameLayout(context), ScreenView 
     )
     // 记录上次滑动时间戳，用于动态计算动画时长
     private val lastSlideTimeState = mutableLongStateOf(0L)
+    private val isLandscapeState = mutableStateOf(
+        resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    )
+
+    private lateinit var gestureDetector: GestureDetector
 
     private val composeView = androidx.compose.ui.platform.ComposeView(context).apply {
         setContent {
@@ -119,7 +125,8 @@ class ComposeCoverFlowView(context: Context) : FrameLayout(context), ScreenView 
                 currentIndexState = currentIndexState,
                 targetIndexState = targetIndexState,
                 animatedIndexState = animatedIndexState,
-                lastSlideTimeState = lastSlideTimeState
+                lastSlideTimeState = lastSlideTimeState,
+                isLandscape = isLandscapeState.value
             )
         }
     }
@@ -143,28 +150,43 @@ class ComposeCoverFlowView(context: Context) : FrameLayout(context), ScreenView 
      * 支持：左右滑动切换专辑、点击中间项目进入
      */
     private fun addTouchHandler() {
-        val gestureDetector = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
+        val swipeStep = 44f * resources.displayMetrics.density
+        val touchSlop = ViewConfiguration.get(context).scaledTouchSlop.toFloat()
+        var horizontalDistance = 0f
+        var verticalDistance = 0f
+
+        gestureDetector = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
             override fun onDown(e: MotionEvent): Boolean {
+                horizontalDistance = 0f
+                verticalDistance = 0f
                 return true
             }
 
-            override fun onFling(
+            override fun onScroll(
                 e1: MotionEvent?,
                 e2: MotionEvent,
-                velocityX: Float,
-                velocityY: Float
+                distanceX: Float,
+                distanceY: Float
             ): Boolean {
-                if (e1 == null) return false
+                horizontalDistance += distanceX
+                verticalDistance += distanceY
 
-                val diffX = e2.x - e1.x
-                val SWIPE_THRESHOLD = 60f
-
-                if (abs(diffX) > SWIPE_THRESHOLD) {
-                    // 左右滑动：向右滑(diffX>0)显示上一张，向左滑(diffX<0)显示下一张
-                    slide(if (diffX > 0) -1 else 1)
+                if (abs(horizontalDistance) < touchSlop ||
+                    abs(horizontalDistance) <= abs(verticalDistance) * 1.15f
+                ) {
                     return true
                 }
-                return false
+
+                while (abs(horizontalDistance) >= swipeStep) {
+                    // GestureDetector 的 distanceX：手指向左为正，向右为负。
+                    val direction = if (horizontalDistance > 0f) 1 else -1
+                    if (!slide(direction)) {
+                        horizontalDistance = 0f
+                        break
+                    }
+                    horizontalDistance -= direction * swipeStep
+                }
+                return true
             }
 
             override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
@@ -183,15 +205,18 @@ class ComposeCoverFlowView(context: Context) : FrameLayout(context), ScreenView 
             }
         })
 
-        // 设置触摸监听器到 FrameLayout
-        setOnTouchListener { _, event ->
-            gestureDetector.onTouchEvent(event)
-            true
-        }
-
         // 确保可以接收点击事件
         isClickable = true
         isFocusable = true
+    }
+
+    /**
+     * ComposeView 会消费触摸事件，因此在分发给子 View 之前识别手势。
+     * CoverFlow 本身没有需要子 View 处理的交互，整页接管事件可保证快划和慢拖都稳定。
+     */
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        gestureDetector.onTouchEvent(event)
+        return true
     }
 
     override fun enter(): Boolean {
@@ -218,6 +243,11 @@ class ComposeCoverFlowView(context: Context) : FrameLayout(context), ScreenView 
     override fun onViewDelete() {
     }
 
+    override fun onConfigurationChanged() {
+        isLandscapeState.value =
+            resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    }
+
     override fun slide(slideVal: Int): Boolean {
         val newIndex = targetIndexState.intValue + slideVal
         if (newIndex in albums.indices) {
@@ -230,9 +260,13 @@ class ComposeCoverFlowView(context: Context) : FrameLayout(context), ScreenView 
     companion object {
         // 预加载可见范围的图片（带倒影）
         // 扩展预加载范围到 -3..3，确保所有可见图片都被预加载，减少闪烁
-        suspend fun preloadVisibleImages(albums: List<MusicList>, centerIndex: Int) {
+        suspend fun preloadVisibleImages(
+            albums: List<MusicList>,
+            centerIndex: Int,
+            sideCount: Int
+        ) {
             Log.d("CoverFlowPreload", "Starting preload for centerIndex=$centerIndex, albums.size=${albums.size}")
-            val range = -3..3
+            val range = -sideCount..sideCount
             for (offset in range) {
                 val index = centerIndex + offset
                 if (index in albums.indices) {
@@ -288,11 +322,11 @@ private fun CoverFlowContent(
     currentIndexState: androidx.compose.runtime.MutableIntState,
     targetIndexState: androidx.compose.runtime.MutableIntState,
     animatedIndexState: androidx.compose.runtime.MutableFloatState,
-    lastSlideTimeState: androidx.compose.runtime.MutableLongState
+    lastSlideTimeState: androidx.compose.runtime.MutableLongState,
+    isLandscape: Boolean
 ) {
     val density = LocalDensity.current
     val context = LocalContext.current
-    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
 
     // 读取当前目标索引
     val targetIndex by remember {
@@ -327,14 +361,13 @@ private fun CoverFlowContent(
 
         // Phase 5: 缓存密度相关的计算值
         // 将 configuration.orientation 添加到 key 中，确保横屏时重新计算布局
-        val cachedMetrics = remember(containerWidth, containerHeight, density, configuration.orientation) {
+        val cachedMetrics = remember(containerWidth, containerHeight, density, isLandscape) {
             // 显示尺寸150dp，处理分辨率600px（由Compose自动缩放）
             val coverSize = 150.dp
             val coverSizePx = with(density) { coverSize.toPx() }
             val screenWidthPx = with(density) { containerWidth.toPx() }
             val screenHeightPx = with(density) { containerHeight.toPx() }
-            val isPortrait = configuration.orientation ==
-                android.content.res.Configuration.ORIENTATION_PORTRAIT
+            val isPortrait = !isLandscape
 
             // ✅ 间距计算：基于布局宽度（ImageView的实际尺寸）
             val maxOffset = 3f
@@ -345,7 +378,7 @@ private fun CoverFlowContent(
                 """Metrics Calculation:
                    | containerWidth (dp): $containerWidth
                    | containerHeight (dp): $containerHeight
-                   | orientation: ${configuration.orientation}
+                   | isLandscape: $isLandscape
                    | density: ${density.density}
                    | coverSizePx: $coverSizePx (150dp)
                    | screenWidthPx: $screenWidthPx
@@ -370,7 +403,8 @@ private fun CoverFlowContent(
                     arcStrength = 0f,
                     maxRotation = 62f,
                     minScale = 0.92f,
-                    maxSideCount = 3,
+                    // 竖屏维持经典的 7 张；横屏利用额外宽度显示 13 张。
+                    maxSideCount = if (isPortrait) 3 else 6,
                     cameraDistance = 6000f,
                     rotationCorrectionFactor = 0.6f,  // 校准系数，根据实际效果调整
                     // 竖屏下增加侧边唱片的露出宽度，同时把第一张侧封面拉近中心，
@@ -424,9 +458,13 @@ private fun CoverFlowContent(
         var preloaded by remember { mutableStateOf(false) }
         var imageRevision by remember { mutableIntStateOf(0) }
 
-        LaunchedEffect(targetIndex) {
+        LaunchedEffect(targetIndex, cachedMetrics.layoutParams.maxSideCount) {
             withContext(Dispatchers.IO) {
-                ComposeCoverFlowView.preloadVisibleImages(albums, targetIndex)
+                ComposeCoverFlowView.preloadVisibleImages(
+                    albums,
+                    targetIndex,
+                    cachedMetrics.layoutParams.maxSideCount
+                )
             }
             preloaded = true
             imageRevision++
@@ -451,6 +489,7 @@ private fun CoverFlowContent(
                     }
                 },
                 update = { nativeView ->
+                    nativeView.setVisibleItemCount(coverFlowData.size)
                     // 读取 revision，使图片异步加载完成时 update 会重新执行。
                     @Suppress("UNUSED_VARIABLE")
                     val currentImageRevision = imageRevision
@@ -837,8 +876,11 @@ private fun calculateCoverFlowItem(
 
     // 增强透明度：中心完全不透明，边缘逐渐半透明
     // 使用平滑插值实现渐变效果
+    // 淡出起点跟随当前可见数量。原先固定从 2.35 开始淡出，导致横屏新增的
+    // 第 4～6 张虽然参与布局，却全部变成透明。
+    val fadeStart = params.maxSideCount - 0.65f
     val alpha = if (isPlaceholder) 0f else
-        (1f - (absoluteOffset - 2.35f).coerceAtLeast(0f) * 0.65f).coerceIn(0f, 1f)
+        (1f - (absoluteOffset - fadeStart).coerceAtLeast(0f) * 0.65f).coerceIn(0f, 1f)
     val zIndex = 100f - absoluteOffset * 20f
     val transformOriginX = 0.5f
 
