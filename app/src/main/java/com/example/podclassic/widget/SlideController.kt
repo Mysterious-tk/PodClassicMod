@@ -17,7 +17,6 @@ import com.example.podclassic.values.Icons.MENU
 import com.example.podclassic.values.Icons.NEXT
 import com.example.podclassic.values.Icons.PAUSE
 import com.example.podclassic.values.Icons.PREV
-import com.example.podclassic.values.Values
 import java.util.*
 import kotlin.math.abs
 import kotlin.math.atan2
@@ -34,6 +33,9 @@ class SlideController : View {
 
         private var minR = 0f
         private var maxR = 0f
+
+        private const val WHEEL_DIAMETER_DP = 217f
+        private const val WHEEL_BOTTOM_MARGIN_DP = 80f
 
     }
 
@@ -58,11 +60,17 @@ class SlideController : View {
         val x = MeasureSpec.getSize(widthMeasureSpec)
         val y = MeasureSpec.getSize(heightMeasureSpec)
         centerX = x / 2f
-        centerY = y / 2f
+        val density = resources.displayMetrics.density
+        val requestedRadius = WHEEL_DIAMETER_DP * density / 2f
+        val bottomMargin = WHEEL_BOTTOM_MARGIN_DP * density
 
-        val center = min(centerX, centerY)
-
-        maxR = center * (center / (center + abs(centerX - centerY) + Values.screenWidth / 12))
+        // Keep the classic wheel aligned with the 3G layout while preserving its
+        // original ring-button arrangement. Only compact windows scale it down.
+        maxR = min(
+            requestedRadius,
+            min(centerX, (y - bottomMargin).coerceAtLeast(0f) / 2f)
+        )
+        centerY = (y - bottomMargin - maxR).coerceAtLeast(maxR)
 
         //maxR = min(maxR, center - Values.screenWidth / 12)
 

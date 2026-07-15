@@ -485,7 +485,7 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
         image.setImageBitmap(empty)
 
         ThreadUtil.asyncTask({
-            bitmap = music.image
+            bitmap = music.image?.let(::cropArtworkReflection)
             Log.d("MusicPlayerView", "Bitmap loaded: ${bitmap != null}")
         }, {
             Log.d("MusicPlayerView", "Image load callback: bitmap=$bitmap")
@@ -523,6 +523,16 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
             }
             Log.d("MusicPlayerView", "Image load completed")
         })
+    }
+
+    /** Preserve the full square cover plus the reflection that fits the 180:220 view. */
+    private fun cropArtworkReflection(source: Bitmap): Bitmap {
+        val targetHeight = (source.width * 11 / 9).coerceAtMost(source.height)
+        return if (targetHeight == source.height) {
+            source
+        } else {
+            Bitmap.createBitmap(source, 0, 0, source.width, targetHeight)
+        }
     }
 
     private fun onPlayStateChange() {

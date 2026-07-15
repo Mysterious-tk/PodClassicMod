@@ -34,7 +34,9 @@ import kotlin.math.abs
 open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : FrameLayout(context) {
 
     companion object {
-        const val DEFAULT_MAX_SIZE = 10
+        // The player viewport grew from 300dp to 370dp; expose two more rows so long
+        // menus such as Settings continue to fill the available content area.
+        const val DEFAULT_MAX_SIZE = 12
         const val DELAY = 75
         const val QUICK_SLIDE = DEFAULT_MAX_SIZE * 5
         private const val PAYLOAD_HIGHLIGHT = "highlight"
