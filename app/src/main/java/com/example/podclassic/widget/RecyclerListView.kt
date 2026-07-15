@@ -3,9 +3,11 @@ package com.example.podclassic.widget
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.RenderEffect
 import android.graphics.Shader
+import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.util.Log
@@ -35,6 +37,7 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
         const val DEFAULT_MAX_SIZE = 10
         const val DELAY = 75
         const val QUICK_SLIDE = DEFAULT_MAX_SIZE * 5
+        private const val PAYLOAD_HIGHLIGHT = "highlight"
     }
 
     constructor(context: Context) : this(context, DEFAULT_MAX_SIZE)
@@ -45,6 +48,17 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
     private val indexView = android.widget.TextView(context)
     private val recyclerParams: LayoutParams
 
+    /**
+     * Enables the liquid-glass selection shared by all iPod-style menus. Individual
+     * screens can still opt out when a classic solid highlight is required.
+     */
+    var liquidGlassHighlightEnabled = true
+        set(value) {
+            if (field == value) return
+            field = value
+            refreshList()
+        }
+
     // 触摸起始位置
     private var touchStartY = 0f
 
@@ -53,6 +67,9 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
         recyclerView = RecyclerView(context)
         recyclerView.layoutManager = LinearLayoutManager(context)
         recyclerView.overScrollMode = View.OVER_SCROLL_NEVER
+        // Selection changes are drawn by ItemView itself. RecyclerView's default
+        // change animation cross-fades rows and looks like a flash on the wheel.
+        recyclerView.itemAnimator = null
         
         // 创建 Adapter
         adapter = ItemAdapter()
@@ -412,6 +429,9 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
             return false
         }
 
+        val oldIndex = index
+        val oldPosition = position
+
         if (direction < 0) {
             if (index > 0) {
                 if (position > 0 && index == position) {
@@ -427,7 +447,14 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
                 index++
             }
         }
-        refreshList()
+        if (oldPosition == position) {
+            adapter.notifyItemChanged(oldIndex - position, PAYLOAD_HIGHLIGHT)
+            adapter.notifyItemChanged(index - position, PAYLOAD_HIGHLIGHT)
+        } else {
+            // The visible window moved, so its item-to-row mapping must be rebound.
+            adapter.notifyDataSetChanged()
+        }
+        updateScrollBar()
         return true
     }
 
@@ -521,9 +548,28 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
                 val item = itemList[actualIndex]
                 // 判断是否显示滚动条（item 数量大于 MAX_SIZE 时显示）
                 val showScrollBar = itemList.size > MAX_SIZE
-                holder.bind(item, actualIndex == index, item.enable, item.rightText, showScrollBar)
+                holder.bind(
+                    item,
+                    actualIndex == index,
+                    item.enable,
+                    item.rightText,
+                    showScrollBar,
+                    liquidGlassHighlightEnabled
+                )
                 // 设置 item 的点击监听
                 onItemCreated(actualIndex, holder.itemView as ItemView)
+            }
+        }
+
+        override fun onBindViewHolder(
+            holder: ItemViewHolder,
+            listPosition: Int,
+            payloads: MutableList<Any>
+        ) {
+            if (payloads.contains(PAYLOAD_HIGHLIGHT)) {
+                holder.setHighlight(position + listPosition == index)
+            } else {
+                super.onBindViewHolder(holder, listPosition, payloads)
             }
         }
 
@@ -533,8 +579,16 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
     }
 
     inner class ItemViewHolder(private val listItemView: ItemView) : RecyclerView.ViewHolder(listItemView) {
-        fun bind(item: Item, isHighlighted: Boolean, isEnabled: Boolean, rightText: String, showScrollBar: Boolean = true) {
+        fun bind(
+            item: Item,
+            isHighlighted: Boolean,
+            isEnabled: Boolean,
+            rightText: String,
+            showScrollBar: Boolean = true,
+            useLiquidGlass: Boolean = false
+        ) {
             listItemView.setText(item.name)
+            listItemView.setUseLiquidGlass(useLiquidGlass)
             listItemView.setHighlight(isHighlighted)
             listItemView.setEnable(isEnabled)
             listItemView.setRightText(rightText, showScrollBar)
@@ -646,6 +700,7 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
         private var highlight = false
         private var enable = false
         private var playing = false
+        private var useLiquidGlass = false
 
         private val rightText = TextView(context)
         private val leftText = TextView(context)
@@ -726,6 +781,16 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
             }
         }
 
+        private val liquidGlassDrawable by lazy {
+            LiquidGlassHighlightDrawable(context.resources.displayMetrics.density)
+        }
+
+        fun setUseLiquidGlass(enabled: Boolean) {
+            if (useLiquidGlass == enabled) return
+            useLiquidGlass = enabled
+            if (highlight) applyHighlightBackground()
+        }
+
         fun setHighlight(highlight: Boolean) {
             if (this.highlight == highlight) {
                 return
@@ -741,8 +806,7 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
                 leftText.isSelected = false
             }
             if (highlight) {
-                // 应用玻璃效果高亮背景
-                applyHighlightGlassEffect()
+                applyHighlightBackground()
                 leftText.setTextColor(0xFFFFFFFF.toInt())
                 rightText.setTextColor(0xFFFFFFFF.toInt())
             } else {
@@ -752,20 +816,13 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
             }
         }
 
-        // 应用高亮玻璃效果 - 半透明蓝色背景+光泽
-        private fun applyHighlightGlassEffect() {
-            // 使用半透明蓝色背景模拟玻璃效果
-            val glassDrawable = GradientDrawable().apply {
-                shape = GradientDrawable.RECTANGLE
-                cornerRadius = 8f * context.resources.displayMetrics.density
-                // 半透明蓝色渐变
-                colors = intArrayOf(
-                    Color.argb(200, 0, 122, 255),  // 半透明主蓝色
-                    Color.argb(180, 90, 200, 250)   // 半透明浅蓝色
-                )
-                orientation = GradientDrawable.Orientation.TOP_BOTTOM
+        private fun applyHighlightBackground() {
+            if (!useLiquidGlass) {
+                background = highlightDrawable
+                return
             }
-            background = glassDrawable
+
+            background = liquidGlassDrawable
         }
 
         fun setEnable(enable: Boolean) {
@@ -852,5 +909,99 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
             leftText.setTextColor(0xFF1A1A1A.toInt())
             rightText.setTextColor(0xFF1A1A1A.toInt())
         }
+    }
+
+    /**
+     * Lightweight glass surface for the selected song row. The album artwork is
+     * already blurred behind the list, so translucent layers preserve that
+     * backdrop while these highlights provide depth without capturing bitmaps on
+     * every click-wheel movement.
+     */
+    private class LiquidGlassHighlightDrawable(private val density: Float) : Drawable() {
+        private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+        private val glossPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+        private val edgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = density
+        }
+        private val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+        private val rect = android.graphics.RectF()
+        private val glossRect = android.graphics.RectF()
+
+        override fun onBoundsChange(bounds: android.graphics.Rect) {
+            super.onBoundsChange(bounds)
+            if (bounds.isEmpty) return
+
+            rect.set(bounds)
+            glossRect.set(rect.left, rect.top, rect.right, rect.top + rect.height() * 0.58f)
+            val centerX = rect.left + rect.width() * 0.56f
+
+            fillPaint.shader = LinearGradient(
+                rect.left,
+                rect.top,
+                rect.right,
+                rect.bottom,
+                intArrayOf(
+                    Color.argb(182, 24, 132, 238),
+                    Color.argb(148, 34, 164, 246),
+                    Color.argb(176, 0, 93, 205)
+                ),
+                floatArrayOf(0f, 0.52f, 1f),
+                Shader.TileMode.CLAMP
+            )
+            glossPaint.shader = LinearGradient(
+                centerX,
+                rect.top,
+                centerX,
+                glossRect.bottom,
+                Color.argb(108, 255, 255, 255),
+                Color.TRANSPARENT,
+                Shader.TileMode.CLAMP
+            )
+            shadowPaint.shader = LinearGradient(
+                0f,
+                rect.bottom - 2f * density,
+                0f,
+                rect.bottom,
+                Color.TRANSPARENT,
+                Color.argb(90, 0, 39, 96),
+                Shader.TileMode.CLAMP
+            )
+        }
+
+        override fun draw(canvas: Canvas) {
+            if (bounds.isEmpty) return
+
+            rect.set(bounds)
+            val radius = 9f * density
+            canvas.drawRoundRect(rect, radius, radius, fillPaint)
+
+            canvas.drawRoundRect(glossRect, radius, radius, glossPaint)
+
+            edgePaint.color = Color.argb(150, 225, 248, 255)
+            rect.inset(density * 0.5f, density * 0.5f)
+            canvas.drawRoundRect(rect, radius, radius, edgePaint)
+
+            canvas.drawRoundRect(rect, radius, radius, shadowPaint)
+        }
+
+        override fun setAlpha(alpha: Int) {
+            fillPaint.alpha = alpha
+            glossPaint.alpha = alpha
+            edgePaint.alpha = alpha
+            shadowPaint.alpha = alpha
+            invalidateSelf()
+        }
+
+        override fun setColorFilter(colorFilter: android.graphics.ColorFilter?) {
+            fillPaint.colorFilter = colorFilter
+            glossPaint.colorFilter = colorFilter
+            edgePaint.colorFilter = colorFilter
+            shadowPaint.colorFilter = colorFilter
+            invalidateSelf()
+        }
+
+        @Suppress("OVERRIDE_DEPRECATION")
+        override fun getOpacity(): Int = android.graphics.PixelFormat.TRANSLUCENT
     }
 }
