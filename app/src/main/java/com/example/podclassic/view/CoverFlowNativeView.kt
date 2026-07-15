@@ -18,6 +18,8 @@ import android.widget.ImageView
 class CoverFlowNativeView(context: Context) : FrameLayout(context) {
 
     companion object {
+        private const val MAX_VISIBLE_ITEMS = 13
+
         /**
          * Set to true to make ImageViews visible in Android Layout Inspector
          *
@@ -69,8 +71,8 @@ class CoverFlowNativeView(context: Context) : FrameLayout(context) {
         clipChildren = false
         clipToPadding = false
 
-        // 初始化7个ImageView
-        for (i in 0..6) {
+        // 横屏最多显示 13 张；竖屏通过 setVisibleItemCount 保持 7 张。
+        repeat(MAX_VISIBLE_ITEMS) { i ->
             val imageView = createImageView(context)
             // Generate unique view ID for Layout Inspector debugging
             val viewId = View.generateViewId()
@@ -124,7 +126,7 @@ class CoverFlowNativeView(context: Context) : FrameLayout(context) {
      * @param transform 变换数据
      */
     fun updateImage(position: Int, albumId: Long?, transform: TransformData) {
-        if (position !in 0..6) return
+        if (position !in imageViews.indices) return
 
         val imageView = imageViews[position]
 
@@ -254,6 +256,21 @@ class CoverFlowNativeView(context: Context) : FrameLayout(context) {
             Calculated right edge: $actualRightEdge
             Parent width: ${(parent as? View)?.width ?: -1}
         """.trimIndent())
+    }
+
+    /**
+     * 配置当前方向需要的封面数量，并清理隐藏位置的旧图片。
+     */
+    fun setVisibleItemCount(count: Int) {
+        val visibleCount = count.coerceIn(0, imageViews.size)
+        imageViews.forEachIndexed { index, imageView ->
+            val visible = index < visibleCount
+            imageView.visibility = if (visible) View.VISIBLE else View.GONE
+            if (!visible && albumIds[index] != null) {
+                imageView.setImageDrawable(null)
+                albumIds[index] = null
+            }
+        }
     }
 
     /**
