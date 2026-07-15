@@ -16,8 +16,8 @@ import android.view.MotionEvent
 import android.view.View
 import android.widget.FrameLayout
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -71,6 +71,8 @@ import kotlin.math.cos
 import kotlin.math.PI
 import kotlin.math.pow
 import kotlin.math.sin
+import kotlin.math.roundToInt
+import kotlin.math.sign
 
 // Conditional debug logging - Phase 1: Quick Wins
 // Set to false to disable debug logging in production builds
@@ -123,7 +125,6 @@ class ComposeCoverFlowView(context: Context) : FrameLayout(context), ScreenView 
     }
 
     init {
-        // 设置白色背景，保持一致的视觉效果
         setBackgroundColor(Colors.white)
         // 添加原生手势处理层
         addTouchHandler()
@@ -298,33 +299,23 @@ private fun CoverFlowContent(
         derivedStateOf { targetIndexState.intValue }
     }
 
-    // 根据滑动间隔判断是否快速滚动
-    // 用于调整弹簧参数：快速滚动减少弹性，提高响应速度
-    val currentTime = System.currentTimeMillis()
-    val timeSinceLastSlide = currentTime - lastSlideTimeState.longValue
-    val isFastScroll = timeSinceLastSlide < 100
-
-    // 响应式弹簧动画 - 使用 spring 替代 tween 实现更自然的物理感觉
-    // 弹簧自动适应目标距离：滚动距离越远，动画时间越长
+    // iPod 的切换快速、连续且不会在落点回弹。临界阻尼仍能承接快速滚轮输入，
+    // 但去掉了 Compose 默认的“卡片弹簧”观感。
     val animatedIndex by animateFloatAsState(
         targetValue = targetIndex.toFloat(),
         animationSpec = spring(
-            // 阻尼比：0.5 = 中等弹性，快速滚动时减少弹性避免过度晃动
-            dampingRatio = if (isFastScroll) 0.6f else Spring.DampingRatioMediumBouncy,
-
-            // 刚度：快速滚动时增加硬度，慢速滚动时保持柔和
-            stiffness = if (isFastScroll) Spring.StiffnessMedium else Spring.StiffnessMediumLow
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = 520f
         ),
         label = "coverflow_scroll"
     )
 
-    // 同步动画状态到外部状态
-    LaunchedEffect(targetIndex) {
-        // 在动画开始时更新时间戳，供下次动画计算使用
-        lastSlideTimeState.longValue = currentTime
+    // 点击与标题都跟随真正到达中心的封面，而不是提前跳到目标专辑。
+    LaunchedEffect(animatedIndex) {
         animatedIndexState.floatValue = animatedIndex
-        // 同步 currentIndex 以便点击时选择正确的专辑
-        currentIndexState.intValue = targetIndex.coerceIn(0, albums.size - 1)
+        if (albums.isNotEmpty()) {
+            currentIndexState.intValue = animatedIndex.roundToInt().coerceIn(albums.indices)
+        }
     }
 
     // 使用BoxWithConstraints获取实际可用尺寸
@@ -342,6 +333,8 @@ private fun CoverFlowContent(
             val coverSizePx = with(density) { coverSize.toPx() }
             val screenWidthPx = with(density) { containerWidth.toPx() }
             val screenHeightPx = with(density) { containerHeight.toPx() }
+            val isPortrait = configuration.orientation ==
+                android.content.res.Configuration.ORIENTATION_PORTRAIT
 
             // ✅ 间距计算：基于布局宽度（ImageView的实际尺寸）
             val maxOffset = 3f
@@ -375,14 +368,16 @@ private fun CoverFlowContent(
                     screenHeightPx = screenHeightPx,
                     itemSpacing = calculatedSpacing,
                     arcStrength = 0f,
-                    maxRotation = 30f,  // 与rotationY保持一致，iOS风格30°
-                    minScale = 0.85f,
+                    maxRotation = 62f,
+                    minScale = 0.92f,
                     maxSideCount = 3,
                     cameraDistance = 6000f,
                     rotationCorrectionFactor = 0.6f,  // 校准系数，根据实际效果调整
-                    sideToSideSpacing = 0.9f,   // 侧边图片之间的间距，增大到0.9f以减少边缘留白
-                    sideToCenterSpacing = 1.9f,  // 侧边到中心的间距，增大到1.9f以避免旋转边缘遮挡中心图片
-                    unifiedSpacingMultiplier = 1.2f  // 新增：统一间距倍数
+                    // 竖屏下增加侧边唱片的露出宽度，同时把第一张侧封面拉近中心，
+                    // 保证每侧至少能辨认出 2 张，并在边缘看到第 3 张。
+                    sideToSideSpacing = if (isPortrait) 0.38f else 0.24f,
+                    sideToCenterSpacing = if (isPortrait) 0.58f else 0.72f,
+                    unifiedSpacingMultiplier = 1f
                 )
             )
         }
@@ -425,22 +420,23 @@ private fun CoverFlowContent(
         }
 
 
-        // 预加载状态跟踪 - 确保初始加载时图片能正确显示
+        // 缓存完成后显式触发 AndroidView 更新，避免快速滚动后封面保持空白。
         var preloaded by remember { mutableStateOf(false) }
+        var imageRevision by remember { mutableIntStateOf(0) }
 
-        // 预加载图片：在首次组合时预加载可见范围的图片
-        LaunchedEffect(Unit) {
+        LaunchedEffect(targetIndex) {
             withContext(Dispatchers.IO) {
                 ComposeCoverFlowView.preloadVisibleImages(albums, targetIndex)
             }
             preloaded = true
+            imageRevision++
         }
 
         // CoverFlow区域 - 使用 AndroidView 混合方案
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(Colors.white))
+                .background(Color.White)
         ) {
             // 等待预加载完成后再显示 AndroidView
             if (preloaded) {
@@ -455,6 +451,9 @@ private fun CoverFlowContent(
                     }
                 },
                 update = { nativeView ->
+                    // 读取 revision，使图片异步加载完成时 update 会重新执行。
+                    @Suppress("UNUSED_VARIABLE")
+                    val currentImageRevision = imageRevision
                     // 动画驱动：每次重组时更新原生 View
                     coverFlowData.forEach { data ->
                         val albumId = if (data.isPlaceholder) null else albums[data.albumIndex].id
@@ -502,13 +501,6 @@ private fun CoverFlowContent(
             )
             }
 
-            // 预加载图片：当targetIndex变化时，预加载可见范围的图片（后续滚动）
-            LaunchedEffect(targetIndex) {
-                withContext(Dispatchers.IO) {
-                    ComposeCoverFlowView.preloadVisibleImages(albums, targetIndex)
-                }
-            }
-
             // 专辑信息文字 - 放在底部，使用高zIndex确保显示在封面之上
             Column(
                 modifier = Modifier
@@ -518,7 +510,8 @@ private fun CoverFlowContent(
                     .zIndex(200f), // 确保文字始终显示在封面和倒影之上
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                val currentAlbum = if (targetIndex in albums.indices) albums[targetIndex] else null
+                val displayIndex = animatedIndex.roundToInt()
+                val currentAlbum = if (displayIndex in albums.indices) albums[displayIndex] else null
                 currentAlbum?.let { album ->
                     Text(
                         text = album.title ?: "",
@@ -791,11 +784,15 @@ private fun calculateCoverFlowItem(
     // pos=0(offset=-3): 靠左侧
     // pos=3(offset=0): 屏幕中心
     // pos=6(offset=3): 靠右侧
-    // ✅ 修复：使用浮点偏移量 + 统一间距倍数
-    // unifiedSpacingMultiplier ≈ 1.2f 使总跨度约等于原始累积模式
-    // 所有位置使用统一的计算方式，避免分支导致的动画跳帧
+    // 经典 Cover Flow 不是等距横排：中心封面两侧留出空间，侧边封面则像唱片架一样
+    // 紧密叠放。这个连续函数在跨越中心时不会跳帧。
+    val absoluteOffset = abs(floatOffsetFromCenter)
+    val centerTravel = params.coverSizePx * params.sideToCenterSpacing *
+        absoluteOffset.coerceAtMost(1f)
+    val stackedTravel = params.coverSizePx * params.sideToSideSpacing *
+        (absoluteOffset - 1f).coerceAtLeast(0f)
     val baseX = params.screenWidthPx / 2f - params.coverSizePx / 2f +
-        floatOffsetFromCenter * params.itemSpacing * params.unifiedSpacingMultiplier
+        sign(floatOffsetFromCenter) * (centerTravel + stackedTravel)
 
     // 3. 3D变换参数 - 增强版：添加倾斜、透视压缩、阴影
 
@@ -810,41 +807,14 @@ private fun calculateCoverFlowItem(
     val absOffsetFromCenter = abs(offsetFromCenter.toFloat())
     val absFloatOffset = abs(floatOffsetFromCenter)  // 浮点绝对偏移，用于平滑插值
 
-    // ✅ 保留离散 displayPos 用于确定"基准"旋转方向和轴
-    // pos0-2: 左侧，+70度旋转
-    // pos3: 中心，0度旋转
-    // pos4-6: 右侧，-70度旋转
-    val isLeftPivot = displayPos < 3      // pos0,1,2 → 左侧
-    val isCenterPivot = displayPos == 3   // pos3 → 中心
-    val isRightPivot = displayPos >= 4    // pos4,5,6 → 右侧
-
-    // ✅ 基准旋转角度：保持离散值用于确定方向
-    val baseRotationReg = when {
-        isLeftPivot -> 70f
-        isCenterPivot -> 0f
-        else -> -70f
-    }
-
-    // ✅ 在过渡区使用连续 floatOffsetFromCenter 进行平滑插值
-    // 左侧过渡区 (offset -0.75 ~ 0): 70° → 0°
-    // 右侧过渡区 (offset 0 ~ 0.75): 0° → -70°
-    val rotationY = when {
-        floatOffsetFromCenter < -0.75f -> 70f
-        floatOffsetFromCenter > 0.75f -> -70f
-        floatOffsetFromCenter < 0 -> {
-            // 左侧过渡区：线性插值 70° → 0°
-            val t = (floatOffsetFromCenter + 0.75f) / 0.75f  // 0 到 1
-            70f * (1f - t)  // 70° → 0°
-        }
-        else -> {
-            // 右侧过渡区：线性插值 0° → -70°
-            val t = floatOffsetFromCenter / 0.75f  // 0 到 1
-            -70f * t  // 0° → -70°
-        }
-    }
+    // 封面进入中心时完成“展开”，离开时重新折向侧面。smoothstep 让展开的首尾
+    // 都减速，比线性 rotationY 更接近 iPod 的机械式翻转。
+    val turnProgress = absoluteOffset.coerceIn(0f, 1f)
+    val easedTurn = turnProgress * turnProgress * (3f - 2f * turnProgress)
+    val rotationY = -sign(floatOffsetFromCenter) * params.maxRotation * easedTurn
 
     // X轴旋转：所有位置都保持倾斜
-    val rotationX = 2f  // 所有位置: 保持倾斜
+    val rotationX = 0f
 
     // iOS风格的温和透视距离差值，避免夸张的3D效果
     // 中心6000 -> 边缘5910 -> 最小1000 的温和对比
@@ -857,7 +827,7 @@ private fun calculateCoverFlowItem(
     // ✅ 动态缩放：中心图片完整大小 (1.0)，边缘图片逐渐缩小 (0.85)
     // 为中心图片切换添加缩放动画，增强视觉流畅性
     val t = minOf(absFloatOffset, 1f)  // 0 到 1 的插值因子（用于阴影等效果）
-    val scaleAmount = 1.0f - absFloatOffset * 0.05f  // 1.0 → 0.85 的平滑缩放
+    val scaleAmount = 1.0f - (1.0f - params.minScale) * turnProgress
     val scaleX = scaleAmount
     val scaleY = scaleAmount
 
@@ -867,80 +837,10 @@ private fun calculateCoverFlowItem(
 
     // 增强透明度：中心完全不透明，边缘逐渐半透明
     // 使用平滑插值实现渐变效果
-    val alpha = when {
-        isPlaceholder -> 0.3f
-        absFloatOffset < 1f -> 1f
-        absFloatOffset < 2f -> 1f - (absFloatOffset - 1f) * 0.15f  // 1.0 → 0.85
-        else -> 0.7f
-    }
-    // z-index 层级计算：进入侧的图片应该有最高层级
-    // 基础层级：靠近中心层级更高
-    val baseZIndex = 100f - absFloatOffset * 10f
-
-    // 方向加成：进入侧的图片有额外层级加成
-    // 向左滚动（animationOffset > 0）：右侧图片进入 → 右侧图片层级加成
-    // 向右滚动（animationOffset < 0）：左侧图片进入 → 左侧图片层级加成
-    // 使用 animationOffset 作为阈值，只在动画进行中应用加成
-    val directionBonus = when {
-        animationOffset > 0.5f && floatOffsetFromCenter > 0 -> {
-            // 向左滚动 + 右侧图片：越靠右加成越大 (8, 16, 24...)
-            minOf(floatOffsetFromCenter, 3f) * 8f
-        }
-        animationOffset < -0.5f && floatOffsetFromCenter < 0 -> {
-            // 向右滚动 + 左侧图片：越靠左加成越大 (8, 16, 24...)
-            minOf(absFloatOffset, 3f) * 8f
-        }
-        else -> 0f
-    }
-
-    val zIndex = baseZIndex + directionBonus
-
-    // ✅ Transform origin：保留离散基准值 + 平滑插值修复瞬切
-    // pos0-2 (左侧): 绕左边缘旋转 (pivotX = 0)
-    // pos3 (中心): 绕中心旋转 (pivotX = 0.5)
-    // pos4-6 (右侧): 绕右边缘旋转 (pivotX = 1)
-    //
-    // 关键修复：在过渡区 (-0.75 ~ +0.75) 使用连续插值
-    // 避免 displayPos 离散跳变导致的瞬切
-
-    // 基准 pivotX：保持原始离散值
-    val baseTransformOriginX = when {
-        isLeftPivot -> 0f
-        isRightPivot -> 1f
-        else -> 0.5f
-    }
-
-    // ✅ 动态旋转轴：中心位置完全跟随滚动方向
-    // animationOffset > 0: 向左滚（显示上一张），transformOriginX → 1（绕右边缘）
-    // animationOffset < 0: 向右滚（显示下一张），transformOriginX → 0（绕左边缘）
-    // animationOffset ≈ 0: 静止，transformOriginX = 0.5（绕中心）
-
-    // 计算方向系数：-1（右滚）~ 0（静止）~ 1（左滚）
-    val directionFactor = animationOffset.coerceIn(-1f, 1f)
-
-    // 中心位置的动态旋转轴：根据方向直接计算
-    // directionFactor = -1 → 0.0（左边缘）
-    // directionFactor = 0 → 0.5（中心）
-    // directionFactor = 1 → 1.0（右边缘）
-    val centerPivotX = 0.5f + directionFactor * 0.5f
-
-    val transformOriginX = when {
-        // 侧边固定区（不受滚动方向影响）
-        floatOffsetFromCenter < -0.75f -> 0f
-        floatOffsetFromCenter > 0.75f -> 1f
-
-        // 左侧过渡区：0 → 中心动态值
-        floatOffsetFromCenter < 0 -> {
-            val t = (floatOffsetFromCenter + 0.75f) / 0.75f
-            0f + t * centerPivotX  // 0 → centerPivotX
-        }
-
-        // 右侧过渡区：中心动态值 → 1
-        else -> {
-            val t = floatOffsetFromCenter / 0.75f
-            centerPivotX + t * (1f - centerPivotX)  // centerPivotX → 1
-        }
-    }
+    val alpha = if (isPlaceholder) 0f else
+        (1f - (absoluteOffset - 2.35f).coerceAtLeast(0f) * 0.65f).coerceIn(0f, 1f)
+    val zIndex = 100f - absoluteOffset * 20f
+    val transformOriginX = 0.5f
 
     // translationX补偿已禁用：finalX已正确计算间距，无需额外补偿
     // 注：保留translationX字段用于可能的未来调整
@@ -952,7 +852,9 @@ private fun calculateCoverFlowItem(
     // ✅ Z 轴深度计算（原生 View 专用）
     // 越靠边的图片越"远"，增强3D深度感（iOS风格温和深度）
     // 类似 MusicPlayerView3rd 中的: image.z = abs(temp * 3)
-    val translationZ = absFloatOffset * 40f  // 偏移越大，Z轴越深（更温和的40px倍数）
+    // Android 的 Z 值越大越靠前；原实现方向相反，导致侧边卡片压住中心卡片。
+    val translationZ = (params.maxSideCount + 1f - absoluteOffset)
+        .coerceAtLeast(0f) * 8f * density.density
 
     // Debug logging for all positions
     if (ENABLE_DEBUG_LOGGING) {
@@ -962,11 +864,6 @@ private fun calculateCoverFlowItem(
             | offsetFromCenter: $offsetFromCenter
             | floatOffsetFromCenter: $floatOffsetFromCenter
             | animationOffset: $animationOffset
-            | directionFactor: $directionFactor
-            | centerPivotX: $centerPivotX
-            | isLeftPivot: $isLeftPivot, isCenterPivot: $isCenterPivot, isRightPivot: $isRightPivot
-            | baseTransformOriginX: $baseTransformOriginX
-            | baseRotationReg: $baseRotationReg°
             | transformOriginX: $transformOriginX
             | rotationY: $rotationY°
             | translationZ: $translationZ
