@@ -18,8 +18,6 @@ data class Music(
         private val imageCache = LruCache<Music, Bitmap>(4)
         private val lyricCache = LruCache<Music, Lyric>(4)
     }
-    private val defaultPaint = Paint().apply { isAntiAlias = true }
-
     class Builder {
         var title: String? = null
         var id: Long? = null
@@ -53,34 +51,71 @@ data class Music(
         }
 
     private fun getReflectBitmap(bitmap: Bitmap): Bitmap {
-        val reflectionGap = 0
         val width = bitmap.width
         val height = bitmap.height
+
+        // Player artwork only has room for a short reflection. Keeping the generated
+        // bitmap close to the view's aspect ratio also prevents centerCrop from cutting
+        // off the transparent tail and turning it into a visible hard edge.
+        val reflectionHeight = (height * 0.25f).toInt().coerceAtLeast(1)
+        val reflectionGap = (height * 0.005f).toInt().coerceAtLeast(1)
         val matrix = Matrix()
         matrix.preScale(1f, -1f)
-        val reflectionImage =
-            Bitmap.createBitmap(bitmap, 0, height / 2, width, height / 2, matrix, false)
+        val sharpReflection = Bitmap.createBitmap(
+            bitmap,
+            0,
+            height - reflectionHeight,
+            width,
+            reflectionHeight,
+            matrix,
+            true
+        )
+
+        // A small bilinear down/up sample takes the digital sharpness out of the
+        // reflection without relying on RenderEffect (the app still supports API 26).
+        val softenedWidth = (width / 2).coerceAtLeast(1)
+        val softenedHeight = (reflectionHeight / 2).coerceAtLeast(1)
+        val softenedSmall = Bitmap.createScaledBitmap(
+            sharpReflection,
+            softenedWidth,
+            softenedHeight,
+            true
+        )
+        val reflectionImage = Bitmap.createScaledBitmap(
+            softenedSmall,
+            width,
+            reflectionHeight,
+            true
+        )
         val bitmap4Reflection =
-            Bitmap.createBitmap(width, height + height / 2 + reflectionGap, Bitmap.Config.ARGB_8888)
+            Bitmap.createBitmap(
+                width,
+                height + reflectionHeight + reflectionGap,
+                Bitmap.Config.ARGB_8888
+            )
         val canvasRef = Canvas(bitmap4Reflection)
 
         canvasRef.drawBitmap(bitmap, 0f, 0f, null)
-        canvasRef.drawRect(
-            0f,
-            height.toFloat(),
-            width.toFloat(),
-            height + reflectionGap.toFloat(),
-            defaultPaint
-        )
         canvasRef.drawBitmap(reflectionImage, 0f, height + reflectionGap.toFloat(), null)
-        val paint = Paint()
+
+        // Fade in over the first few pixels to soften the join, then fall off faster
+        // than a linear gradient so the bottom dissolves naturally into the glass.
+        val reflectionTop = height + reflectionGap.toFloat()
+        val reflectionBottom = bitmap4Reflection.height.toFloat()
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
         val shader = LinearGradient(
             0f,
-            bitmap.height.toFloat(),
+            reflectionTop,
             0f,
-            bitmap4Reflection.height.toFloat() + reflectionGap,
-            0x70ffffff,
-            0x00ffffff,
+            reflectionBottom,
+            intArrayOf(
+                0x00ffffff,
+                0x58ffffff,
+                0x3dffffff,
+                0x18ffffff,
+                0x00ffffff
+            ),
+            floatArrayOf(0f, 0.035f, 0.16f, 0.55f, 1f),
             Shader.TileMode.CLAMP
         )
         paint.shader = shader
@@ -88,11 +123,35 @@ data class Music(
 
         canvasRef.drawRect(
             0f,
-            height.toFloat(),
+            reflectionTop,
             width.toFloat(),
-            (bitmap4Reflection.height + reflectionGap).toFloat(),
+            reflectionBottom,
             paint
         )
+
+        // A restrained specular seam visually ties the reflection to the surrounding
+        // liquid-glass surface instead of leaving a blunt mirrored boundary.
+        val highlightPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.shader = LinearGradient(
+                0f,
+                height.toFloat(),
+                width.toFloat(),
+                height.toFloat(),
+                intArrayOf(0x00ffffff, 0x36ffffff, 0x12ffffff, 0x00ffffff),
+                floatArrayOf(0f, 0.24f, 0.72f, 1f),
+                Shader.TileMode.CLAMP
+            )
+        }
+        canvasRef.drawRect(
+            0f,
+            height.toFloat(),
+            width.toFloat(),
+            height + reflectionGap.toFloat(),
+            highlightPaint
+        )
+
+        sharpReflection.recycle()
+        if (softenedSmall !== sharpReflection) softenedSmall.recycle()
         reflectionImage.recycle()
         return bitmap4Reflection
     }

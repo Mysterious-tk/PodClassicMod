@@ -9,6 +9,7 @@ import android.view.View
 import android.view.ViewOutlineProvider
 import android.widget.LinearLayout
 import com.example.podclassic.base.ScreenView
+import com.example.podclassic.storage.SPManager
 import com.example.podclassic.view.MainView
 
 /**
@@ -24,8 +25,11 @@ class Screen(context: Context, attributeSet: AttributeSet?) : LinearLayout(conte
     private val screenLayout = ScreenLayout(context)
     private val titleBar = TitleBar(context)
 
-    // 玻璃效果参数
-    private val cornerRadius = 24f
+    // 3G 卡片使用密度无关的大圆角，其他皮肤保持原有外观。
+    private val density = resources.displayMetrics.density
+    private val isIpod3rdTheme =
+        SPManager.getInt(SPManager.Theme.SP_NAME) == SPManager.Theme.IPOD_3RD.id
+    private val cornerRadius = if (isIpod3rdTheme) 18f * density else 24f
     private val isGlassEffectSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
 
     // 渐变画笔 - 用于光泽效果
@@ -36,18 +40,27 @@ class Screen(context: Context, attributeSet: AttributeSet?) : LinearLayout(conte
     // 边框画笔
     private val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
-        strokeWidth = 2f
+        strokeWidth = if (isIpod3rdTheme) density else 2f
     }
 
     // 背景渐变 - 半透明毛玻璃效果
     private val glassBackgroundGradient = GradientDrawable(
         GradientDrawable.Orientation.TOP_BOTTOM,
-        intArrayOf(
-            Color.argb((255 * 0.75).toInt(), 250, 250, 252),
-            Color.argb((255 * 0.65).toInt(), 245, 245, 248),
-            Color.argb((255 * 0.60).toInt(), 240, 240, 245),
-            Color.argb((255 * 0.55).toInt(), 235, 235, 242)
-        )
+        if (isIpod3rdTheme) {
+            intArrayOf(
+                Color.argb(224, 252, 252, 255),
+                Color.argb(205, 247, 248, 252),
+                Color.argb(188, 239, 241, 247),
+                Color.argb(176, 232, 235, 243)
+            )
+        } else {
+            intArrayOf(
+                Color.argb((255 * 0.75).toInt(), 250, 250, 252),
+                Color.argb((255 * 0.65).toInt(), 245, 245, 248),
+                Color.argb((255 * 0.60).toInt(), 240, 240, 245),
+                Color.argb((255 * 0.55).toInt(), 235, 235, 242)
+            )
+        }
     ).apply {
         cornerRadius = this@Screen.cornerRadius
     }
@@ -214,6 +227,11 @@ class Screen(context: Context, attributeSet: AttributeSet?) : LinearLayout(conte
         val width = width.toFloat()
         val height = height.toFloat()
 
+        if (isIpod3rdTheme) {
+            drawModernGlassBorder(canvas, width, height)
+            return
+        }
+
         // 外边框 - 半透明白色
         borderPaint.color = Color.argb((255 * 0.65).toInt(), 255, 255, 255)
         borderPaint.strokeWidth = 1.5f
@@ -244,6 +262,62 @@ class Screen(context: Context, attributeSet: AttributeSet?) : LinearLayout(conte
             lineTo(width - cornerRadius, 1.5f)
         }
         canvas.drawPath(path, topHighlight)
+    }
+
+    /** Subtle layered edge used by the wider iPod 3G glass card. */
+    private fun drawModernGlassBorder(canvas: Canvas, width: Float, height: Float) {
+        val outerInset = 0.75f * density
+        borderPaint.shader = null
+        borderPaint.color = Color.argb(168, 255, 255, 255)
+        borderPaint.strokeWidth = density
+        canvas.drawRoundRect(
+            outerInset,
+            outerInset,
+            width - outerInset,
+            height - outerInset,
+            cornerRadius - outerInset,
+            cornerRadius - outerInset,
+            borderPaint
+        )
+
+        val innerInset = 2.25f * density
+        borderPaint.color = Color.argb(58, 255, 255, 255)
+        borderPaint.strokeWidth = 0.5f * density
+        canvas.drawRoundRect(
+            innerInset,
+            innerInset,
+            width - innerInset,
+            height - innerInset,
+            cornerRadius - innerInset,
+            cornerRadius - innerInset,
+            borderPaint
+        )
+
+        // A fading rim highlight follows the rounded top edge instead of forming a hard line.
+        borderPaint.shader = LinearGradient(
+            0f,
+            0f,
+            0f,
+            height * 0.42f,
+            intArrayOf(
+                Color.argb(205, 255, 255, 255),
+                Color.argb(70, 255, 255, 255),
+                Color.TRANSPARENT
+            ),
+            floatArrayOf(0f, 0.45f, 1f),
+            Shader.TileMode.CLAMP
+        )
+        borderPaint.strokeWidth = 1.25f * density
+        canvas.drawRoundRect(
+            outerInset,
+            outerInset,
+            width - outerInset,
+            height - outerInset,
+            cornerRadius - outerInset,
+            cornerRadius - outerInset,
+            borderPaint
+        )
+        borderPaint.shader = null
     }
 
     private fun setTitle() {

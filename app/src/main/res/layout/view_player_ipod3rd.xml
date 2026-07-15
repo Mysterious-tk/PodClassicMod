@@ -4,7 +4,7 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:padding="0dp"
-    android:background="@color/background"
+    android:background="@android:color/transparent"
     android:clipChildren="false"
     android:clipToPadding="false">
 
@@ -73,8 +73,8 @@
         <!-- 专辑封面 - 靠左上显示，使用带倒影的图片 -->
         <com.example.podclassic.widget.ImageView
             android:id="@+id/image"
-            android:layout_width="160dp"
-            android:layout_height="200dp"
+            android:layout_width="180dp"
+            android:layout_height="220dp"
             android:layout_marginStart="10dp"
             android:layout_marginTop="20dp"
             android:layout_marginEnd="8dp"

@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <dimen name="layout_rectangle_height">300dp</dimen>
+    <dimen name="layout_rectangle_height_ipod_3rd">370dp</dimen>
+    <!-- Combined with the parent 6dp inset, this gives the 3G glass card an 8dp edge. -->
+    <dimen name="player_card_horizontal_margin_ipod_3rd">2dp</dimen>
     <dimen name="title_bar_height">40dp</dimen>
 </resources>

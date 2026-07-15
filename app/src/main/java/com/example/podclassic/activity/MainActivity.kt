@@ -297,12 +297,25 @@ class MainActivity : AppCompatActivity() {
         } else {
             // 其他情况，保持默认布局
             // 使用dp单位设置高度，确保在不同分辨率屏幕上显示一致
-            layoutParams.height = resources.getDimensionPixelSize(R.dimen.layout_rectangle_height)
+            layoutParams.height = resources.getDimensionPixelSize(
+                if (isIpod3rdTheme) {
+                    R.dimen.layout_rectangle_height_ipod_3rd
+                } else {
+                    R.dimen.layout_rectangle_height
+                }
+            )
             // 全局隐藏状态栏，不再为系统栏额外预留高度。
             val topMargin = TOP_MARGIN
             layoutParams.topMargin = topMargin
-            layoutParams.leftMargin = resources.getDimensionPixelSize(R.dimen.padding_1)
-            layoutParams.rightMargin = resources.getDimensionPixelSize(R.dimen.padding_1)
+            val horizontalCardMargin = resources.getDimensionPixelSize(
+                if (isIpod3rdTheme) {
+                    R.dimen.player_card_horizontal_margin_ipod_3rd
+                } else {
+                    R.dimen.padding_1
+                }
+            )
+            layoutParams.leftMargin = horizontalCardMargin
+            layoutParams.rightMargin = horizontalCardMargin
             layoutParams.bottomMargin = 0
             slideControllerParams.height = LinearLayout.LayoutParams.MATCH_PARENT
             slideController3rd.layoutParams.height = LinearLayout.LayoutParams.MATCH_PARENT

@@ -13,7 +13,6 @@ import com.example.podclassic.util.ThreadUtil
 import com.example.podclassic.util.VolumeUtil
 import com.example.podclassic.values.Colors
 import com.example.podclassic.values.Icons
-import com.example.podclassic.values.Values
 import java.util.*
 import kotlin.math.abs
 import kotlin.math.min
@@ -28,6 +27,9 @@ class SlideController3rd : View {
 
         private var minR = 0f
         private var maxR = 0f
+
+        private const val WHEEL_DIAMETER_DP = 217f
+        private const val WHEEL_BOTTOM_MARGIN_DP = 80f
 
     }
 
@@ -52,12 +54,17 @@ class SlideController3rd : View {
         val x = MeasureSpec.getSize(widthMeasureSpec)
         val y = MeasureSpec.getSize(heightMeasureSpec)
         centerX = x / 2f
-        centerY = y * 0.6f // 转盘位置再往上一点，移到屏幕60%高度处
+        val density = resources.displayMetrics.density
+        val requestedRadius = WHEEL_DIAMETER_DP * density / 2f
+        val bottomMargin = WHEEL_BOTTOM_MARGIN_DP * density
 
-        val center = min(centerX, centerY)
-
-        // 增大转盘大小，调整计算比例
-        maxR = center * (center / (center + abs(centerX - centerY) + Values.screenWidth / 16))
+        // 3G 转盘使用稳定的 217dp 直径，并以约 80dp 的底边距定位。
+        // 极窄或极矮的窗口中才缩小，避免转盘被裁切。
+        maxR = min(
+            requestedRadius,
+            min(centerX, (y - bottomMargin).coerceAtLeast(0f) / 2f)
+        )
+        centerY = (y - bottomMargin - maxR).coerceAtLeast(maxR)
 
         minR = maxR / 16 * 5
 

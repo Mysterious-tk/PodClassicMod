@@ -506,7 +506,7 @@ class MusicPlayerView3rd(context: Context) : FrameLayout(context), ScreenView {
         image.setImageBitmap(empty)
 
         ThreadUtil.asyncTask({
-            bitmap = music.image
+            bitmap = music.image?.let(::cropArtworkReflection)
             Log.d("MusicPlayerView3rd", "Bitmap loaded: ${bitmap != null}")
         }, {
             Log.d("MusicPlayerView3rd", "Image load callback: bitmap=$bitmap")
@@ -544,6 +544,21 @@ class MusicPlayerView3rd(context: Context) : FrameLayout(context), ScreenView {
             }
             Log.d("MusicPlayerView3rd", "Image load completed")
         })
+    }
+
+    /**
+     * The cached artwork contains a reflection equal to half of the square cover height.
+     * The 3G player presents a 180:220 surface, so retain the full square cover and only
+     * the reflection portion that fits the remaining 40 units. This keeps both the cover
+     * and its shadow visible without center-cropping either edge.
+     */
+    private fun cropArtworkReflection(source: Bitmap): Bitmap {
+        val targetHeight = (source.width * 11 / 9).coerceAtMost(source.height)
+        return if (targetHeight == source.height) {
+            source
+        } else {
+            Bitmap.createBitmap(source, 0, 0, source.width, targetHeight)
+        }
     }
 
     private fun onPlayStateChange() {

@@ -5,7 +5,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Path
 import android.os.BatteryManager
 import android.util.AttributeSet
 import android.view.Gravity
@@ -94,10 +96,29 @@ class TitleBar : FrameLayout {
         val batteryParams = battery.layoutParams as LayoutParams
         batteryParams.setMargins(0, DEFAULT_PADDING / 2, if (isLandscape) DEFAULT_PADDING / 2 else DEFAULT_PADDING, DEFAULT_PADDING / 2)
         battery.layoutParams = batteryParams
-        
-        // 更新播放状态图标布局
+        updatePlayStateMargin(height)
+    }
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        updatePlayStateMargin(h)
+    }
+
+    /** Keep the playback state immediately to the left of the variable-width battery. */
+    private fun updatePlayStateMargin(titleBarHeight: Int) {
+        if (titleBarHeight <= 0) return
+
+        val batteryParams = battery.layoutParams as LayoutParams
+        val batteryHeight =
+            (titleBarHeight - batteryParams.topMargin - batteryParams.bottomMargin).coerceAtLeast(0)
+        val batteryWidth = (batteryHeight * 1.8f).toInt()
         val playStateParams = playState.layoutParams as LayoutParams
-        playStateParams.setMargins(0, 0, DEFAULT_PADDING * 7, 0)
+        playStateParams.setMargins(
+            0,
+            0,
+            batteryParams.rightMargin + batteryWidth + DEFAULT_PADDING / 2,
+            0
+        )
         playState.layoutParams = playStateParams
     }
 
@@ -228,24 +249,14 @@ class TitleBar : FrameLayout {
 
     private val batteryBroadcastReceiver: BroadcastReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
-            battery.batteryLevel =
-                intent.getIntExtra(BatteryManager.EXTRA_LEVEL, 100) * 100 / intent.getIntExtra(
-                    BatteryManager.EXTRA_SCALE,
-                    100
-                )
-            battery.isCharging = (intent.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1) != 0).or(
-                intent.getIntExtra(
-                    BatteryManager.EXTRA_STATUS,
-                    -1
-                ) == BatteryManager.BATTERY_STATUS_CHARGING
-            )
-            battery.refreshBattery()
+            battery.applyBatteryStatus(intent)
         }
     }
 
     class BatteryView(context: Context) : View(context) {
 
-        private val paint by lazy { Paint() }
+        private val paint by lazy { Paint(Paint.ANTI_ALIAS_FLAG) }
+        private val chargingPath = Path()
 
         var isCharging = false
         var batteryLevel = 100
@@ -272,17 +283,10 @@ class TitleBar : FrameLayout {
             )
             //canvas?.drawRoundRect(0f, PADDING, width - PADDING * 5, measuredHeight - PADDING, 4f, 4f, paint)
             //canvas?.drawRoundRect(measuredWidth - PADDING * 5 - 2, PADDING * 1.5f, measuredWidth - PADDING * 6 - 2, measuredHeight - PADDING * 1.5f, 4f, 4f, paint)
-            val batteryWidth = batteryLevel * (width - padding * 3) / 100f
+            val batteryBodyRight = width - padding * 3
+            val batteryWidth = batteryLevel.coerceIn(0, 100) * batteryBodyRight / 100f
 
             paint.shader = when {
-                (isCharging && batteryLevel != 100) -> Colors.getShader(
-                    0f,
-                    0f,
-                    0f,
-                    height / 1.8f,
-                    Colors.theme_white,
-                    Colors.battery_yellow
-                )
                 (batteryLevel <= 20) -> Colors.getShader(
                     0f,
                     0f,
@@ -290,6 +294,14 @@ class TitleBar : FrameLayout {
                     height / 1.8f,
                     Colors.theme_white,
                     Colors.battery_red
+                )
+                (batteryLevel <= 40) -> Colors.getShader(
+                    0f,
+                    0f,
+                    0f,
+                    height / 1.8f,
+                    Colors.theme_white,
+                    Colors.battery_yellow
                 )
                 else -> Colors.getShader(
                     0f,
@@ -300,15 +312,43 @@ class TitleBar : FrameLayout {
                     Colors.battery_green
                 )
             }
-            canvas.drawRoundRect(
-                2f,
-                padding + 2,
-                batteryWidth - 2,
-                height - padding - 2,
-                4f,
-                4f,
-                paint
-            )
+            if (batteryWidth > 4f) {
+                canvas.drawRoundRect(
+                    2f,
+                    padding + 2,
+                    batteryWidth - 2,
+                    height - padding - 2,
+                    4f,
+                    4f,
+                    paint
+                )
+            }
+
+            if (isCharging) {
+                drawChargingIndicator(canvas, batteryBodyRight, padding)
+            }
+        }
+
+        private fun drawChargingIndicator(canvas: Canvas, batteryBodyRight: Float, padding: Float) {
+            val centerX = batteryBodyRight / 2f
+            val top = padding + 3f
+            val bottom = height - padding - 3f
+            val indicatorHeight = (bottom - top).coerceAtLeast(1f)
+            val halfWidth = indicatorHeight * 0.22f
+
+            chargingPath.reset()
+            chargingPath.moveTo(centerX + halfWidth * 0.25f, top)
+            chargingPath.lineTo(centerX - halfWidth, top + indicatorHeight * 0.55f)
+            chargingPath.lineTo(centerX - halfWidth * 0.15f, top + indicatorHeight * 0.55f)
+            chargingPath.lineTo(centerX - halfWidth * 0.25f, bottom)
+            chargingPath.lineTo(centerX + halfWidth, top + indicatorHeight * 0.42f)
+            chargingPath.lineTo(centerX + halfWidth * 0.15f, top + indicatorHeight * 0.42f)
+            chargingPath.close()
+
+            paint.shader = null
+            paint.color = Color.WHITE
+            paint.style = Paint.Style.FILL
+            canvas.drawPath(chargingPath, paint)
         }
 
         override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
@@ -331,6 +371,24 @@ class TitleBar : FrameLayout {
             invalidate()
         }
 
+        fun applyBatteryStatus(statusIntent: Intent) {
+            val scale = statusIntent.getIntExtra(BatteryManager.EXTRA_SCALE, 100).coerceAtLeast(1)
+            batteryLevel = (statusIntent.getIntExtra(BatteryManager.EXTRA_LEVEL, 100) * 100 / scale)
+                .coerceIn(0, 100)
+
+            val plugged = statusIntent.getIntExtra(
+                BatteryManager.EXTRA_PLUGGED,
+                0
+            )
+            val status = statusIntent.getIntExtra(
+                BatteryManager.EXTRA_STATUS,
+                BatteryManager.BATTERY_STATUS_UNKNOWN
+            )
+            isCharging = plugged != 0 ||
+                status == BatteryManager.BATTERY_STATUS_CHARGING
+            refreshBattery()
+        }
+
         fun updateBatteryStatus() {
             val batteryStatus: Intent? = try {
                 context.registerReceiver(
@@ -342,12 +400,7 @@ class TitleBar : FrameLayout {
             }
 
             batteryStatus?.let {
-                batteryLevel = it.getIntExtra(BatteryManager.EXTRA_LEVEL, 100) *
-                    100 / it.getIntExtra(BatteryManager.EXTRA_SCALE, 100)
-                isCharging = (it.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1) != 0).or(
-                    it.getIntExtra(BatteryManager.EXTRA_STATUS, -1) == BatteryManager.BATTERY_STATUS_CHARGING
-                )
-                refreshBattery()
+                applyBatteryStatus(it)
             }
         }
     }
