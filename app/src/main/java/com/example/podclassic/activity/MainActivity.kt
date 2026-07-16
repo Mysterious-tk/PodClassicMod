@@ -274,15 +274,6 @@ class MainActivity : AppCompatActivity() {
         val isMusicListView = currentViewName == "MusicListView"
         val shouldFullScreen = isCoverFlowView || isMainView || isMusicListView
         
-        // 根据主题显示或隐藏对应的SlideController
-        if (isIpod3rdTheme) {
-            slideController.visibility = View.GONE
-            slideController3rd.visibility = View.VISIBLE
-        } else {
-            slideController.visibility = View.VISIBLE
-            slideController3rd.visibility = View.GONE
-        }
-        
         if (isLandscape && shouldFullScreen) {
             // 横屏且是CoverFlowView、MainView或MusicListView，全屏显示
             layoutParams.height = LinearLayout.LayoutParams.MATCH_PARENT
@@ -292,6 +283,9 @@ class MainActivity : AppCompatActivity() {
             layoutParams.bottomMargin = 0
             slideControllerParams.height = 0
             slideController3rd.layoutParams.height = 0
+            // 高度变为 0 后也隐藏控制器，避免配置切换期间继续触发绘制。
+            slideController.visibility = View.GONE
+            slideController3rd.visibility = View.GONE
             // 移除 iPod 屏幕容器的圆角底板，避免横屏四周露出黑框。
             linearLayout.background = null
         } else {
@@ -315,6 +309,9 @@ class MainActivity : AppCompatActivity() {
             layoutParams.bottomMargin = 0
             slideControllerParams.height = LinearLayout.LayoutParams.MATCH_PARENT
             slideController3rd.layoutParams.height = LinearLayout.LayoutParams.MATCH_PARENT
+            // 非全屏布局只显示当前主题对应的控制器。
+            slideController.visibility = if (isIpod3rdTheme) View.GONE else View.VISIBLE
+            slideController3rd.visibility = if (isIpod3rdTheme) View.VISIBLE else View.GONE
             linearLayout.setBackgroundResource(R.drawable.round_rectangle)
         }
 

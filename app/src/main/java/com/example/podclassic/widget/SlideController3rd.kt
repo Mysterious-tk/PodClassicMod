@@ -102,7 +102,13 @@ class SlideController3rd : View {
     }
 
     private fun updateGlassShaders() {
-        if (maxR <= 0f) return
+        if (maxR <= 0f) {
+            wheelBaseShader = null
+            wheelReflectionShader = null
+            wheelDepthShader = null
+            wheelEdgeShader = null
+            return
+        }
 
         wheelBaseShader = LinearGradient(
             centerX - maxR,
@@ -160,6 +166,10 @@ class SlideController3rd : View {
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
+
+        // 横屏全屏页面会暂时把控制器高度设为 0。配置切换期间 View 仍可能
+        // 收到一次绘制回调，此时 RadialGradient 不接受 0 半径。
+        if (maxR <= 0f || minR <= 0f || width <= 0 || height <= 0) return
 
         drawLiquidGlassWheel(canvas)
 
@@ -323,56 +333,86 @@ class SlideController3rd : View {
     }
 
     private fun drawGlassButton(canvas: Canvas, x: Float, y: Float) {
-        val rimWidth = 4f * density
+        val rimWidth = 3.5f * density
         val surfaceRadius = buttonRadius - rimWidth
 
-        // Raised surrounding lip: highlight above, shadow below.
+        // A restrained raised lip surrounds the lower glass face. The broad
+        // radial transition avoids a metallic, cut-out looking ring.
         glassPaint.shader = RadialGradient(
-            x - buttonRadius * 0.28f,
-            y - buttonRadius * 0.34f,
-            buttonRadius * 1.55f,
+            x - buttonRadius * 0.22f,
+            y - buttonRadius * 0.26f,
+            buttonRadius * 1.48f,
             intArrayOf(
-                Color.argb(150, 255, 255, 255),
-                Color.argb(105, 113, 120, 132),
-                Color.argb(145, 18, 20, 25)
+                Color.argb(112, 232, 236, 243),
+                Color.argb(82, 99, 106, 119),
+                Color.argb(132, 18, 20, 26)
             ),
-            floatArrayOf(0f, 0.52f, 1f),
+            floatArrayOf(0f, 0.56f, 1f),
             Shader.TileMode.CLAMP
         )
         canvas.drawCircle(x, y, buttonRadius, glassPaint)
 
-        // The glass face is lower than the lip and reverses the old convex light.
-        glassPaint.shader = LinearGradient(
+        // One continuous concave surface: dark center, softly lifted shoulder,
+        // then a darker inner wall. There is no 50% horizontal color stop.
+        glassPaint.shader = RadialGradient(
             x,
-            y - surfaceRadius,
-            x,
-            y + surfaceRadius,
+            y + surfaceRadius * 0.08f,
+            surfaceRadius * 1.05f,
             intArrayOf(
-                Color.argb(116, 35, 39, 47),
-                Color.argb(70, 91, 98, 111),
-                Color.argb(82, 183, 190, 202)
+                Color.argb(224, 18, 21, 29),
+                Color.argb(214, 31, 35, 45),
+                Color.argb(188, 62, 68, 81),
+                Color.argb(226, 25, 28, 36)
             ),
-            floatArrayOf(0f, 0.58f, 1f),
+            floatArrayOf(0f, 0.38f, 0.74f, 1f),
+            Shader.TileMode.CLAMP
+        )
+        canvas.drawCircle(x, y, surfaceRadius, glassPaint)
+
+        // Soft upper reflection fades through the entire face instead of ending
+        // at the equator as the previous semicircular highlight did.
+        glassPaint.shader = RadialGradient(
+            x,
+            y - surfaceRadius * 0.76f,
+            surfaceRadius * 1.28f,
+            intArrayOf(
+                Color.argb(58, 255, 255, 255),
+                Color.argb(20, 255, 255, 255),
+                Color.TRANSPARENT
+            ),
+            floatArrayOf(0f, 0.46f, 1f),
+            Shader.TileMode.CLAMP
+        )
+        canvas.drawCircle(x, y, surfaceRadius, glassPaint)
+
+        // A low, diffuse shadow supplies depth without a straight lower edge.
+        glassPaint.shader = RadialGradient(
+            x,
+            y + surfaceRadius * 1.12f,
+            surfaceRadius * 1.18f,
+            intArrayOf(
+                Color.argb(72, 0, 0, 0),
+                Color.argb(24, 0, 0, 0),
+                Color.TRANSPARENT
+            ),
+            floatArrayOf(0f, 0.48f, 1f),
             Shader.TileMode.CLAMP
         )
         canvas.drawCircle(x, y, surfaceRadius, glassPaint)
         glassPaint.shader = null
 
-        val outerBounds = RectF(x - buttonRadius, y - buttonRadius, x + buttonRadius, y + buttonRadius)
+        // Complete circular edges stay continuous at the left and right sides.
         edgePaint.shader = null
-        edgePaint.strokeWidth = 1.2f * density
-        edgePaint.color = Color.argb(190, 255, 255, 255)
-        canvas.drawArc(outerBounds, 185f, 170f, false, edgePaint)
-        edgePaint.color = Color.argb(170, 0, 0, 0)
-        canvas.drawArc(outerBounds, 5f, 170f, false, edgePaint)
+        edgePaint.strokeWidth = 1.15f * density
+        edgePaint.color = Color.argb(92, 214, 220, 230)
+        canvas.drawCircle(x, y, buttonRadius - edgePaint.strokeWidth / 2f, edgePaint)
 
-        val insetBounds = RectF(x - surfaceRadius, y - surfaceRadius, x + surfaceRadius, y + surfaceRadius)
-        edgePaint.strokeWidth = 3.2f * density
-        edgePaint.color = Color.argb(175, 8, 10, 14)
-        canvas.drawArc(insetBounds, 180f, 180f, false, edgePaint)
-        edgePaint.strokeWidth = density
-        edgePaint.color = Color.argb(128, 238, 242, 248)
-        canvas.drawArc(insetBounds, 0f, 180f, false, edgePaint)
+        edgePaint.strokeWidth = 2.4f * density
+        edgePaint.color = Color.argb(76, 5, 7, 11)
+        canvas.drawCircle(x, y, surfaceRadius - edgePaint.strokeWidth / 2f, edgePaint)
+        edgePaint.strokeWidth = 0.65f * density
+        edgePaint.color = Color.argb(54, 238, 242, 248)
+        canvas.drawCircle(x, y, surfaceRadius - edgePaint.strokeWidth / 2f, edgePaint)
     }
 
     private var startPoint: TouchPoint = TouchPoint.emptyTouchPoint()

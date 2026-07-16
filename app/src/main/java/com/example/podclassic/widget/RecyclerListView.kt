@@ -708,7 +708,9 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
         private val leftText = TextView(context)
         
         companion object {
-            private const val RIGHT_TEXT_MAX_WIDTH_DP = 80f
+            // Settings values such as "iPod 3rd" must remain readable even
+            // with a larger system font scale.
+            private const val RIGHT_TEXT_MAX_WIDTH_DP = 96f
         }
         
         var onItemClickListener: OnItemClickListener? = null
@@ -722,8 +724,8 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
 
         init {
             val density = context.resources.displayMetrics.density
-            // 固定右边距，给 rightText 留出空间（约 60dp 足够显示时间格式 05:00）
-            val rightTextAreaWidth = (60 * density).toInt()
+            // 为右侧设置值预留足够空间，避免较长主题名称被截断。
+            val rightTextAreaWidth = (RIGHT_TEXT_MAX_WIDTH_DP * density).toInt()
             
             // rightText 宽度自适应，靠右对齐
             val layoutParams2 = FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT)
