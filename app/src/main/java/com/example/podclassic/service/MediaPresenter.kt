@@ -250,10 +250,6 @@ object MediaPresenter {
         sendMessage(MediaService.ACTION_UPDATE_AUDIO_FOCUS)
     }
 
-    fun setAgcEnabled() {
-        sendMessage(MediaService.ACTION_SET_AGC_ENABLED)
-    }
-
     fun setTomSteadyEnabled() {
         sendMessage(MediaService.ACTION_SET_TOM_STEADY_ENABLED)
     }
@@ -274,10 +270,6 @@ object MediaPresenter {
             "releaseTime" to releaseTime
         )
         sendMessage(MediaService.ACTION_SET_TOM_STEADY_PARAMETERS, params, null)
-    }
-
-    fun initTomSteadyProcessor() {
-        sendMessage(MediaService.ACTION_INIT_TOM_STEADY)
     }
 
     // 胆机音效相关方法
@@ -310,31 +302,4 @@ object MediaPresenter {
         sendMessage(MediaService.ACTION_SET_TUBE_AMP_PRESET, preset)
     }
 
-    // DC Phase Linearizer 相关方法
-    fun setDCPhaseEnabled() {
-        sendMessage(MediaService.ACTION_SET_DC_PHASE_ENABLED)
-    }
-
-    fun setDCPhaseParameters(
-        strength: Float? = null,
-        lowDelay: Float? = null,
-        midDelay: Float? = null,
-        highDelay: Float? = null,
-        crossover: Float? = null,
-        highCrossover: Float? = null
-    ) {
-        val params = mapOf(
-            "strength" to strength,
-            "lowDelay" to lowDelay,
-            "midDelay" to midDelay,
-            "highDelay" to highDelay,
-            "crossover" to crossover,
-            "highCrossover" to highCrossover
-        )
-        sendMessage(MediaService.ACTION_SET_DC_PHASE_PARAMETERS, params, null)
-    }
-
-    fun applyDCPhasePreset(preset: com.example.podclassic.media.DCPhasePreset) {
-        sendMessage(MediaService.ACTION_SET_DC_PHASE_PRESET, preset)
-    }
-}  
+}

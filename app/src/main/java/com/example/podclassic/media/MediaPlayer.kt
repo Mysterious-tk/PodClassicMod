@@ -1,106 +1,92 @@
+@file:androidx.annotation.OptIn(
+    markerClass = [androidx.media3.common.util.UnstableApi::class]
+)
+
 package com.example.podclassic.media
 
 import android.content.Context
-import android.media.AudioFormat
-import android.media.AudioManager
-import android.media.AudioTrack
-import android.media.MediaExtractor
-import android.media.MediaFormat
-import android.media.MediaPlayer
-import android.media.MediaCodec
-import android.media.audiofx.AcousticEchoCanceler
-import android.media.audiofx.AutomaticGainControl
 import android.media.audiofx.Equalizer
-import android.media.audiofx.NoiseSuppressor
+import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
+import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
+import androidx.media3.exoplayer.DefaultRenderersFactory
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.audio.AudioSink
+import androidx.media3.exoplayer.audio.DefaultAudioSink
 import com.example.podclassic.storage.SPManager
-import java.util.*
+import java.util.Timer
+import java.util.TimerTask
+import java.util.concurrent.FutureTask
 import kotlin.math.max
 import kotlin.math.min
 
-class MediaPlayer<E>(context: Context, private val mediaAdapter: MediaAdapter<E>) :
-    MediaPlayer.OnCompletionListener, MediaPlayer.OnErrorListener, MediaPlayer.OnPreparedListener {
+/**
+ * App-facing player facade backed by Media3.
+ *
+ * Its public API intentionally matches the old facade so the service and UI do not need to know
+ * which playback engine is used.  Unlike android.media.MediaPlayer, Media3 lets the decoded PCM
+ * pass through [PlaybackDspAudioProcessor] before it reaches AudioTrack.
+ */
+class MediaPlayer<E>(context: Context, private val mediaAdapter: MediaAdapter<E>) {
+    private val playlist = Playlist(mediaAdapter)
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val dsp = PlaybackDspAudioProcessor()
+    private val audioAttributes = AudioAttributes.Builder()
+        .setUsage(C.USAGE_MEDIA)
+        .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+        .build()
 
-    private val playlist: Playlist<E> = Playlist(mediaAdapter)
+    private val renderersFactory = object : DefaultRenderersFactory(context) {
+        override fun buildAudioSink(
+            context: Context,
+            enableFloatOutput: Boolean,
+            enableAudioOutputPlaybackParameters: Boolean
+        ): AudioSink = DefaultAudioSink.Builder(context)
+            .setAudioProcessors(arrayOf(dsp))
+            .setEnableFloatOutput(false)
+            .build()
+    }
 
-    private var playState: PlayState = PlayState.STATE_STOP
+    private val player = ExoPlayer.Builder(context, renderersFactory)
+        .setAudioAttributes(audioAttributes, true)
+        .setHandleAudioBecomingNoisy(true)
+        .build()
 
-    val isPlaying: Boolean
-        get() = playState == PlayState.STATE_PLAYING
+    private var playState = PlayState.STATE_STOP
+    private var equalizer: Equalizer? = null
+    private var presetList: Array<String?> = emptyArray()
+    private var released = false
 
-    val isPrepared: Boolean
-        get() = playState == PlayState.STATE_PLAYING || playState == PlayState.STATE_PAUSE
+    val isPlaying: Boolean get() = onPlayerThread { player.isPlaying }
+    val isPrepared: Boolean get() = onPlayerThread {
+        player.playbackState == Player.STATE_READY || playState == PlayState.STATE_PAUSE
+    }
 
     var enableAudioFocus: Boolean = true
         set(value) {
-            if (value) {
-                if (playState == PlayState.STATE_PLAYING) {
-                    audioFocusManager.requestAudioFocus()
-                }
-            } else {
-                audioFocusManager.abandonAudioFocus()
-            }
-            onDataChangeListener?.onAudioManagerChange()
             field = value
+            onPlayerThread { player.setAudioAttributes(audioAttributes, value) }
+            onDataChangeListener?.onAudioManagerChange()
         }
-
-    private val audioFocusManager: AudioFocusManager
-    
-    // 用于区分用户手动暂停和音频焦点丢失导致的暂停
-    private var pausedByUser: Boolean = false
-
-    private val mediaPlayer: MediaPlayer
-
-    private var equalizer: Equalizer? = null
-    private var automaticGainControl: AutomaticGainControl? = null
-    private var tomSteadyProcessor: TomSteadyProcessor? = null
-    
-    // 音量控制相关
-    private var isInitialVolumePhase: Boolean = false
-    private var initialVolumeCounter: Int = 0
-    private val INITIAL_VOLUME_SECONDS: Int = 3 // 初始音量阶段秒数 (3秒)
-    private val initialVolumeIncrement: Float = 0.9f / INITIAL_VOLUME_SECONDS // 音量增量
 
     var equalizerId: Int = 0
         set(value) {
-            equalizer?.let {
-                if (value in 0 until it.numberOfPresets) {
-                    it.usePreset(value.toShort())
-                }
-            }
             field = value
+            onPlayerThread { applyEqualizerPreset() }
             onDataChangeListener?.onEqualizerChange()
         }
 
-    var agcEnabled: Boolean = false
+    var tomSteadyEnabled: Boolean
+        get() = dsp.loudnessEnabled
         set(value) {
-            automaticGainControl?.let {
-                it.enabled = value
-            }
-            field = value
-            onDataChangeListener?.onAgcChange()
-        }
-
-    fun isAgcAvailable(): Boolean {
-        return AutomaticGainControl.isAvailable()
-    }
-
-    var tomSteadyEnabled: Boolean = false
-        set(value) {
-            // 确保TomSteadyProcessor已初始化
-            if (tomSteadyProcessor == null) {
-                initTomSteadyProcessor()
-            }
-            tomSteadyProcessor?.setParameters(enabled = value)
-            field = value
+            dsp.loudnessEnabled = value
             onDataChangeListener?.onTomSteadyChange()
         }
-
-    fun initTomSteadyProcessor() {
-        tomSteadyProcessor = TomSteadyProcessor(mediaPlayer.audioSessionId)
-        tomSteadyProcessor?.init()
-    }
 
     fun setTomSteadyParameters(
         targetLevel: Float? = null,
@@ -109,40 +95,18 @@ class MediaPlayer<E>(context: Context, private val mediaAdapter: MediaAdapter<E>
         attackTime: Float? = null,
         releaseTime: Float? = null
     ) {
-        tomSteadyProcessor?.setParameters(
-            targetLevel = targetLevel,
-            maxGain = maxGain,
-            minGain = minGain,
-            attackTime = attackTime,
-            releaseTime = releaseTime
-        )
+        targetLevel?.let { dsp.targetLevel = it.coerceIn(0.08f, 0.25f) }
+        maxGain?.let { dsp.maxGainDb = it.coerceIn(0f, 12f) }
+        minGain?.let { dsp.minGainDb = it.coerceIn(-12f, 0f) }
+        attackTime?.let { dsp.attackMs = it.coerceIn(10f, 500f) }
+        releaseTime?.let { dsp.releaseMs = it.coerceIn(100f, 3_000f) }
         onDataChangeListener?.onTomSteadyChange()
     }
 
-    fun isTomSteadyAvailable(): Boolean {
-        return tomSteadyProcessor?.isAvailable() ?: false
-    }
-
-    fun getTomSteadyAGC(): TomSteadyAGC? {
-        return tomSteadyProcessor?.getTomSteadyAGC()
-    }
-
-    /**
-     * 检查TomSteady预分析是否完成
-     */
-    fun isTomSteadyPreAnalysisComplete(): Boolean {
-        return tomSteadyProcessor?.isPreAnalysisComplete() ?: false
-    }
-
-    // 胆机音效相关
     var tubeAmpEnabled: Boolean
-        get() = tomSteadyProcessor?.tubeAmpEnabled ?: false
+        get() = dsp.tube.parameters.enabled
         set(value) {
-            // 确保TomSteadyProcessor已初始化
-            if (tomSteadyProcessor == null) {
-                initTomSteadyProcessor()
-            }
-            tomSteadyProcessor?.tubeAmpEnabled = value
+            dsp.tube.parameters = dsp.tube.parameters.copy(enabled = value)
             SPManager.setBoolean(SPManager.SP_TUBE_AMP_ENABLED, value)
             onDataChangeListener?.onTubeAmpChange()
         }
@@ -156,17 +120,16 @@ class MediaPlayer<E>(context: Context, private val mediaAdapter: MediaAdapter<E>
         release: Float? = null,
         warmth: Float? = null
     ) {
-        tomSteadyProcessor?.setTubeAmpParameters(
-            gain = gain,
-            saturation = saturation,
-            harmonics = harmonics,
-            ratio = ratio,
-            attack = attack,
-            release = release,
-            warmth = warmth
+        val current = dsp.tube.parameters
+        dsp.tube.parameters = current.copy(
+            drive = gain?.coerceIn(1f, 2.2f) ?: current.drive,
+            saturation = saturation?.coerceIn(0f, 1f) ?: current.saturation,
+            harmonics = harmonics?.coerceIn(0f, 1f) ?: current.harmonics,
+            compressionRatio = ratio?.coerceIn(1f, 2f) ?: current.compressionRatio,
+            attackMs = attack?.coerceIn(5f, 200f) ?: current.attackMs,
+            releaseMs = release?.coerceIn(50f, 1_000f) ?: current.releaseMs,
+            warmth = warmth?.coerceIn(0f, 1f) ?: current.warmth
         )
-
-        // 保存参数到SharedPreferences
         warmth?.let { SPManager.setFloat(SPManager.SP_TUBE_AMP_WARMTH, it) }
         saturation?.let { SPManager.setFloat(SPManager.SP_TUBE_AMP_SATURATION, it) }
         harmonics?.let { SPManager.setFloat(SPManager.SP_TUBE_AMP_HARMONICS, it) }
@@ -174,699 +137,331 @@ class MediaPlayer<E>(context: Context, private val mediaAdapter: MediaAdapter<E>
     }
 
     fun applyTubeAmpPreset(preset: TubeAmpPreset) {
-        tomSteadyProcessor?.applyTubeAmpPreset(preset)
+        dsp.tube.parameters = when (preset) {
+            TubeAmpPreset.NONE -> TubeAmpDsp.Parameters(enabled = false)
+            TubeAmpPreset.WARM -> TubeAmpDsp.Parameters(
+                enabled = true, drive = 1.18f, saturation = 0.20f, harmonics = 0.10f,
+                compressionRatio = 1.12f, attackMs = 35f, releaseMs = 260f, warmth = 0.25f
+            )
+            TubeAmpPreset.SMOOTH -> TubeAmpDsp.Parameters(
+                enabled = true, drive = 1.30f, saturation = 0.40f, harmonics = 0.20f,
+                compressionRatio = 1.22f, attackMs = 28f, releaseMs = 240f, warmth = 0.50f
+            )
+            TubeAmpPreset.VINTAGE -> TubeAmpDsp.Parameters(
+                enabled = true, drive = 1.48f, saturation = 0.60f, harmonics = 0.30f,
+                compressionRatio = 1.38f, attackMs = 22f, releaseMs = 300f, warmth = 0.75f
+            )
+            TubeAmpPreset.DYNAMIC -> TubeAmpDsp.Parameters(
+                enabled = true, drive = 1.36f, saturation = 0.40f, harmonics = 0.20f,
+                compressionRatio = 1.16f, attackMs = 12f, releaseMs = 150f, warmth = 0.50f
+            )
+        }
         SPManager.setInt(SPManager.SP_TUBE_AMP_PRESET, preset.ordinal)
+        SPManager.setBoolean(SPManager.SP_TUBE_AMP_ENABLED, preset != TubeAmpPreset.NONE)
+        SPManager.setFloat(SPManager.SP_TUBE_AMP_WARMTH, dsp.tube.parameters.warmth)
+        SPManager.setFloat(SPManager.SP_TUBE_AMP_SATURATION, dsp.tube.parameters.saturation)
+        SPManager.setFloat(SPManager.SP_TUBE_AMP_HARMONICS, dsp.tube.parameters.harmonics)
         onDataChangeListener?.onTubeAmpChange()
     }
 
-    fun getTubeAmpProcessor(): TubeAmpProcessor? {
-        return tomSteadyProcessor?.getTubeAmpProcessor()
-    }
-
-    // DC Phase Linearizer 相关
-    var dcPhaseEnabled: Boolean
-        get() = tomSteadyProcessor?.dcPhaseEnabled ?: false
-        set(value) {
-            // 确保TomSteadyProcessor已初始化
-            if (tomSteadyProcessor == null) {
-                initTomSteadyProcessor()
-            }
-            tomSteadyProcessor?.dcPhaseEnabled = value
-            SPManager.setBoolean(SPManager.SP_DC_PHASE_ENABLED, value)
-            onDataChangeListener?.onDCPhaseChange()
-        }
-
-    fun setDCPhaseParameters(
-        strength: Float? = null,
-        lowDelay: Float? = null,
-        midDelay: Float? = null,
-        highDelay: Float? = null,
-        crossover: Float? = null,
-        highCrossover: Float? = null
-    ) {
-        tomSteadyProcessor?.setDCPhaseParameters(
-            strength = strength,
-            lowDelay = lowDelay,
-            midDelay = midDelay,
-            highDelay = highDelay,
-            crossover = crossover,
-            highCrossover = highCrossover
-        )
-
-        // 保存参数到SharedPreferences
-        strength?.let { SPManager.setFloat(SPManager.SP_DC_PHASE_STRENGTH, it) }
-        lowDelay?.let { SPManager.setFloat(SPManager.SP_DC_PHASE_LOW_DELAY, it) }
-        midDelay?.let { SPManager.setFloat(SPManager.SP_DC_PHASE_MID_DELAY, it) }
-        highDelay?.let { SPManager.setFloat(SPManager.SP_DC_PHASE_HIGH_DELAY, it) }
-        crossover?.let { SPManager.setFloat(SPManager.SP_DC_PHASE_CROSSOVER, it) }
-        onDataChangeListener?.onDCPhaseChange()
-    }
-
-    fun applyDCPhasePreset(preset: DCPhasePreset) {
-        tomSteadyProcessor?.applyDCPhasePreset(preset)
-        SPManager.setInt(SPManager.SP_DC_PHASE_PRESET, preset.ordinal)
-        onDataChangeListener?.onDCPhaseChange()
-    }
-
-    fun getDCPhaseProcessor(): DCPhaseLinearizerProcessor? {
-        return tomSteadyProcessor?.getDCPhaseProcessor()
-    }
-
-    /**
-     * 获取TomSteady参考电平
-     */
-    fun getTomSteadyReferenceLevel(): Float {
-        return tomSteadyProcessor?.getReferenceLevel() ?: 0.0f
-    }
-
-    /**
-     * 预分析TomSteady音频数据
-     * @param buffer 音频数据缓冲区
-     * @param size 数据大小
-     * @return 是否完成预分析
-     */
-    fun preAnalyzeTomSteadyAudio(buffer: ShortArray, size: Int): Boolean {
-        return tomSteadyProcessor?.preAnalyzeAudio(buffer, size) ?: false
-    }
-
-    /**
-     * 设置TomSteady音乐时长（用于分段采样）
-     * @param durationMs 音乐总时长（毫秒）
-     */
-    fun setTomSteadyDuration(durationMs: Long) {
-        tomSteadyProcessor?.setDuration(durationMs)
-    }
-
-    /**
-     * 从文件路径预分析TomSteady音频（后台线程调用）
-     * @param filePath 音频文件路径
-     * @param durationMs 音乐总时长（毫秒）
-     * @return 是否成功完成预分析
-     */
-    fun preAnalyzeTomSteadyFromFile(filePath: String, durationMs: Long): Boolean {
-        return tomSteadyProcessor?.preAnalyzeFromFile(filePath, durationMs) ?: false
-    }
-
-    // 模拟音频处理方法，实际项目中需要根据具体实现调整
-    fun processAudio(buffer: ShortArray, size: Int): ShortArray {
-        return tomSteadyProcessor?.processAudio(buffer, size) ?: buffer
-    }
-
-    private var presetList: Array<String?> = arrayOf()
-
-    fun getPresetList(): Array<String?> {
-        return presetList
-    }
+    fun getPresetList(): Array<String?> = presetList.copyOf()
 
     interface OnDataChangeListener {
         fun onPlaylistChange() {}
         fun onPlayModeChange() {}
         fun onRepeatModeChange() {}
         fun onEqualizerChange() {}
-        fun onAgcChange() {}
         fun onTomSteadyChange() {}
         fun onTubeAmpChange() {}
-        fun onDCPhaseChange() {}
         fun onAudioManagerChange() {}
         fun onStopTimeChange() {}
-
     }
 
     var onDataChangeListener: OnDataChangeListener? = null
 
     interface OnMediaChangeListener<E> {
-        fun onMediaMetadataChange(mediaPlayer: com.example.podclassic.media.MediaPlayer<E>) {}
-        fun onPlaybackStateChange(mediaPlayer: com.example.podclassic.media.MediaPlayer<E>) {}
-    }
-
-    private fun onMediaMetadataChange() {
-        for (listener in onMediaChangeListeners) {
-            listener.onMediaMetadataChange(this)
-        }
-    }
-
-    private fun onPlayStateChange() {
-        for (listener in onMediaChangeListeners) {
-            listener.onPlaybackStateChange(this)
-        }
+        fun onMediaMetadataChange(mediaPlayer: MediaPlayer<E>) {}
+        fun onPlaybackStateChange(mediaPlayer: MediaPlayer<E>) {}
     }
 
     private val onMediaChangeListeners = HashSet<OnMediaChangeListener<E>>()
 
     @Synchronized
-    fun addOnMediaChangeListener(onMediaChangeListener: OnMediaChangeListener<E>) {
-        onMediaChangeListeners.add(onMediaChangeListener)
+    fun addOnMediaChangeListener(listener: OnMediaChangeListener<E>) {
+        onMediaChangeListeners.add(listener)
     }
 
     @Synchronized
-    fun removeOnMediaChangeListener(onMediaChangeListener: OnMediaChangeListener<E>) {
-        onMediaChangeListeners.remove(onMediaChangeListener)
+    fun removeOnMediaChangeListener(listener: OnMediaChangeListener<E>) {
+        onMediaChangeListeners.remove(listener)
+    }
+
+    private fun onMediaMetadataChange() = onMediaChangeListeners.toList().forEach {
+        it.onMediaMetadataChange(this)
+    }
+
+    private fun onPlayStateChange() = onMediaChangeListeners.toList().forEach {
+        it.onPlaybackStateChange(this)
     }
 
     private var stopTimer: Timer? = null
-
     var stopTime = 0
         set(value) {
-            //stopTime自减也会走这个set
             if (value == 0) {
-                //stop timer
-                if (stopTime > 0) {
-                    stopTimer()
-                }
-            } else {
-                // decrease ? ignore it
-                if (value != stopTime - 1) {
-                    stopTimer()
-                    stopTimer = Timer().apply {
-                        schedule(object : TimerTask() {
-                            override fun run() {
-                                updateTimer()
+                stopTimer?.cancel()
+                stopTimer = null
+            } else if (value != field - 1) {
+                stopTimer?.cancel()
+                stopTimer = Timer("PodClassicStopTimer", true).apply {
+                    schedule(object : TimerTask() {
+                        override fun run() {
+                            if (stopTime <= 1) {
+                                stop()
+                                stopTime = 0
+                            } else {
+                                stopTime--
                             }
-                        }, 60 * 1000L, 60 * 1000L)
-                    }
+                        }
+                    }, 60_000L, 60_000L)
                 }
             }
-            onDataChangeListener?.onStopTimeChange()
             field = value
+            onDataChangeListener?.onStopTimeChange()
         }
 
-    private fun updateTimer() {
-        if (stopTime == 1) {
-            stop()
-            stopTime = 0
-        } else {
-            stopTime--
-        }
+    init {
+        player.addListener(object : Player.Listener {
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                when (playbackState) {
+                    Player.STATE_READY -> {
+                        playState = if (player.playWhenReady) PlayState.STATE_PLAYING else PlayState.STATE_PAUSE
+                        onPlayStateChange()
+                    }
+                    Player.STATE_ENDED -> {
+                        if (playlist.onCompletion() != null) startMediaPlayer() else stop()
+                    }
+                    else -> Unit
+                }
+            }
+
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                val nextState = when {
+                    isPlaying -> PlayState.STATE_PLAYING
+                    player.playbackState == Player.STATE_READY -> PlayState.STATE_PAUSE
+                    else -> playState
+                }
+                if (nextState != playState) {
+                    playState = nextState
+                    onPlayStateChange()
+                }
+            }
+
+            override fun onPlayerError(error: PlaybackException) {
+                if (playlist.next() != null) startMediaPlayer() else stop()
+            }
+
+            override fun onAudioSessionIdChanged(audioSessionId: Int) {
+                createEqualizer(audioSessionId)
+            }
+        })
     }
 
-    private fun stopTimer() {
+    fun release() = onPlayerThread {
+        if (released) return@onPlayerThread
         stopTimer?.cancel()
-        stopTimer = null
-    }
-
-    fun release() {
-        stop()
-        mediaPlayer.release()
-        onMediaChangeListeners.clear()
         equalizer?.release()
-        automaticGainControl?.release()
-        tomSteadyProcessor?.release()
+        equalizer = null
+        player.release()
+        onMediaChangeListeners.clear()
+        released = true
     }
 
-    fun stop() {
-        android.util.Log.d("MediaPlayer", "stop() called")
-        if (mediaPlayer.isPlaying) {
-            mediaPlayer.pause()
-        }
-        stopTime = 0
-        mediaPlayer.reset()
-        abandonAudioFocus()
+    fun stop() = onPlayerThread {
+        player.stop()
+        player.clearMediaItems()
         playlist.clear()
-        tomSteadyProcessor?.reset()
+        stopTime = 0
         playState = PlayState.STATE_STOP
-
+        dsp.tube.reset()
         onPlayStateChange()
         onMediaMetadataChange()
     }
 
-    private fun startMediaPlayer() {
-        if (playlist.isEmpty()) {
-            stop()
-            return
-        }
-        onMediaMetadataChange()
-
-        playState = PlayState.STATE_STOP
-        mediaPlayer.reset()
-
-        // 如果启用了TomSteady，先进行预分析
-        if (tomSteadyEnabled && tomSteadyProcessor?.isPreAnalysisComplete() != true) {
-            val currentMedia = playlist.getCurrent()
-            if (currentMedia != null) {
-                val filePath = mediaAdapter.getFilePath(currentMedia)
-                val duration = getDuration()
-                if (filePath != null && duration > 0) {
-                    // 在后台线程进行预分析
-                    Thread {
-                        val success = preAnalyzeTomSteadyFromFile(filePath, duration.toLong())
-                        if (success) {
-                            // 预分析完成，开始播放
-                            mediaPlayer.start()
-                        }
-                    }.start()
-                    // 先准备播放器
-                    if (playlist.play(mediaPlayer)) {
-                        mediaPlayer.prepareAsync()
-                    }
-                    return
-                }
+    private fun startMediaPlayer() = onPlayerThread {
+        var attempts = 0
+        var current = playlist.getCurrent()
+        while (current != null && attempts < playlist.size()) {
+            val uri = mediaAdapter.getMediaUri(current)
+            if (uri != null) {
+                playState = PlayState.STATE_STOP
+                onMediaMetadataChange()
+                player.setMediaItem(MediaItem.fromUri(uri))
+                player.prepare()
+                player.playWhenReady = true
+                return@onPlayerThread
             }
+            current = playlist.next()
+            attempts++
         }
-
-        if (playlist.play(mediaPlayer)) {
-            mediaPlayer.prepareAsync()
-        } else {
-            // 加载失败时，尝试播放下一首，而不是清空播放列表
-            val nextMedia = playlist.next()
-            if (nextMedia != null) {
-                startMediaPlayer()
-            } else {
-                stop()
-            }
-        }
+        stop()
     }
 
-    fun next() {
-        playlist.next()
-        startMediaPlayer()
+    fun next() = onPlayerThread {
+        if (playlist.next() != null) startMediaPlayer()
     }
 
-    fun prev() {
-        if (getProgress() > 3000) {
-            seekTo(0)
+    fun prev() = onPlayerThread {
+        if (getProgress() > 3_000) seekTo(0) else if (playlist.prev() != null) startMediaPlayer()
+    }
+
+    fun playPause() = onPlayerThread { if (player.isPlaying) pause() else play() }
+
+    fun play() = onPlayerThread {
+        if (playlist.isEmpty()) return@onPlayerThread
+        if (player.playbackState == Player.STATE_READY) {
+            player.play()
+            playState = PlayState.STATE_PLAYING
+            onPlayStateChange()
         } else {
-            playlist.prev()
             startMediaPlayer()
         }
     }
 
-    fun playPause() {
-        if (playState == PlayState.STATE_PLAYING) {
-            pause()
-        } else {
-            play()
-        }
-    }
-
-    fun play() {
-        if (playState != PlayState.STATE_PLAYING) {
-            // 重置用户暂停标志
-            pausedByUser = false
-            if (playState == PlayState.STATE_PAUSE) {
-                mediaPlayer.start()
-                playState = PlayState.STATE_PLAYING
-                requestAudioFocus()
-                tomSteadyProcessor?.reset()
-                onPlayStateChange()
-            } else {
-                // 开始新的播放，启用初始音量控制阶段
-                isInitialVolumePhase = true
-                initialVolumeCounter = 0
-                startMediaPlayer()
-            }
-        }
-    }
-
-    fun pause() {
-        if (playState == PlayState.STATE_PLAYING) {
-            android.util.Log.d("MediaPlayer", "pause() called by user")
-            pausedByUser = true
-            abandonAudioFocus()
+    fun pause() = onPlayerThread {
+        if (playState == PlayState.STATE_PLAYING || player.playWhenReady) {
+            player.pause()
             playState = PlayState.STATE_PAUSE
-            mediaPlayer.pause()
-            tomSteadyProcessor?.reset()
-            onPlayStateChange()
-        }
-    }
-    
-    // 由音频焦点管理器调用，不设置 pausedByUser 标志
-    private fun pauseByAudioFocus() {
-        if (playState == PlayState.STATE_PLAYING) {
-            android.util.Log.d("MediaPlayer", "pauseByAudioFocus() called")
-            abandonAudioFocus()
-            playState = PlayState.STATE_PAUSE
-            mediaPlayer.pause()
-            tomSteadyProcessor?.reset()
             onPlayStateChange()
         }
     }
 
-    fun seekTo(position: Int) {
-        mediaPlayer.seekTo(position)
-        onPlayStateChange()
-    }
+    fun seekTo(position: Int) = onPlayerThread { player.seekTo(position.coerceAtLeast(0).toLong()) }
 
-    var defaultSeekDuration = 12000
-    fun forward(): Boolean {
-        if (!(playState == PlayState.STATE_PLAYING || playState == PlayState.STATE_PAUSE)) {
-            return false
-        }
-        val progress = getProgress()
+    var defaultSeekDuration = 12_000
+    fun forward(): Boolean = onPlayerThread {
+        if (!isPrepared) return@onPlayerThread false
         val duration = getDuration()
-
-        return if (progress == duration) {
-            false
-        } else {
+        val progress = getProgress()
+        if (duration <= 0 || progress >= duration) false
+        else {
             seekTo(min(progress + defaultSeekDuration, duration))
             true
         }
     }
 
-    fun backward(): Boolean {
-        if (!(playState == PlayState.STATE_PLAYING || playState == PlayState.STATE_PAUSE)) {
-            return false
-        }
+    fun backward(): Boolean = onPlayerThread {
+        if (!isPrepared) return@onPlayerThread false
         val progress = getProgress()
-        return if (progress == 0) {
-            false
-        } else {
+        if (progress <= 0) false else {
             seekTo(max(0, progress - defaultSeekDuration))
             true
         }
     }
 
-    fun getDuration(): Int {
-        return try {
-            mediaPlayer.duration
-        } catch (e: IllegalStateException) {
-            0
-        }
+    fun getDuration(): Int = onPlayerThread {
+        player.duration.takeIf { it != C.TIME_UNSET }?.coerceAtMost(Int.MAX_VALUE.toLong())?.toInt() ?: 0
     }
 
-    fun getProgress(): Int {
-        return try {
-            mediaPlayer.currentPosition
-        } catch (e: IllegalStateException) {
-            0
-        }
+    fun getProgress(): Int = onPlayerThread {
+        player.currentPosition.coerceIn(0, Int.MAX_VALUE.toLong()).toInt()
     }
 
-    fun getPlaylist(): ArrayList<E> {
-        return playlist.getPlayList()
-    }
+    fun getPlaylist(): ArrayList<E> = onPlayerThread { ArrayList(playlist.getPlayList()) }
+    fun getCurrent(): E? = onPlayerThread { playlist.getCurrent() }
+    fun getIndex(): Int = onPlayerThread { playlist.index }
+    fun getPlayState(): PlayState = onPlayerThread { playState }
 
-    fun setPlayMode(playMode: PlayMode) {
+    fun setPlayMode(playMode: PlayMode) = onPlayerThread {
         playlist.playMode = playMode
         onDataChangeListener?.onPlayModeChange()
     }
+    fun getPlayMode(): PlayMode = onPlayerThread { playlist.playMode }
 
-    fun getPlayMode(): PlayMode {
-        return playlist.playMode
-    }
-
-    fun setRepeatMode(repeatMode: RepeatMode) {
+    fun setRepeatMode(repeatMode: RepeatMode) = onPlayerThread {
         playlist.repeatMode = repeatMode
         onDataChangeListener?.onRepeatModeChange()
     }
+    fun getRepeatMode(): RepeatMode = onPlayerThread { playlist.repeatMode }
 
-    fun getRepeatMode(): RepeatMode {
-        return playlist.repeatMode
-    }
-
-    fun getPlayState(): PlayState {
-        return playState
-    }
-
-    fun add(e: E) {
+    fun add(e: E) = onPlayerThread {
         playlist.add(e)
         onDataChangeListener?.onPlaylistChange()
     }
 
-    fun set(e: E) {
+    fun set(e: E) = onPlayerThread {
         playlist.add(e)
         playlist.setCurrent(e)
         startMediaPlayer()
-        /*
-        if (getCurrent() != e) {
-            playlist.setCurrent(e)
-        }
-        if (playState == PlayState.STATE_STOP) {
-                startMediaPlayer()
-        } else if (playState == PlayState.STATE_PAUSE) {
-            play()
-        }
-
-         */
     }
 
-    fun remove(e: E) {
+    fun remove(e: E) = onPlayerThread {
         playlist.remove(e)
         onDataChangeListener?.onPlaylistChange()
     }
 
-    fun removeAt(index: Int) {
+    fun removeAt(index: Int) = onPlayerThread {
         playlist.removeAt(index)
         onDataChangeListener?.onPlaylistChange()
     }
 
-    fun setIndex(index: Int) {
+    fun setIndex(index: Int) = onPlayerThread {
         playlist.index = index
         startMediaPlayer()
     }
 
-    fun getIndex(): Int {
-        return playlist.index
-    }
-
-    fun setPlaylist(list: ArrayList<E>) {
+    fun setPlaylist(list: ArrayList<E>) = onPlayerThread {
         playlist.setPlaylist(list)
+        if (list.isNotEmpty()) playlist.index = 0
         startMediaPlayer()
         onDataChangeListener?.onPlaylistChange()
     }
 
-    fun setPlaylist(list: ArrayList<E>, index: Int) {
+    fun setPlaylist(list: ArrayList<E>, index: Int) = onPlayerThread {
         playlist.setPlaylist(list, index)
         startMediaPlayer()
         onDataChangeListener?.onPlaylistChange()
     }
 
-    fun shufflePlay(list: ArrayList<E>?) {
-        if (list == null) {
-            playlist.shufflePlay(playlist.getPlayList())
-        } else {
-            playlist.shufflePlay(list)
-            onDataChangeListener?.onPlaylistChange()
-        }
+    fun shufflePlay(list: ArrayList<E>?) = onPlayerThread {
+        val source = list ?: playlist.getPlayList()
+        playlist.shufflePlay(ArrayList(source))
         startMediaPlayer()
-    }
-
-    fun shufflePlay(list: ArrayList<E>, index: Int) {
-        playlist.shufflePlay(list, index)
         onDataChangeListener?.onPlaylistChange()
+    }
+
+    fun shufflePlay(list: ArrayList<E>, index: Int) = onPlayerThread {
+        playlist.shufflePlay(list, index)
         startMediaPlayer()
+        onDataChangeListener?.onPlaylistChange()
     }
 
-    fun getCurrent(): E? {
-        return playlist.getCurrent()
-    }
-
-    override fun onCompletion(p0: MediaPlayer?) {
-        playlist.onCompletion()
-        startMediaPlayer()
-    }
-
-    override fun onPrepared(mp: MediaPlayer?) {
-        // 只有在TomSteady启用时才设置较低的初始音量
-        if (tomSteadyEnabled) {
-            mediaPlayer.setVolume(0.5f, 0.5f)
-        } else {
-            // 否则设置正常音量
-            mediaPlayer.setVolume(1.0f, 1.0f)
+    private fun createEqualizer(audioSessionId: Int) {
+        equalizer?.release()
+        equalizer = try {
+            Equalizer(1_000, audioSessionId).apply { enabled = hasControl() }
+        } catch (_: Exception) {
+            null
         }
-        
-        mediaPlayer.start()
-        playState = PlayState.STATE_PLAYING
-        requestAudioFocus()
-        tomSteadyProcessor?.reset()
-        
-        // 启动音量逐渐增加的定时器（仅在TomSteady启用时）
-        if (isInitialVolumePhase && tomSteadyEnabled) {
-            val volumeTimer = Timer()
-            volumeTimer.schedule(object : TimerTask() {
-                override fun run() {
-                    if (isInitialVolumePhase && tomSteadyEnabled) {
-                        initialVolumeCounter++
-                        val currentVolume = 0.5f + (initialVolumeCounter * initialVolumeIncrement * 0.5f)
-                        if (initialVolumeCounter < INITIAL_VOLUME_SECONDS) {
-                            mediaPlayer.setVolume(currentVolume, currentVolume)
-                        } else {
-                            mediaPlayer.setVolume(1.0f, 1.0f)
-                            isInitialVolumePhase = false
-                            volumeTimer.cancel()
-                        }
-                    } else {
-                        volumeTimer.cancel()
-                    }
-                }
-            }, 0, 1000) // 每秒执行一次
-        }
-        
-        //onMediaMetadataChange()
-        onPlayStateChange()
+        presetList = equalizer?.let { effect ->
+            Array(effect.numberOfPresets.toInt()) { effect.getPresetName(it.toShort()) }
+        } ?: emptyArray()
+        applyEqualizerPreset()
     }
 
-    override fun onError(p0: MediaPlayer?, what: Int, extra: Int): Boolean {
-        if (what == 1 && extra == -2147483648) {
-            next()
-        }
-        return true
-    }
-
-    private fun requestAudioFocus() {
-        if (enableAudioFocus) {
-            audioFocusManager.requestAudioFocus()
+    private fun applyEqualizerPreset() {
+        equalizer?.let { effect ->
+            if (equalizerId in 0 until effect.numberOfPresets) effect.usePreset(equalizerId.toShort())
         }
     }
 
-    private fun abandonAudioFocus() {
-        if (enableAudioFocus) {
-            audioFocusManager.abandonAudioFocus()
-        }
+    private fun <T> onPlayerThread(block: () -> T): T {
+        if (Looper.myLooper() == player.applicationLooper) return block()
+        val task = FutureTask(block)
+        mainHandler.post(task)
+        return task.get()
     }
 
     interface MediaAdapter<E> {
-        fun onLoadMedia(e: E, mediaPlayer: MediaPlayer): Boolean
-        fun getFilePath(e: E): String? = null
+        fun getMediaUri(e: E): Uri?
     }
-
-
-    init {
-        this.audioFocusManager =
-            AudioFocusManager(context, object : AudioFocusManager.OnAudioFocusChangeListener {
-                private var wasPlaying = false
-                private var isTemporaryLoss = false
-                private var lossTime: Long = 0
-                private var isDucked: Boolean = false
-                private var resumeAttempts: Int = 0
-                private val maxResumeAttempts = 5
-                private val resumeInterval = 2000L // 2秒
-
-                private val resumeRunnable = Runnable {
-                    attemptResume()
-                }
-
-                private fun attemptResume() {
-                    if (!enableAudioFocus || pausedByUser) {
-                        android.util.Log.d("MediaPlayer", "Resume aborted: enableAudioFocus=$enableAudioFocus, pausedByUser=$pausedByUser")
-                        return
-                    }
-                    
-                    val currentTime = System.currentTimeMillis()
-                    val lossDuration = currentTime - lossTime
-                    
-                    android.util.Log.d("MediaPlayer", "Attempting resume, wasPlaying=$wasPlaying, isTemporaryLoss=$isTemporaryLoss, lossDuration=$lossDuration, attempts=$resumeAttempts")
-                    
-                    // 如果丢失时间超过30秒，放弃恢复
-                    if (lossDuration > 30000) {
-                        android.util.Log.d("MediaPlayer", "Giving up resume after 30 seconds")
-                        resetState()
-                        return
-                    }
-                    
-                    // 尝试重新请求音频焦点
-                    if (wasPlaying && playState != PlayState.STATE_PLAYING) {
-                        resumeAttempts++
-                        android.util.Log.d("MediaPlayer", "Requesting audio focus, attempt $resumeAttempts")
-                        requestAudioFocus()
-                        
-                        // 如果还没有收到焦点恢复，继续尝试
-                        if (resumeAttempts < maxResumeAttempts && isTemporaryLoss) {
-                            Handler(Looper.getMainLooper()).postDelayed(resumeRunnable, resumeInterval)
-                        }
-                    }
-                }
-
-                private fun resetState() {
-                    isTemporaryLoss = false
-                    wasPlaying = false
-                    pausedByUser = false
-                    lossTime = 0
-                    resumeAttempts = 0
-                }
-
-                override fun onAudioFocusGain() {
-                    if (!enableAudioFocus) {
-                        return
-                    }
-                    val currentTime = System.currentTimeMillis()
-                    val lossDuration = currentTime - lossTime
-                    android.util.Log.d("MediaPlayer", "Audio focus gained, wasPlaying=$wasPlaying, isTemporaryLoss=$isTemporaryLoss, pausedByUser=$pausedByUser, lossDuration=$lossDuration")
-                    
-                    // 取消任何待定的恢复尝试
-                    Handler(Looper.getMainLooper()).removeCallbacks(resumeRunnable)
-                    
-                    // 恢复音量（如果是被duck的情况）
-                    if (isDucked) {
-                        mediaPlayer.setVolume(1.0f, 1.0f)
-                        isDucked = false
-                    }
-                    
-                    // 只有不是用户手动暂停的情况下才自动恢复
-                    // 临时丢失后恢复，或者丢失时间较短（小于30秒），自动继续播放
-                    val shouldResume = wasPlaying && !pausedByUser && playState != PlayState.STATE_PLAYING && 
-                        (isTemporaryLoss || lossDuration < 30000)
-                    
-                    if (shouldResume) {
-                        android.util.Log.d("MediaPlayer", "Resuming playback after audio focus gain")
-                        play()
-                    }
-                    // 重置标志
-                    resetState()
-                }
-                
-                override fun onAudioFocusLoss(permanent: Boolean, pausedByDuck: Boolean) {
-                    if (!enableAudioFocus) {
-                        return
-                    }
-                    lossTime = System.currentTimeMillis()
-                    // 只要不是永久丢失，都认为是临时丢失
-                    isTemporaryLoss = !permanent
-                    resumeAttempts = 0
-                    android.util.Log.d("MediaPlayer", "Audio focus lost, permanent=$permanent, pausedByDuck=$pausedByDuck, isTemporaryLoss=$isTemporaryLoss")
-                    if (playState == PlayState.STATE_PLAYING) {
-                        wasPlaying = true
-                        if (pausedByDuck) {
-                            // 降低音量继续播放
-                            isDucked = true
-                            mediaPlayer.setVolume(0.1f, 0.1f)
-                        } else {
-                            pauseByAudioFocus()
-                        }
-                        
-                        // 启动恢复尝试定时器（针对高德地图等不释放焦点的应用）
-                        if (!permanent) {
-                            Handler(Looper.getMainLooper()).postDelayed(resumeRunnable, resumeInterval)
-                        }
-                    } else {
-                        wasPlaying = false
-                    }
-                }
-            })
-        this.mediaPlayer = MediaPlayer().apply {
-            setOnCompletionListener(this@MediaPlayer)
-            setOnErrorListener(this@MediaPlayer)
-            setOnPreparedListener(this@MediaPlayer)
-            setAudioAttributes(audioFocusManager.audioAttributes)
-        }
-        try {
-            this.equalizer = Equalizer(1000, mediaPlayer.audioSessionId).apply {
-                if (hasControl()) {
-                    enabled = true
-                }
-            }
-            this.equalizer?.let {
-                this.presetList = arrayOfNulls(it.numberOfPresets.toInt())
-                for (i in 0 until it.numberOfPresets) {
-                    this.presetList[i] = it.getPresetName(i.toShort())
-                }
-            }
-        } catch (e: Exception) {
-            // 均衡器初始化失败，跳过均衡器设置
-            this.equalizer = null
-            this.presetList = arrayOf()
-        }
-        
-        try {
-            if (AutomaticGainControl.isAvailable()) {
-                this.automaticGainControl = AutomaticGainControl.create(mediaPlayer.audioSessionId).apply {
-                    enabled = agcEnabled
-                }
-            }
-        } catch (e: Exception) {
-            // AGC初始化失败，跳过AGC设置
-            this.automaticGainControl = null
-        }
-    }
-
 }
-

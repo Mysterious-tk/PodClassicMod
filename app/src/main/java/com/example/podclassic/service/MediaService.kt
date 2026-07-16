@@ -77,20 +77,13 @@ class MediaService : Service() {
         const val ACTION_MAIN = "action_main"
 
         const val ACTION_UPDATE_AUDIO_FOCUS = "action_set_audio_focus"
-        const val ACTION_SET_AGC_ENABLED = "action_set_agc_enabled"
         const val ACTION_SET_TOM_STEADY_ENABLED = "action_set_tom_steady_enabled"
         const val ACTION_SET_TOM_STEADY_PARAMETERS = "action_set_tom_steady_parameters"
-        const val ACTION_INIT_TOM_STEADY = "action_init_tom_steady"
 
         // 胆机音效相关
         const val ACTION_SET_TUBE_AMP_ENABLED = "action_set_tube_amp_enabled"
         const val ACTION_SET_TUBE_AMP_PRESET = "action_set_tube_amp_preset"
         const val ACTION_SET_TUBE_AMP_PARAMETERS = "action_set_tube_amp_parameters"
-
-        // DC Phase Linearizer 相关
-        const val ACTION_SET_DC_PHASE_ENABLED = "action_set_dc_phase_enabled"
-        const val ACTION_SET_DC_PHASE_PRESET = "action_set_dc_phase_preset"
-        const val ACTION_SET_DC_PHASE_PARAMETERS = "action_set_dc_phase_parameters"
 
         // 进度更新间隔（毫秒）
         const val PROGRESS_UPDATE_INTERVAL = 1000L
@@ -282,31 +275,13 @@ class MediaService : Service() {
             // 胆机音效变化时的回调（可扩展）
         }
 
-        override fun onDCPhaseChange() {
-            // DC Phase Linearizer 变化时的回调（可扩展）
-        }
     }
 
     private val mediaAdapter = object : MediaPlayer.MediaAdapter<Music> {
-        override fun onLoadMedia(e: Music, mediaPlayer: android.media.MediaPlayer): Boolean {
-            if (e.data != null && e.data.isNotBlank()) {
-                try {
-                    mediaPlayer.setDataSource(e.data)
-                    return true
-                } catch (ex: Exception) {
-                    ex.printStackTrace()
-                    return false
-                }
-            } else if (e.uri != null) {
-                try {
-                    mediaPlayer.setDataSource(this@MediaService, e.uri)
-                    return true
-                } catch (ex: Exception) {
-                    ex.printStackTrace()
-                    return false
-                }
-            }
-            return false
+        override fun getMediaUri(e: Music): android.net.Uri? = when {
+            !e.data.isNullOrBlank() -> android.net.Uri.parse(e.data)
+            e.uri != null -> e.uri
+            else -> null
         }
     }
 
@@ -590,10 +565,8 @@ class MediaService : Service() {
         )
 
         updateAudioFocus()
-        updateAgcEnabled()
         updateTomSteadyEnabled()
         updateTubeAmpEnabled()
-        updateDCPhaseEnabled()
 
         android.util.Log.d("MediaService", "MediaPlayer initialized")
     }
@@ -752,9 +725,6 @@ class MediaService : Service() {
                 ACTION_UPDATE_AUDIO_FOCUS -> {
                     updateAudioFocus()
                 }
-                ACTION_SET_AGC_ENABLED -> {
-                    updateAgcEnabled()
-                }
                 ACTION_SET_TOM_STEADY_ENABLED -> {
                     updateTomSteadyEnabled()
                 }
@@ -776,10 +746,6 @@ class MediaService : Service() {
                             releaseTime = releaseTime
                         )
                     }
-                }
-                ACTION_INIT_TOM_STEADY -> {
-                    // 初始化TomSteady处理器
-                    mediaPlayer.initTomSteadyProcessor()
                 }
                 ACTION_SET_TUBE_AMP_ENABLED -> {
                     updateTubeAmpEnabled()
@@ -813,36 +779,6 @@ class MediaService : Service() {
                         )
                     }
                 }
-                ACTION_SET_DC_PHASE_ENABLED -> {
-                    updateDCPhaseEnabled()
-                }
-                ACTION_SET_DC_PHASE_PRESET -> {
-                    // 处理 DC Phase 预设
-                    if (arg1 is com.example.podclassic.media.DCPhasePreset) {
-                        mediaPlayer.applyDCPhasePreset(arg1)
-                    }
-                }
-                ACTION_SET_DC_PHASE_PARAMETERS -> {
-                    // 处理 DC Phase 参数设置
-                    if (arg1 is Map<*, *>) {
-                        val params = arg1
-                        val strength = params["strength"] as? Float
-                        val lowDelay = params["lowDelay"] as? Float
-                        val midDelay = params["midDelay"] as? Float
-                        val highDelay = params["highDelay"] as? Float
-                        val crossover = params["crossover"] as? Float
-                        val highCrossover = params["highCrossover"] as? Float
-
-                        mediaPlayer.setDCPhaseParameters(
-                            strength = strength,
-                            lowDelay = lowDelay,
-                            midDelay = midDelay,
-                            highDelay = highDelay,
-                            crossover = crossover,
-                            highCrossover = highCrossover
-                        )
-                    }
-                }
                 else -> {
                     throw IllegalArgumentException("unknown action")
                 }
@@ -865,20 +801,41 @@ class MediaService : Service() {
         mediaPlayer.enableAudioFocus = SPManager.getBoolean(SPManager.SP_AUDIO_FOCUS, true)
     }
 
-    private fun updateAgcEnabled() {
-        mediaPlayer.agcEnabled = SPManager.getBoolean(SPManager.SP_AGC_ENABLED)
-    }
-
     private fun updateTomSteadyEnabled() {
+        val storedTarget = SPManager.getFloat(SPManager.SP_TOM_STEADY_TARGET_LEVEL, 0.16f)
+        val storedMaxGain = SPManager.getFloat(SPManager.SP_TOM_STEADY_MAX_GAIN, 6f)
+        val target = if (storedTarget in 0.08f..0.25f) storedTarget else 0.16f
+        val maxGain = if (storedMaxGain in 0f..12f) storedMaxGain else 6f
+        SPManager.setFloat(SPManager.SP_TOM_STEADY_TARGET_LEVEL, target)
+        SPManager.setFloat(SPManager.SP_TOM_STEADY_MAX_GAIN, maxGain)
+        mediaPlayer.setTomSteadyParameters(
+            // Migrate values from the old placeholder implementation, whose 0.7 target clipped.
+            targetLevel = target,
+            maxGain = maxGain,
+            attackTime = SPManager.getFloat(SPManager.SP_TOM_STEADY_ATTACK_TIME, 80f),
+            releaseTime = SPManager.getFloat(SPManager.SP_TOM_STEADY_RELEASE_TIME, 900f)
+        )
         mediaPlayer.tomSteadyEnabled = SPManager.getBoolean(SPManager.SP_TOM_STEADY_ENABLED)
     }
 
     private fun updateTubeAmpEnabled() {
-        mediaPlayer.tubeAmpEnabled = SPManager.getBoolean(SPManager.SP_TUBE_AMP_ENABLED)
-    }
-
-    private fun updateDCPhaseEnabled() {
-        mediaPlayer.dcPhaseEnabled = SPManager.getBoolean(SPManager.SP_DC_PHASE_ENABLED)
+        val wasEnabled = SPManager.getBoolean(SPManager.SP_TUBE_AMP_ENABLED)
+        val warmth = SPManager.getFloat(SPManager.SP_TUBE_AMP_WARMTH, 0.5f)
+        val saturation = SPManager.getFloat(SPManager.SP_TUBE_AMP_SATURATION, 0.4f)
+        val harmonics = SPManager.getFloat(SPManager.SP_TUBE_AMP_HARMONICS, 0.2f)
+        val preset = com.example.podclassic.media.TubeAmpPreset.values()[
+            SPManager.getInt(SPManager.SP_TUBE_AMP_PRESET).coerceIn(
+                0,
+                com.example.podclassic.media.TubeAmpPreset.values().lastIndex
+            )
+        ]
+        mediaPlayer.applyTubeAmpPreset(preset)
+        mediaPlayer.setTubeAmpParameters(
+            warmth = warmth,
+            saturation = saturation,
+            harmonics = harmonics
+        )
+        mediaPlayer.tubeAmpEnabled = wasEnabled
     }
 
     data class Action(val action: String, val arg1: Any?, val arg2: Any?)

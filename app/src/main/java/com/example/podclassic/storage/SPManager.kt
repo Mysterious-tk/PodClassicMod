@@ -21,7 +21,6 @@ object SPManager {
     const val SP_PLAY_ALL = "play_all"
     const val SP_COVER_FLOW = "cover_flow"
     const val SP_REPEAT_MODE = "repeat_mode"
-    const val SP_AGC_ENABLED = "agc_enabled"
     const val SP_TOM_STEADY_ENABLED = "tom_steady_enabled"
     const val SP_TOM_STEADY_TARGET_LEVEL = "tom_steady_target_level"
     const val SP_TOM_STEADY_MAX_GAIN = "tom_steady_max_gain"
@@ -34,15 +33,6 @@ object SPManager {
     const val SP_TUBE_AMP_WARMTH = "tube_amp_warmth"
     const val SP_TUBE_AMP_SATURATION = "tube_amp_saturation"
     const val SP_TUBE_AMP_HARMONICS = "tube_amp_harmonics"
-
-    // DC Phase Linearizer 相关
-    const val SP_DC_PHASE_ENABLED = "dc_phase_enabled"
-    const val SP_DC_PHASE_PRESET = "dc_phase_preset"
-    const val SP_DC_PHASE_STRENGTH = "dc_phase_strength"
-    const val SP_DC_PHASE_LOW_DELAY = "dc_phase_low_delay"
-    const val SP_DC_PHASE_MID_DELAY = "dc_phase_mid_delay"
-    const val SP_DC_PHASE_HIGH_DELAY = "dc_phase_high_delay"
-    const val SP_DC_PHASE_CROSSOVER = "dc_phase_crossover"
 
     private val sharedPreferences =
         PreferenceManager.getDefaultSharedPreferences(BaseApplication.context)
@@ -98,24 +88,16 @@ object SPManager {
         setInt(SP_REPEAT_MODE, 1)
         setInt(Language.SP_NAME, 0)
         setInt(SP_EQUALIZER, 0)
-        setBoolean(SP_AGC_ENABLED, false)
         setBoolean(SP_TOM_STEADY_ENABLED, false)
-        setString(SP_TOM_STEADY_TARGET_LEVEL, "0.7")
-        setString(SP_TOM_STEADY_MAX_GAIN, "20.0")
-        setString(SP_TOM_STEADY_ATTACK_TIME, "50.0")
-        setString(SP_TOM_STEADY_RELEASE_TIME, "200.0")
+        setString(SP_TOM_STEADY_TARGET_LEVEL, "0.16")
+        setString(SP_TOM_STEADY_MAX_GAIN, "6.0")
+        setString(SP_TOM_STEADY_ATTACK_TIME, "80.0")
+        setString(SP_TOM_STEADY_RELEASE_TIME, "900.0")
         setBoolean(SP_TUBE_AMP_ENABLED, false)
         setInt(SP_TUBE_AMP_PRESET, 0)
         setString(SP_TUBE_AMP_WARMTH, "0.5")
         setString(SP_TUBE_AMP_SATURATION, "0.6")
         setString(SP_TUBE_AMP_HARMONICS, "0.3")
-        setBoolean(SP_DC_PHASE_ENABLED, false)
-        setInt(SP_DC_PHASE_PRESET, 0)
-        setString(SP_DC_PHASE_STRENGTH, "0.5")
-        setString(SP_DC_PHASE_LOW_DELAY, "0.3")
-        setString(SP_DC_PHASE_MID_DELAY, "0.2")
-        setString(SP_DC_PHASE_HIGH_DELAY, "0.1")
-        setString(SP_DC_PHASE_CROSSOVER, "500.0")
         var resetCount = getInt(SP_RESET_COUNT)
         resetCount++
         setInt(SP_RESET_COUNT, resetCount)

@@ -2,11 +2,6 @@ package com.example.podclassic.media
 
 open class Playlist<E>(private val mediaAdapter: MediaPlayer.MediaAdapter<E>) {
 
-    fun play(mediaPlayer: android.media.MediaPlayer): Boolean {
-        val e = getCurrent() ?: return false
-        return mediaAdapter.onLoadMedia(e, mediaPlayer)
-    }
-
     var playMode: PlayMode = PlayMode.ORDER
         set(value) {
             field = value
@@ -161,7 +156,7 @@ open class Playlist<E>(private val mediaAdapter: MediaPlayer.MediaAdapter<E>) {
         if (playMode == PlayMode.SINGLE) {
             return currentPlaylist[index]
         }
-        if (repeatMode == RepeatMode.NONE && index == currentPlaylist.size) {
+        if (repeatMode == RepeatMode.NONE && index == currentPlaylist.lastIndex) {
             return null
         }
         index = (index + 1) % currentPlaylist.size
