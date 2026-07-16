@@ -2,7 +2,6 @@ package com.example.podclassic.view
 
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
-import android.animation.ObjectAnimator
 import android.animation.ValueAnimator
 import android.content.Context
 import android.content.res.Configuration
@@ -38,6 +37,8 @@ import com.example.podclassic.view.MusicPlayerView3rd
 import com.example.podclassic.widget.RecyclerListView
 import java.io.File
 import java.util.*
+import kotlin.math.ceil
+import kotlin.math.hypot
 
 
 class MainView(context: Context) : RelativeLayout(context), ScreenView {
@@ -62,19 +63,19 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
     private val coverImages = arrayOf("img/1.jpg", "img/2.jpg", "img/3.jpg", "img/4.jpg", "img/5.jpg", "img/6.jpg")
 
     // 动画相关
-    private var xAnimator: ObjectAnimator? = null
-    private var yAnimator: ObjectAnimator? = null
+    private var coverAnimator: ValueAnimator? = null
     private var isAnimating = false
-    
-    // 蛇形扫描算法相关
-    private var scanGridCols = 3  // 网格列数
-    private var scanGridRows = 3  // 网格行数
-    private var currentGridX = 0  // 当前网格X索引
-    private var currentGridY = 0  // 当前网格Y索引
-    private var scanDirectionX = 1 // X方向扫描方向：1为右，-1为左
-    private var scanDirectionY = 1 // Y方向扫描方向：1为下，-1为上
-    private var isHorizontalScan = true // 是否以横向扫描为主
-    private val visitedGrids = mutableSetOf<Pair<Int, Int>>() // 记录已访问的网格
+    private var nextDriftPoint = 0
+
+    // iPod photo-style path. Every leg changes both axes, avoiding a horizontal-only pan.
+    private val driftPath = arrayOf(
+        0.08f to 0.14f,
+        0.92f to 0.84f,
+        0.14f to 0.92f,
+        0.86f to 0.08f,
+        0.06f to 0.68f,
+        0.94f to 0.32f
+    )
 
     // Orientation change handling - prevent rapid consecutive orientation changes
     private var orientationChangeHandler: Runnable? = null
@@ -211,13 +212,10 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
             ) {
                 savedContainerWidth = newWidth
                 savedContainerHeight = newHeight
-                // Run after this traversal so ImageView receives the final container bounds.
-                coverContainer.postOnAnimation {
-                    if (coverContainer.width == newWidth && coverContainer.height == newHeight &&
-                        coverImageView.drawable != null
-                    ) {
-                        resetCoverPosition()
-                    }
+                // The listener runs after this container has its final bounds but before draw.
+                // Resize the child now so rotation cannot expose one black frame at an edge.
+                if (coverImageView.drawable != null) {
+                    resetCoverPosition()
                 }
             }
         }
@@ -574,13 +572,13 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
             // 尺寸已测量，直接初始化
             updateLayoutForOrientation()
             updateCoverImage()
-            // startCoverAnimation() 将由 resetCoverPosition() 在完成后调用
+            // resetCoverPosition() 会在布局稳定后启动漂移动画
         } else {
             // 延迟一帧等待测量
             post {
                 updateLayoutForOrientation()
                 updateCoverImage()
-                // startCoverAnimation() 将由 resetCoverPosition() 在完成后调用
+                // resetCoverPosition() 会在布局稳定后启动漂移动画
             }
         }
 
@@ -658,9 +656,9 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
             dividerView.requestLayout()
             requestLayout()
 
-            // 横竖屏切换后重新计算图片位置（保持动画状态连续性）
+            // Wait for the final post-rotation bounds before sizing or moving the artwork.
             waitForLayout {
-                updateCoverAnimationForOrientation()
+                resetCoverPosition()
             }
         } finally {
             handler?.postDelayed({
@@ -732,334 +730,96 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
     }
 
     /**
-     * 立即将当前图片位置限制在有效边界内，防止露出黑边
-     * 在横竖屏切换时调用，确保图片位置始终有效
-     *
-     * 使用统一的宽度获取函数，确保与其他函数一致
+     * Sizes the artwork with overscan on both axes, then starts a slow, constant-speed
+     * diagonal drift. Using the container's laid-out bounds here is important: display
+     * metrics can still describe the previous orientation during a window transition.
      */
-    private fun clampCurrentPositionToBounds() {
-        // 使用统一的宽度获取函数，确保与其他函数一致
-        val containerWidth = getActualContainerWidth()
-
-        // 高度使用基于屏幕的估算（此函数在布局完成前调用）
-        val screenHeight = resources.displayMetrics.heightPixels
-        val containerHeight = (screenHeight * 0.9).toInt()
-
-        val imageWidth = coverImageView.width
-        val imageHeight = coverImageView.height
-
-        if (containerWidth <= 0 || containerHeight <= 0 || imageWidth <= 0 || imageHeight <= 0) {
-            return
-        }
-
-        // 计算有效边界（图片不能露出黑边）
-        val minX = if (imageWidth > containerWidth) (containerWidth - imageWidth).toFloat() else 0f
-        val maxX = 0f
-        val minY = if (imageHeight > containerHeight) (containerHeight - imageHeight).toFloat() else 0f
-        val maxY = 0f
-
-        // 获取当前位置
-        val currentX = coverImageView.x
-        val currentY = coverImageView.y
-
-        // 限制在边界内
-        val clampedX = kotlin.math.max(minX, kotlin.math.min(maxX, currentX))
-        val clampedY = kotlin.math.max(minY, kotlin.math.min(maxY, currentY))
-
-        // 如果位置需要调整，立即应用（取消当前动画）
-        if (clampedX != currentX || clampedY != currentY) {
-            stopCoverAnimation()
-            coverImageView.x = clampedX
-            coverImageView.y = clampedY
-            android.util.Log.d("MainView", "Position clamped: ($currentX, $currentY) -> ($clampedX, $clampedY), bounds: x[$minX,$maxX], y[$minY,$maxY]")
-        }
-    }
-
     private fun resetCoverPosition() {
-        // 停止当前动画（防止与位置重置冲突）
-        stopCoverAnimation()
+        stopCoverDrift()
 
-        // 移除：不再在这里调用 clampCurrentPositionToBounds()
-        // 原因：1) updateLayoutForOrientation() 已经调用过了
-        //       2) 这里会重新计算正确的位置，无需额外 clamp
-
-        // Use the exact bounds from the completed container layout. Screen metrics include
-        // different inset/full-screen states on some devices and are not drawing bounds.
         val containerWidth = coverContainer.width
         val containerHeight = coverContainer.height
-
-        android.util.Log.d("MainView", "resetCoverPosition() - container: ${containerWidth}x${containerHeight}")
-
-        // 获取图片实际尺寸 - 确保 Bitmap 已就绪
-        val drawable = coverImageView.drawable
-        if (drawable == null) {
-            android.util.Log.w("MainView", "Drawable not ready, scheduling retry...")
-            // 使用 waitForLayout 替代 postDelayed
-            waitForLayout {
-                resetCoverPosition()
-            }
+        val drawable = coverImageView.drawable ?: return
+        val sourceWidth = drawable.intrinsicWidth
+        val sourceHeight = drawable.intrinsicHeight
+        if (containerWidth <= 0 || containerHeight <= 0 || sourceWidth <= 0 || sourceHeight <= 0) {
             return
         }
 
-        val bitmapWidth = drawable.intrinsicWidth
-        val bitmapHeight = drawable.intrinsicHeight
+        // CENTER_CROP plus 14% overscan guarantees useful movement in X and Y. ceil() and
+        // two extra pixels protect against sub-pixel rounding exposing the container edge.
+        val cropScale = maxOf(
+            containerWidth.toFloat() / sourceWidth,
+            containerHeight.toFloat() / sourceHeight
+        )
+        val driftScale = cropScale * 1.14f
+        savedImageWidth = ceil(sourceWidth * driftScale).toInt() + 2
+        savedImageHeight = ceil(sourceHeight * driftScale).toInt() + 2
 
-        // 增加更严格的尺寸检查
-        if (containerWidth <= 0 || containerHeight <= 0) {
-            android.util.Log.w("MainView", "Container size invalid: ${containerWidth}x${containerHeight}, waiting for layout...")
-            updateLayoutForOrientation()
-            return  // waitForLayout 会调用 resetCoverPosition
-        }
-
-        if (bitmapWidth <= 0 || bitmapHeight <= 0) {
-            android.util.Log.w("MainView", "Bitmap size invalid: ${bitmapWidth}x${bitmapHeight}, reloading image...")
-            updateCoverImage()  // 重新加载图片
-            return  // updateCoverImage 会通过 waitForLayout 调用 resetCoverPosition
-        }
-        
-        // 计算缩放比例：确保图片填满整个容器（不露出黑色背景）
-        // 同时保证至少一个边超出容器，以便有移动空间展示全貌
-        val scaleX = containerWidth.toFloat() / bitmapWidth
-        val scaleY = containerHeight.toFloat() / bitmapHeight
-        
-        // 基础缩放：取较大值确保填满容器
-        val baseScale = maxOf(scaleX, scaleY)
-        
-        // 计算基础图片尺寸
-        var imageWidth = (bitmapWidth * baseScale).toInt()
-        var imageHeight = (bitmapHeight * baseScale).toInt()
-        
-        // 计算可移动范围
-        var movableWidth = imageWidth - containerWidth
-        var movableHeight = imageHeight - containerHeight
-        
-        // 确保至少有一个方向有足够的移动范围来展示图片全貌
-        // 目标是让图片至少有一个边的可移动范围 >= 容器对应边的15%
-        val targetMovableWidth = (containerWidth * 0.15f).toInt()
-        val targetMovableHeight = (containerHeight * 0.15f).toInt()
-        
-        if (movableWidth < targetMovableWidth && movableHeight < targetMovableHeight) {
-            // 两个方向都不够，需要额外放大
-            // 根据容器比例决定优先放大哪个方向
-            if (containerWidth >= containerHeight) {
-                // 横向容器：优先确保横向有足够移动范围
-                val targetWidth = containerWidth + targetMovableWidth
-                val additionalScale = targetWidth.toFloat() / imageWidth
-                imageWidth = targetWidth
-                imageHeight = (imageHeight * additionalScale).toInt()
-            } else {
-                // 纵向容器：优先确保纵向有足够移动范围
-                val targetHeight = containerHeight + targetMovableHeight
-                val additionalScale = targetHeight.toFloat() / imageHeight
-                imageHeight = targetHeight
-                imageWidth = (imageWidth * additionalScale).toInt()
-            }
-        }
-        
-        // 保存最终尺寸
-        savedImageWidth = imageWidth
-        savedImageHeight = imageHeight
-        
-        // 更新图片视图尺寸
         coverImageView.layoutParams = FrameLayout.LayoutParams(savedImageWidth, savedImageHeight)
-        
-        // 重新计算可移动范围
-        movableWidth = savedImageWidth - containerWidth
-        movableHeight = savedImageHeight - containerHeight
-        
-        android.util.Log.d("MainView", "resetCoverPosition() - container: ${containerWidth}x${containerHeight}, bitmap: ${bitmapWidth}x${bitmapHeight}, image: ${savedImageWidth}x${savedImageHeight}, movable: ${movableWidth}x${movableHeight}")
-        
-        // 根据可移动范围决定扫描策略
-        // 决定主扫描方向：如果横向可移动范围更大，则以横向扫描为主
-        isHorizontalScan = movableWidth >= movableHeight
-        
-        // 根据可移动范围动态调整网格数量（至少3x3，最多6x6）
-        scanGridCols = kotlin.math.max(3, kotlin.math.min(6, (movableWidth / 150).toInt() + 1))
-        scanGridRows = kotlin.math.max(3, kotlin.math.min(6, (movableHeight / 150).toInt() + 1))
-        
-        // 如果某个方向无法移动，该方向网格设为1
-        if (movableWidth <= 0) scanGridCols = 1
-        if (movableHeight <= 0) scanGridRows = 1
-        
-        // 重置扫描状态
-        currentGridX = 0
-        currentGridY = 0
-        scanDirectionX = 1
-        scanDirectionY = 1
-        visitedGrids.clear()
-        
-        android.util.Log.d("MainView", "Scan grid: ${scanGridCols}x${scanGridRows}, horizontalScan: $isHorizontalScan, movable: ${movableWidth}x${movableHeight}")
-        
-        // 设置初始位置到第一个网格点
-        val initialPos = calculateGridPosition(currentGridX, currentGridY, movableWidth, movableHeight)
-        coverImageView.x = initialPos.first
-        coverImageView.y = initialPos.second
-        android.util.Log.d("MainView", "Initial position: (${coverImageView.x}, ${coverImageView.y})")
+        // A container resize can otherwise draw once with the child's old measured size.
+        coverImageView.measure(
+            View.MeasureSpec.makeMeasureSpec(savedImageWidth, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(savedImageHeight, View.MeasureSpec.EXACTLY)
+        )
+        coverImageView.layout(0, 0, savedImageWidth, savedImageHeight)
 
-        // 启动动画（确保在所有尺寸计算完成后）
-        startCoverAnimation()
+        val minX = (containerWidth - savedImageWidth).toFloat()
+        val minY = (containerHeight - savedImageHeight).toFloat()
+        coverImageView.translationX = minX / 2f
+        coverImageView.translationY = minY / 2f
+
+        nextDriftPoint = random.nextInt(driftPath.size)
+        startCoverDrift()
     }
 
-    /**
-     * 横竖屏切换时更新动画状态（保持动画连续性）
-     * 与 resetCoverPosition() 不同，此函数保留动画状态
-     */
-    private fun updateCoverAnimationForOrientation() {
-        // 1. 停止当前动画
-        stopCoverAnimation()
-
-        // 2. Use the exact bounds from the completed container layout.
-        val containerWidth = coverContainer.width
-        val containerHeight = coverContainer.height
-
-        android.util.Log.d("MainView", "updateCoverAnimationForOrientation() - container: ${containerWidth}x${containerHeight}")
-
-        // 3. 获取图片实际尺寸
-        val drawable = coverImageView.drawable
-        if (drawable == null) {
-            android.util.Log.w("MainView", "Drawable not ready, scheduling retry...")
-            waitForLayout {
-                updateCoverAnimationForOrientation()
-            }
-            return
-        }
-
-        val bitmapWidth = drawable.intrinsicWidth
-        val bitmapHeight = drawable.intrinsicHeight
-
-        // 4. 尺寸检查
-        if (containerWidth <= 0 || containerHeight <= 0) {
-            android.util.Log.w("MainView", "Container size invalid: ${containerWidth}x${containerHeight}, waiting for layout...")
-            updateLayoutForOrientation()
-            return
-        }
-
-        if (bitmapWidth <= 0 || bitmapHeight <= 0) {
-            android.util.Log.w("MainView", "Bitmap size invalid: ${bitmapWidth}x${bitmapHeight}, reloading image...")
-            updateCoverImage()
-            return
-        }
-
-        // 5. 计算新的缩放比例（与 resetCoverPosition 相同逻辑）
-        val scaleX = containerWidth.toFloat() / bitmapWidth
-        val scaleY = containerHeight.toFloat() / bitmapHeight
-        val baseScale = maxOf(scaleX, scaleY)
-
-        var imageWidth = (bitmapWidth * baseScale).toInt()
-        var imageHeight = (bitmapHeight * baseScale).toInt()
-
-        var movableWidth = imageWidth - containerWidth
-        var movableHeight = imageHeight - containerHeight
-
-        val targetMovableWidth = (containerWidth * 0.15f).toInt()
-        val targetMovableHeight = (containerHeight * 0.15f).toInt()
-
-        if (movableWidth < targetMovableWidth && movableHeight < targetMovableHeight) {
-            if (containerWidth >= containerHeight) {
-                val targetWidth = containerWidth + targetMovableWidth
-                val additionalScale = targetWidth.toFloat() / imageWidth
-                imageWidth = targetWidth
-                imageHeight = (imageHeight * additionalScale).toInt()
-            } else {
-                val targetHeight = containerHeight + targetMovableHeight
-                val additionalScale = targetHeight.toFloat() / imageHeight
-                imageHeight = targetHeight
-                imageWidth = (imageWidth * additionalScale).toInt()
-            }
-        }
-
-        // 6. 保存新尺寸
-        savedImageWidth = imageWidth
-        savedImageHeight = imageHeight
-
-        // 7. 更新图片视图尺寸
-        coverImageView.layoutParams = FrameLayout.LayoutParams(savedImageWidth, savedImageHeight)
-
-        // 8. 重新计算可移动范围
-        movableWidth = savedImageWidth - containerWidth
-        movableHeight = savedImageHeight - containerHeight
-
-        android.util.Log.d("MainView", "updateCoverAnimationForOrientation() - image: ${savedImageWidth}x${savedImageHeight}, movable: ${movableWidth}x${movableHeight}")
-
-        // 9. 保存旧网格尺寸（用于调整坐标）
-        val oldGridCols = scanGridCols
-        val oldGridRows = scanGridRows
-
-        // 10. 根据新的可移动范围更新网格参数
-        isHorizontalScan = movableWidth >= movableHeight
-        scanGridCols = kotlin.math.max(3, kotlin.math.min(6, (movableWidth / 150).toInt() + 1))
-        scanGridRows = kotlin.math.max(3, kotlin.math.min(6, (movableHeight / 150).toInt() + 1))
-
-        if (movableWidth <= 0) scanGridCols = 1
-        if (movableHeight <= 0) scanGridRows = 1
-
-        // 11. 调整当前网格坐标以适应新网格尺寸
-        // 保持相对位置比例：如果旧网格是6x6，新网格是3x3，则坐标除以2
-        if (oldGridCols > 0 && oldGridRows > 0) {
-            currentGridX = (currentGridX * scanGridCols) / oldGridCols
-            currentGridY = (currentGridY * scanGridRows) / oldGridRows
-        }
-
-        // 确保坐标在新范围内
-        currentGridX = currentGridX.coerceIn(0, scanGridCols - 1)
-        currentGridY = currentGridY.coerceIn(0, scanGridRows - 1)
-
-        // 12. 清理已访问网格中超出新范围的记录
-        visitedGrids.removeIf { it.first >= scanGridCols || it.second >= scanGridRows }
-
-        android.util.Log.d("MainView", "Grid updated: ${oldGridCols}x${oldGridRows} -> ${scanGridCols}x${scanGridRows}, pos: ($currentGridX, $currentGridY), visited: ${visitedGrids.size}")
-
-        // 13. 基于当前网格坐标计算新的图片位置
-        val newPos = calculateGridPosition(currentGridX, currentGridY, movableWidth, movableHeight)
-        coverImageView.x = newPos.first
-        coverImageView.y = newPos.second
-
-        android.util.Log.d("MainView", "Position restored: (${coverImageView.x}, ${coverImageView.y})")
-
-        // 14. 重启动画
-        startCoverAnimation()
+    private fun startCoverDrift() {
+        if (!isShown || coverContainer.width <= 0 || coverContainer.height <= 0) return
+        isAnimating = true
+        animateToNextDriftPoint()
     }
 
-    /**
-     * 计算指定网格位置对应的图片坐标
-     */
-    private fun calculateGridPosition(gridX: Int, gridY: Int, movableWidth: Int, movableHeight: Int): Pair<Float, Float> {
-        // 使用统一的尺寸获取函数
-        val containerWidth = getActualContainerWidth()
-        val containerHeight = getActualContainerHeight()
-        // 使用保存的尺寸，避免在横竖屏切换时使用旧值或零值
-        val imageWidth = savedImageWidth
-        val imageHeight = savedImageHeight
+    private fun animateToNextDriftPoint() {
+        if (!isAnimating) return
 
-        // Debug: 验证尺寸来源
-        android.util.Log.d("MainView", "calculateGridPosition - saved: ${savedImageWidth}x${savedImageHeight}, actual: ${coverImageView.width}x${coverImageView.height}, container: ${containerWidth}x${containerHeight}")
+        val minX = (coverContainer.width - savedImageWidth).toFloat()
+        val minY = (coverContainer.height - savedImageHeight).toFloat()
+        if (minX >= 0f || minY >= 0f) return
 
-        // 计算实际可移动范围（确保图片不会露出黑色背景）
-        // 图片位置范围：x ∈ [containerWidth - imageWidth, 0], y ∈ [containerHeight - imageHeight, 0]
-        val actualMinX = if (imageWidth > containerWidth) (containerWidth - imageWidth).toFloat() else 0f
-        val actualMaxX = 0f
-        val actualMinY = if (imageHeight > containerHeight) (containerHeight - imageHeight).toFloat() else 0f
-        val actualMaxY = 0f
-        
-        // 计算网格步长
-        val actualMovableWidth = (actualMaxX - actualMinX).toInt()
-        val actualMovableHeight = (actualMaxY - actualMinY).toInt()
-        val stepX = if (scanGridCols > 1) actualMovableWidth.toFloat() / (scanGridCols - 1) else 0f
-        val stepY = if (scanGridRows > 1) actualMovableHeight.toFloat() / (scanGridRows - 1) else 0f
-        
-        // 计算基础位置
-        val baseX = actualMaxX - gridX * stepX
-        val baseY = actualMaxY - gridY * stepY
-        
-        // 添加随机扰动（±15%的步长，减小扰动避免越界）
-        val randomOffsetX = if (stepX > 0) (random.nextFloat() - 0.5f) * stepX * 0.3f else 0f
-        val randomOffsetY = if (stepY > 0) (random.nextFloat() - 0.5f) * stepY * 0.3f else 0f
-        
-        // 严格限制在边界内，确保不露出黑色背景
-        val finalX = kotlin.math.max(actualMinX, kotlin.math.min(actualMaxX, baseX + randomOffsetX))
-        val finalY = kotlin.math.max(actualMinY, kotlin.math.min(actualMaxY, baseY + randomOffsetY))
-        
-        return Pair(finalX, finalY)
+        val point = driftPath[nextDriftPoint]
+        nextDriftPoint = (nextDriftPoint + 1) % driftPath.size
+        val startX = coverImageView.translationX.coerceIn(minX, 0f)
+        val startY = coverImageView.translationY.coerceIn(minY, 0f)
+        val targetX = minX * point.first
+        val targetY = minY * point.second
+        val distance = hypot(targetX - startX, targetY - startY)
+
+        // Duration comes only from distance, so every segment has the same visual speed.
+        val pixelsPerSecond = 8f * resources.displayMetrics.density
+        val durationMs = (distance / pixelsPerSecond * 1000f).toLong().coerceAtLeast(1L)
+
+        coverAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = durationMs
+            interpolator = LinearInterpolator()
+            addUpdateListener { animator ->
+                val fraction = animator.animatedFraction
+                coverImageView.translationX = startX + (targetX - startX) * fraction
+                coverImageView.translationY = startY + (targetY - startY) * fraction
+            }
+            addListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator) {
+                    if (isAnimating && animation === coverAnimator) animateToNextDriftPoint()
+                }
+            })
+            start()
+        }
+    }
+
+    private fun stopCoverDrift() {
+        isAnimating = false
+        coverAnimator?.removeAllListeners()
+        coverAnimator?.cancel()
+        coverAnimator = null
     }
 
     private fun setRandomCover() {
@@ -1093,134 +853,6 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
         }
     }
 
-    private fun startCoverAnimation() {
-        if (isAnimating) return
-        isAnimating = true
-        animateToNextPosition()
-    }
-
-    private fun animateToNextPosition() {
-        // 使用统一的尺寸获取函数，确保与其他函数一致
-        val containerWidth = getActualContainerWidth()
-        val containerHeight = getActualContainerHeight()
-        val imageWidth = savedImageWidth
-        val imageHeight = savedImageHeight
-
-        if (containerWidth == 0 || containerHeight == 0 || imageWidth == 0 || imageHeight == 0) {
-            isAnimating = false
-            return
-        }
-
-        val movableWidth = imageWidth - containerWidth
-        val movableHeight = imageHeight - containerHeight
-
-        // 蛇形扫描算法：计算下一个网格点
-        val nextPos = calculateNextGridPosition(movableWidth, movableHeight)
-        val targetX = nextPos.first
-        val targetY = nextPos.second
-
-        // 计算动画持续时间（根据距离动态调整）
-        val currentX = coverImageView.x
-        val currentY = coverImageView.y
-        val distance = kotlin.math.sqrt((targetX - currentX) * (targetX - currentX) + (targetY - currentY) * (targetY - currentY))
-        val duration = kotlin.math.max(3000L, (distance * 6).toLong()) // 至少3秒，速度减半
-
-        // 创建X轴动画
-        xAnimator = ObjectAnimator.ofFloat(coverImageView, "x", currentX, targetX).apply {
-            this.duration = duration
-            interpolator = LinearInterpolator()
-            addListener(object : AnimatorListenerAdapter() {
-                override fun onAnimationEnd(animation: Animator) {
-                    if (isAnimating) {
-                        animateToNextPosition()
-                    }
-                }
-            })
-            start()
-        }
-
-        // 创建Y轴动画
-        yAnimator = ObjectAnimator.ofFloat(coverImageView, "y", currentY, targetY).apply {
-            this.duration = duration
-            interpolator = LinearInterpolator()
-            start()
-        }
-    }
-
-    private fun stopCoverAnimation() {
-        isAnimating = false
-        xAnimator?.cancel()
-        yAnimator?.cancel()
-        xAnimator?.removeAllListeners()  // 清除监听器，防止递归调用
-        yAnimator?.removeAllListeners()
-        xAnimator = null
-        yAnimator = null
-    }
-    
-    /**
-     * 蛇形扫描算法：计算下一个网格位置
-     * 采用S形扫描路径，确保覆盖图片的每个部分
-     */
-    private fun calculateNextGridPosition(movableWidth: Int, movableHeight: Int): Pair<Float, Float> {
-        // 记录当前网格为已访问
-        visitedGrids.add(Pair(currentGridX, currentGridY))
-        
-        // 计算下一个网格位置（蛇形扫描）
-        if (isHorizontalScan) {
-            // 横向为主扫描：每行从左到右或从右到左，然后换行
-            currentGridX += scanDirectionX
-            
-            // 检查是否需要换行
-            if (currentGridX >= scanGridCols || currentGridX < 0) {
-                scanDirectionX = -scanDirectionX // 反转X方向
-                currentGridX = kotlin.math.max(0, kotlin.math.min(scanGridCols - 1, currentGridX))
-                currentGridY += scanDirectionY // 移动到下一行
-                
-                // 检查是否需要反转Y方向（到达底部）
-                if (currentGridY >= scanGridRows || currentGridY < 0) {
-                    scanDirectionY = -scanDirectionY
-                    currentGridY = kotlin.math.max(0, kotlin.math.min(scanGridRows - 1, currentGridY))
-                    
-                    // 如果所有网格都已访问，随机选择一个未访问的网格或重新开始
-                    if (visitedGrids.size >= scanGridCols * scanGridRows) {
-                        visitedGrids.clear()
-                        // 随机选择新起点
-                        currentGridX = random.nextInt(scanGridCols)
-                        currentGridY = random.nextInt(scanGridRows)
-                    }
-                }
-            }
-        } else {
-            // 纵向为主扫描：每列从上到下或从下到上，然后换列
-            currentGridY += scanDirectionY
-            
-            // 检查是否需要换列
-            if (currentGridY >= scanGridRows || currentGridY < 0) {
-                scanDirectionY = -scanDirectionY // 反转Y方向
-                currentGridY = kotlin.math.max(0, kotlin.math.min(scanGridRows - 1, currentGridY))
-                currentGridX += scanDirectionX // 移动到下一列
-                
-                // 检查是否需要反转X方向（到达边缘）
-                if (currentGridX >= scanGridCols || currentGridX < 0) {
-                    scanDirectionX = -scanDirectionX
-                    currentGridX = kotlin.math.max(0, kotlin.math.min(scanGridCols - 1, currentGridX))
-                    
-                    // 如果所有网格都已访问，随机选择一个新起点
-                    if (visitedGrids.size >= scanGridCols * scanGridRows) {
-                        visitedGrids.clear()
-                        currentGridX = random.nextInt(scanGridCols)
-                        currentGridY = random.nextInt(scanGridRows)
-                    }
-                }
-            }
-        }
-        
-        // 计算目标位置
-        val pos = calculateGridPosition(currentGridX, currentGridY, movableWidth, movableHeight)
-        android.util.Log.d("MainView", "Next grid: ($currentGridX, $currentGridY), pos: (${pos.first}, ${pos.second}), visited: ${visitedGrids.size}/${scanGridCols * scanGridRows}")
-        
-        return pos
-    }
 
     private fun changeCoverImage() {
         // 检查是否正在播放音乐
@@ -1238,7 +870,7 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
 
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
-        stopCoverAnimation()
+        stopCoverDrift()
     }
 
     override fun onWindowVisibilityChanged(visibility: Int) {
@@ -1262,8 +894,6 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
             handler?.removeCallbacks(it)
             orientationChangeHandler = null
         }
-        isAnimating = false
-        xAnimator?.cancel()
-        yAnimator?.cancel()
+        stopCoverDrift()
     }
 }
