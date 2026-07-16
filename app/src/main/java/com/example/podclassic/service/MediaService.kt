@@ -36,6 +36,7 @@ import kotlin.system.exitProcess
 class MediaService : Service() {
     companion object {
         const val ACTION_SET_EQUALIZER = "action_set_equalizer"
+        const val ACTION_RELOAD_AUDIO_EFFECTS = "action_reload_audio_effects"
         const val ACTION_PLAY_PAUSE = "action_play_pause"
         const val ACTION_PLAY = "action_play"
         const val ACTION_PAUSE = "action_pause"
@@ -567,6 +568,7 @@ class MediaService : Service() {
         updateAudioFocus()
         updateTomSteadyEnabled()
         updateTubeAmpEnabled()
+        updateAudioEffects()
 
         android.util.Log.d("MediaService", "MediaPlayer initialized")
     }
@@ -716,6 +718,11 @@ class MediaService : Service() {
                 ACTION_SET_EQUALIZER -> {
                     mediaPlayer.equalizerId = arg1 as Int
                 }
+                ACTION_RELOAD_AUDIO_EFFECTS -> {
+                    updateTomSteadyEnabled()
+                    updateTubeAmpEnabled()
+                    updateAudioEffects()
+                }
                 ACTION_SEEK -> {
                     mediaPlayer.seekTo(arg1 as Int)
                 }
@@ -804,8 +811,8 @@ class MediaService : Service() {
     private fun updateTomSteadyEnabled() {
         val storedTarget = SPManager.getFloat(SPManager.SP_TOM_STEADY_TARGET_LEVEL, 0.16f)
         val storedMaxGain = SPManager.getFloat(SPManager.SP_TOM_STEADY_MAX_GAIN, 6f)
-        val target = if (storedTarget in 0.08f..0.25f) storedTarget else 0.16f
-        val maxGain = if (storedMaxGain in 0f..12f) storedMaxGain else 6f
+        val target = if (storedTarget in 0.08f..0.20f) storedTarget else 0.16f
+        val maxGain = if (storedMaxGain in 0f..9f) storedMaxGain else 6f
         SPManager.setFloat(SPManager.SP_TOM_STEADY_TARGET_LEVEL, target)
         SPManager.setFloat(SPManager.SP_TOM_STEADY_MAX_GAIN, maxGain)
         mediaPlayer.setTomSteadyParameters(
@@ -823,12 +830,16 @@ class MediaService : Service() {
         val warmth = SPManager.getFloat(SPManager.SP_TUBE_AMP_WARMTH, 0.5f)
         val saturation = SPManager.getFloat(SPManager.SP_TUBE_AMP_SATURATION, 0.4f)
         val harmonics = SPManager.getFloat(SPManager.SP_TUBE_AMP_HARMONICS, 0.2f)
-        val preset = com.example.podclassic.media.TubeAmpPreset.values()[
+        var preset = com.example.podclassic.media.TubeAmpPreset.values()[
             SPManager.getInt(SPManager.SP_TUBE_AMP_PRESET).coerceIn(
                 0,
                 com.example.podclassic.media.TubeAmpPreset.values().lastIndex
             )
         ]
+        if (wasEnabled && preset == com.example.podclassic.media.TubeAmpPreset.NONE) {
+            preset = com.example.podclassic.media.TubeAmpPreset.WARM
+            SPManager.setInt(SPManager.SP_TUBE_AMP_PRESET, preset.ordinal)
+        }
         mediaPlayer.applyTubeAmpPreset(preset)
         mediaPlayer.setTubeAmpParameters(
             warmth = warmth,
@@ -836,6 +847,29 @@ class MediaService : Service() {
             harmonics = harmonics
         )
         mediaPlayer.tubeAmpEnabled = wasEnabled
+    }
+
+    private fun updateAudioEffects() {
+        mediaPlayer.equalizerEnabled = SPManager.getBoolean(SPManager.SP_EQUALIZER_ENABLED)
+        mediaPlayer.equalizerId = SPManager.getInt(SPManager.SP_EQUALIZER)
+        mediaPlayer.setEqualizerStrength(
+            SPManager.getFloat(SPManager.SP_EQUALIZER_STRENGTH, 1f)
+        )
+        mediaPlayer.setVolumeNormalization(
+            enabled = SPManager.getBoolean(SPManager.SP_VOLUME_NORMALIZATION_ENABLED),
+            targetDb = SPManager.getFloat(SPManager.SP_VOLUME_NORMALIZATION_TARGET_DB, -16f),
+            maxBoostDb = SPManager.getFloat(SPManager.SP_VOLUME_NORMALIZATION_MAX_BOOST_DB, 6f)
+        )
+        mediaPlayer.setClearBass(
+            enabled = SPManager.getBoolean(SPManager.SP_CLEAR_BASS_ENABLED),
+            level = SPManager.getInt(SPManager.SP_CLEAR_BASS_LEVEL).let { if (it in 1..5) it else 2 }
+        )
+        val crossfeedIndex = SPManager.getInt(SPManager.SP_CROSSFEED_LEVEL)
+            .coerceIn(0, com.example.podclassic.media.CrossfeedLevel.values().lastIndex)
+        mediaPlayer.setCrossfeed(
+            enabled = SPManager.getBoolean(SPManager.SP_CROSSFEED_ENABLED),
+            level = com.example.podclassic.media.CrossfeedLevel.values()[crossfeedIndex]
+        )
     }
 
     data class Action(val action: String, val arg1: Any?, val arg2: Any?)

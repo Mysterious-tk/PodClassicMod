@@ -5,7 +5,6 @@
 package com.example.podclassic.media
 
 import android.content.Context
-import android.media.audiofx.Equalizer
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
@@ -48,7 +47,7 @@ class MediaPlayer<E>(context: Context, private val mediaAdapter: MediaAdapter<E>
             enableAudioOutputPlaybackParameters: Boolean
         ): AudioSink = DefaultAudioSink.Builder(context)
             .setAudioProcessors(arrayOf(dsp))
-            .setEnableFloatOutput(false)
+            .setEnableFloatOutput(true)
             .build()
     }
 
@@ -58,8 +57,6 @@ class MediaPlayer<E>(context: Context, private val mediaAdapter: MediaAdapter<E>
         .build()
 
     private var playState = PlayState.STATE_STOP
-    private var equalizer: Equalizer? = null
-    private var presetList: Array<String?> = emptyArray()
     private var released = false
 
     val isPlaying: Boolean get() = onPlayerThread { player.isPlaying }
@@ -76,15 +73,25 @@ class MediaPlayer<E>(context: Context, private val mediaAdapter: MediaAdapter<E>
 
     var equalizerId: Int = 0
         set(value) {
-            field = value
-            onPlayerThread { applyEqualizerPreset() }
+            field = value.coerceIn(0, EqualizerPreset.values().lastIndex)
+            dsp.equalizer.parameters = dsp.equalizer.parameters.copy(
+                preset = EqualizerPreset.values()[field]
+            )
             onDataChangeListener?.onEqualizerChange()
         }
 
+    var equalizerEnabled: Boolean
+        get() = dsp.equalizer.parameters.enabled
+        set(value) { dsp.equalizer.parameters = dsp.equalizer.parameters.copy(enabled = value) }
+
+    fun setEqualizerStrength(strength: Float) {
+        dsp.equalizer.parameters = dsp.equalizer.parameters.copy(strength = strength.coerceIn(0.25f, 1f))
+    }
+
     var tomSteadyEnabled: Boolean
-        get() = dsp.loudnessEnabled
+        get() = dsp.nightVolume.parameters.enabled
         set(value) {
-            dsp.loudnessEnabled = value
+            dsp.nightVolume.parameters = dsp.nightVolume.parameters.copy(enabled = value)
             onDataChangeListener?.onTomSteadyChange()
         }
 
@@ -95,12 +102,30 @@ class MediaPlayer<E>(context: Context, private val mediaAdapter: MediaAdapter<E>
         attackTime: Float? = null,
         releaseTime: Float? = null
     ) {
-        targetLevel?.let { dsp.targetLevel = it.coerceIn(0.08f, 0.25f) }
-        maxGain?.let { dsp.maxGainDb = it.coerceIn(0f, 12f) }
-        minGain?.let { dsp.minGainDb = it.coerceIn(-12f, 0f) }
-        attackTime?.let { dsp.attackMs = it.coerceIn(10f, 500f) }
-        releaseTime?.let { dsp.releaseMs = it.coerceIn(100f, 3_000f) }
+        val current = dsp.nightVolume.parameters
+        dsp.nightVolume.parameters = current.copy(
+            targetLevel = targetLevel?.coerceIn(0.08f, 0.20f) ?: current.targetLevel,
+            maxGainDb = maxGain?.coerceIn(0f, 9f) ?: current.maxGainDb,
+            attackMs = attackTime?.coerceIn(10f, 500f) ?: current.attackMs,
+            releaseMs = releaseTime?.coerceIn(100f, 3_000f) ?: current.releaseMs
+        )
         onDataChangeListener?.onTomSteadyChange()
+    }
+
+    fun setVolumeNormalization(enabled: Boolean, targetDb: Float, maxBoostDb: Float) {
+        dsp.normalizer.parameters = VolumeNormalizerDsp.Parameters(
+            enabled = enabled,
+            targetDb = targetDb.coerceIn(-20f, -12f),
+            maxBoostDb = maxBoostDb.coerceIn(0f, 9f)
+        )
+    }
+
+    fun setClearBass(enabled: Boolean, level: Int) {
+        dsp.clearBass.parameters = ClearBassDsp.Parameters(enabled, level.coerceIn(1, 5))
+    }
+
+    fun setCrossfeed(enabled: Boolean, level: CrossfeedLevel) {
+        dsp.crossfeed.parameters = CrossfeedDsp.Parameters(enabled, level)
     }
 
     var tubeAmpEnabled: Boolean
@@ -164,7 +189,7 @@ class MediaPlayer<E>(context: Context, private val mediaAdapter: MediaAdapter<E>
         onDataChangeListener?.onTubeAmpChange()
     }
 
-    fun getPresetList(): Array<String?> = presetList.copyOf()
+    fun getPresetList(): Array<String?> = EqualizerPreset.values().map { it.title }.toTypedArray()
 
     interface OnDataChangeListener {
         fun onPlaylistChange() {}
@@ -260,17 +285,12 @@ class MediaPlayer<E>(context: Context, private val mediaAdapter: MediaAdapter<E>
                 if (playlist.next() != null) startMediaPlayer() else stop()
             }
 
-            override fun onAudioSessionIdChanged(audioSessionId: Int) {
-                createEqualizer(audioSessionId)
-            }
         })
     }
 
     fun release() = onPlayerThread {
         if (released) return@onPlayerThread
         stopTimer?.cancel()
-        equalizer?.release()
-        equalizer = null
         player.release()
         onMediaChangeListeners.clear()
         released = true
@@ -433,25 +453,6 @@ class MediaPlayer<E>(context: Context, private val mediaAdapter: MediaAdapter<E>
         playlist.shufflePlay(list, index)
         startMediaPlayer()
         onDataChangeListener?.onPlaylistChange()
-    }
-
-    private fun createEqualizer(audioSessionId: Int) {
-        equalizer?.release()
-        equalizer = try {
-            Equalizer(1_000, audioSessionId).apply { enabled = hasControl() }
-        } catch (_: Exception) {
-            null
-        }
-        presetList = equalizer?.let { effect ->
-            Array(effect.numberOfPresets.toInt()) { effect.getPresetName(it.toShort()) }
-        } ?: emptyArray()
-        applyEqualizerPreset()
-    }
-
-    private fun applyEqualizerPreset() {
-        equalizer?.let { effect ->
-            if (equalizerId in 0 until effect.numberOfPresets) effect.usePreset(equalizerId.toShort())
-        }
     }
 
     private fun <T> onPlayerThread(block: () -> T): T {

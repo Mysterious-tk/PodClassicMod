@@ -146,6 +146,10 @@ object MediaPresenter {
         sendMessage(MediaService.ACTION_SET_EQUALIZER, index)
     }
 
+    fun reloadAudioEffects() {
+        sendMessage(MediaService.ACTION_RELOAD_AUDIO_EFFECTS)
+    }
+
     fun stop() {
         sendMessage(MediaService.ACTION_STOP)
     }

@@ -17,6 +17,15 @@ object SPManager {
     const val SP_SHOW_LYRIC = "show_lyric"
     const val SP_SHOW_INFO = "show_info"
     const val SP_EQUALIZER = "equalizer"
+    const val SP_EQUALIZER_ENABLED = "equalizer_enabled"
+    const val SP_EQUALIZER_STRENGTH = "equalizer_strength"
+    const val SP_VOLUME_NORMALIZATION_ENABLED = "volume_normalization_enabled"
+    const val SP_VOLUME_NORMALIZATION_TARGET_DB = "volume_normalization_target_db"
+    const val SP_VOLUME_NORMALIZATION_MAX_BOOST_DB = "volume_normalization_max_boost_db"
+    const val SP_CLEAR_BASS_ENABLED = "clear_bass_enabled"
+    const val SP_CLEAR_BASS_LEVEL = "clear_bass_level"
+    const val SP_CROSSFEED_ENABLED = "crossfeed_enabled"
+    const val SP_CROSSFEED_LEVEL = "crossfeed_level"
     const val SP_PLAY_MODE = "play_mode"
     const val SP_PLAY_ALL = "play_all"
     const val SP_COVER_FLOW = "cover_flow"
@@ -88,6 +97,15 @@ object SPManager {
         setInt(SP_REPEAT_MODE, 1)
         setInt(Language.SP_NAME, 0)
         setInt(SP_EQUALIZER, 0)
+        setBoolean(SP_EQUALIZER_ENABLED, false)
+        setString(SP_EQUALIZER_STRENGTH, "1.0")
+        setBoolean(SP_VOLUME_NORMALIZATION_ENABLED, false)
+        setString(SP_VOLUME_NORMALIZATION_TARGET_DB, "-16.0")
+        setString(SP_VOLUME_NORMALIZATION_MAX_BOOST_DB, "6.0")
+        setBoolean(SP_CLEAR_BASS_ENABLED, false)
+        setInt(SP_CLEAR_BASS_LEVEL, 2)
+        setBoolean(SP_CROSSFEED_ENABLED, false)
+        setInt(SP_CROSSFEED_LEVEL, 1)
         setBoolean(SP_TOM_STEADY_ENABLED, false)
         setString(SP_TOM_STEADY_TARGET_LEVEL, "0.16")
         setString(SP_TOM_STEADY_MAX_GAIN, "6.0")
@@ -96,8 +114,8 @@ object SPManager {
         setBoolean(SP_TUBE_AMP_ENABLED, false)
         setInt(SP_TUBE_AMP_PRESET, 0)
         setString(SP_TUBE_AMP_WARMTH, "0.5")
-        setString(SP_TUBE_AMP_SATURATION, "0.6")
-        setString(SP_TUBE_AMP_HARMONICS, "0.3")
+        setString(SP_TUBE_AMP_SATURATION, "0.4")
+        setString(SP_TUBE_AMP_HARMONICS, "0.2")
         var resetCount = getInt(SP_RESET_COUNT)
         resetCount++
         setInt(SP_RESET_COUNT, resetCount)
