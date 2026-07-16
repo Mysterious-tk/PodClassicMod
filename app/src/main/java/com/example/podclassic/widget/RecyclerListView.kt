@@ -940,15 +940,18 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
             glossRect.set(rect.left, rect.top, rect.right, rect.top + rect.height() * 0.58f)
             val centerX = rect.left + rect.width() * 0.56f
 
+            // Keep the tint light enough for the artwork to be visibly refracted
+            // through the selected row. Depth comes from the rim and gloss rather
+            // than an almost-opaque blue fill.
             fillPaint.shader = LinearGradient(
                 rect.left,
                 rect.top,
                 rect.right,
                 rect.bottom,
                 intArrayOf(
-                    Color.argb(182, 24, 132, 238),
-                    Color.argb(148, 34, 164, 246),
-                    Color.argb(176, 0, 93, 205)
+                    Color.argb(92, 22, 118, 224),
+                    Color.argb(64, 56, 181, 246),
+                    Color.argb(104, 0, 76, 184)
                 ),
                 floatArrayOf(0f, 0.52f, 1f),
                 Shader.TileMode.CLAMP
@@ -958,7 +961,7 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
                 rect.top,
                 centerX,
                 glossRect.bottom,
-                Color.argb(108, 255, 255, 255),
+                Color.argb(82, 255, 255, 255),
                 Color.TRANSPARENT,
                 Shader.TileMode.CLAMP
             )
@@ -968,7 +971,7 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
                 0f,
                 rect.bottom,
                 Color.TRANSPARENT,
-                Color.argb(90, 0, 39, 96),
+                Color.argb(58, 0, 28, 76),
                 Shader.TileMode.CLAMP
             )
         }
@@ -982,7 +985,7 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
 
             canvas.drawRoundRect(glossRect, radius, radius, glossPaint)
 
-            edgePaint.color = Color.argb(150, 225, 248, 255)
+            edgePaint.color = Color.argb(132, 225, 248, 255)
             rect.inset(density * 0.5f, density * 0.5f)
             canvas.drawRoundRect(rect, radius, radius, edgePaint)
 

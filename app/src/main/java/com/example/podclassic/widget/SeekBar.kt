@@ -6,7 +6,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.LinearGradient
 import android.graphics.Paint
-import android.graphics.Path
+import android.graphics.RadialGradient
 import android.graphics.RectF
 import android.graphics.Shader
 import android.graphics.drawable.Drawable
@@ -18,7 +18,6 @@ import android.widget.LinearLayout
 import androidx.appcompat.widget.AppCompatTextView
 import com.example.podclassic.values.Colors
 import com.example.podclassic.values.Values
-import kotlin.math.sqrt
 
 
 class SeekBar(context: Context) : LinearLayout(context) {
@@ -38,104 +37,172 @@ class SeekBar(context: Context) : LinearLayout(context) {
 
     // Custom ProgressView class to access seekMode property
     private inner class ProgressView(context: Context) : View(context) {
-        val paint = Paint().apply { shader = null }
-        val backPaint = Paint().apply { shader = null }
-        val rect = RectF()
+        private val density = resources.displayMetrics.density
+        private val trackRect = RectF()
+        private val progressRect = RectF()
+        private val highlightRect = RectF()
         var seekMode = false
 
-        // Pre-allocated Paint objects to avoid allocation in onDraw
-        private val borderPaint = Paint().apply {
+        private val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+        private val trackGlossPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+        private val trackEdgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
-            strokeWidth = 1f
+            strokeWidth = density
         }
-        private val glassPaint = Paint()
-        private val progressBorderPaint = Paint().apply {
+        private val progressPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+        private val progressGlossPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+        private val progressEdgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
-            strokeWidth = 1f
+            strokeWidth = density
         }
-        private val highlightPaint = Paint()
-        private val gradientPaint = Paint()
-        private val markerPaint = Paint()
-        private val markerBorderPaint = Paint().apply {
+        private val markerShadowPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+        private val markerPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+        private val markerGlossPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+        private val markerBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
-            strokeWidth = 2f
+            strokeWidth = density
         }
-        private val markerHighlightPaint = Paint()
-        private val highlightRect = RectF()
 
         override fun onDraw(canvas: Canvas) {
-            // Draw background with glassmorphism effect
-            val backgroundColor = Color.parseColor("#202020")
-            backPaint.color = backgroundColor
-            backPaint.alpha = 150 // Reduced opacity for more transparency
-            canvas.drawRoundRect(0f, 0f, width.toFloat(), height.toFloat(), height.toFloat() / 2, height.toFloat() / 2, backPaint)
-            
-            // Add subtle border to background
-            borderPaint.color = Color.WHITE
-            borderPaint.alpha = 20 // Reduced opacity for more transparency
-            canvas.drawRoundRect(0f, 0f, width.toFloat(), height.toFloat(), height.toFloat() / 2, height.toFloat() / 2, borderPaint)
-            
-            // Draw progress bar with glassmorphism effect
-            val progressWidth = width * current / max.toFloat()
-            
-            if (progressWidth > 0) {
-                // Create blue glassmorphism effect for progress
-                val blueColor = Color.parseColor("#4A90D9")
-                glassPaint.color = blueColor
-                glassPaint.alpha = 140 // Reduced opacity for more transparency
-                
-                // Draw main progress bar
-                rect.set(0f, 0f, progressWidth, height.toFloat())
-                canvas.drawRoundRect(rect, height.toFloat() / 2, height.toFloat() / 2, glassPaint)
-                
-                // Add inner border to progress bar
-                progressBorderPaint.color = Color.WHITE
-                progressBorderPaint.alpha = 40 // Reduced opacity for more transparency
-                canvas.drawRoundRect(rect, height.toFloat() / 2, height.toFloat() / 2, progressBorderPaint)
-                
-                // Add glass highlight effect
-                highlightPaint.color = Color.WHITE
-                highlightPaint.alpha = 60 // Reduced opacity for more transparency
-                
-                // Draw top highlight
-                highlightRect.set(0f, 0f, progressWidth, height.toFloat() / 2)
-                canvas.drawRoundRect(highlightRect, height.toFloat() / 2, height.toFloat() / 2, highlightPaint)
-                
-                // Draw subtle gradient overlay for depth
-                gradientPaint.shader = LinearGradient(
-                    0f,
-                    0f,
-                    0f,
-                    height.toFloat(),
-                    Color.parseColor("#30FFFFFF"), // Reduced opacity for more transparency
-                    Color.parseColor("#00FFFFFF"),
+            if (width <= 0 || height <= 0) return
+
+            val viewHeight = height.toFloat()
+            val trackInset = density.coerceAtMost(viewHeight * 0.08f)
+            trackRect.set(trackInset, trackInset, width - trackInset, viewHeight - trackInset)
+            val trackRadius = trackRect.height() / 2f
+            val progressFraction = (current / max.toFloat()).coerceIn(0f, 1f)
+            val progressX = trackRect.left + trackRect.width() * progressFraction
+
+            // A transparent smoked-glass channel. Its bright upper rim and darker
+            // lower edge create thickness without hiding the surface underneath.
+            trackPaint.shader = LinearGradient(
+                0f,
+                trackRect.top,
+                0f,
+                trackRect.bottom,
+                intArrayOf(
+                    Color.argb(54, 244, 252, 255),
+                    Color.argb(66, 44, 66, 88),
+                    Color.argb(92, 8, 20, 38)
+                ),
+                floatArrayOf(0f, 0.42f, 1f),
+                Shader.TileMode.CLAMP
+            )
+            canvas.drawRoundRect(trackRect, trackRadius, trackRadius, trackPaint)
+
+            highlightRect.set(
+                trackRect.left + density,
+                trackRect.top + density * 0.55f,
+                trackRect.right - density,
+                trackRect.top + trackRect.height() * 0.43f
+            )
+            trackGlossPaint.shader = LinearGradient(
+                0f,
+                highlightRect.top,
+                0f,
+                highlightRect.bottom,
+                Color.argb(72, 255, 255, 255),
+                Color.TRANSPARENT,
+                Shader.TileMode.CLAMP
+            )
+            canvas.drawRoundRect(highlightRect, trackRadius, trackRadius, trackGlossPaint)
+
+            trackEdgePaint.color = Color.argb(92, 221, 245, 255)
+            canvas.drawRoundRect(trackRect, trackRadius, trackRadius, trackEdgePaint)
+
+            if (progressX > trackRect.left) {
+                progressRect.set(trackRect.left, trackRect.top, progressX, trackRect.bottom)
+                progressPaint.shader = LinearGradient(
+                    progressRect.left,
+                    progressRect.top,
+                    progressRect.right,
+                    progressRect.bottom,
+                    intArrayOf(
+                        Color.argb(116, 57, 182, 255),
+                        Color.argb(92, 20, 133, 238),
+                        Color.argb(126, 0, 75, 183)
+                    ),
+                    floatArrayOf(0f, 0.58f, 1f),
                     Shader.TileMode.CLAMP
                 )
-                canvas.drawRoundRect(rect, height.toFloat() / 2, height.toFloat() / 2, gradientPaint)
+                canvas.drawRoundRect(progressRect, trackRadius, trackRadius, progressPaint)
+
+                if (progressRect.width() > density * 2f) {
+                    highlightRect.set(
+                        progressRect.left + density,
+                        progressRect.top + density * 0.55f,
+                        progressRect.right - density,
+                        progressRect.top + progressRect.height() * 0.48f
+                    )
+                    progressGlossPaint.shader = LinearGradient(
+                        0f,
+                        highlightRect.top,
+                        0f,
+                        highlightRect.bottom,
+                        Color.argb(110, 255, 255, 255),
+                        Color.TRANSPARENT,
+                        Shader.TileMode.CLAMP
+                    )
+                    canvas.drawRoundRect(highlightRect, trackRadius, trackRadius, progressGlossPaint)
+                }
+
+                progressEdgePaint.color = Color.argb(126, 210, 246, 255)
+                canvas.drawRoundRect(progressRect, trackRadius, trackRadius, progressEdgePaint)
             }
-            
+
             if (seekMode) {
-                // Calculate marker position based on current progress
-                val markerPosition = width * current / max.toFloat()
-                
-                // Draw a circular marker at the current progress position
-                val markerSize = height * 1.5f
-                val halfMarkerSize = markerSize / 2
-                
-                // Draw marker background
-                markerPaint.color = Color.parseColor("#4A90D9")
-                markerPaint.alpha = 160 // Reduced opacity for more transparency
-                canvas.drawCircle(markerPosition, height / 2f, halfMarkerSize, markerPaint)
-                
-                // Draw marker border
-                markerBorderPaint.color = Color.WHITE
-                markerBorderPaint.alpha = 120 // Reduced opacity for more transparency
-                canvas.drawCircle(markerPosition, height / 2f, halfMarkerSize - 1, markerBorderPaint)
-                
-                // Draw marker highlight
-                markerHighlightPaint.color = Color.WHITE
-                markerHighlightPaint.alpha = 80 // Reduced opacity for more transparency
-                canvas.drawCircle(markerPosition - halfMarkerSize / 3, height / 2f - halfMarkerSize / 3, halfMarkerSize / 4, markerHighlightPaint)
+                // Keep the scrubber entirely inside its canvas at both endpoints.
+                // The old 1.5x-height circle was clipped into a flat-looking disc.
+                val markerRadius = viewHeight * 0.44f
+                val markerX = if (width >= markerRadius * 2f) {
+                    progressX.coerceIn(markerRadius, width - markerRadius)
+                } else {
+                    width / 2f
+                }
+                val markerY = viewHeight / 2f
+
+                markerShadowPaint.color = Color.argb(70, 0, 28, 72)
+                canvas.drawCircle(markerX, markerY + density, markerRadius, markerShadowPaint)
+
+                markerPaint.shader = RadialGradient(
+                    markerX - markerRadius * 0.28f,
+                    markerY - markerRadius * 0.32f,
+                    markerRadius * 1.35f,
+                    intArrayOf(
+                        Color.argb(178, 146, 231, 255),
+                        Color.argb(138, 30, 148, 240),
+                        Color.argb(172, 0, 67, 168)
+                    ),
+                    floatArrayOf(0f, 0.5f, 1f),
+                    Shader.TileMode.CLAMP
+                )
+                canvas.drawCircle(markerX, markerY, markerRadius, markerPaint)
+
+                markerGlossPaint.shader = LinearGradient(
+                    0f,
+                    markerY - markerRadius,
+                    0f,
+                    markerY + markerRadius * 0.25f,
+                    Color.argb(150, 255, 255, 255),
+                    Color.TRANSPARENT,
+                    Shader.TileMode.CLAMP
+                )
+                canvas.drawOval(
+                    markerX - markerRadius * 0.64f,
+                    markerY - markerRadius * 0.72f,
+                    markerX + markerRadius * 0.64f,
+                    markerY + markerRadius * 0.1f,
+                    markerGlossPaint
+                )
+
+                markerBorderPaint.color = Color.argb(210, 226, 250, 255)
+                val outerRimRadius = (markerRadius - density * 0.5f)
+                    .coerceAtLeast(markerRadius * 0.78f)
+                canvas.drawCircle(markerX, markerY, outerRimRadius, markerBorderPaint)
+                markerBorderPaint.color = Color.argb(86, 0, 48, 124)
+                val innerRimRadius = (markerRadius - density * 1.5f)
+                    .coerceAtLeast(markerRadius * 0.56f)
+                canvas.drawCircle(markerX, markerY, innerRimRadius, markerBorderPaint)
             }
         }
     }

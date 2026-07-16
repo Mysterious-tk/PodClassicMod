@@ -66,9 +66,10 @@ class MusicListView : FrameLayout, ScreenView {
         val layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
         imageView.layoutParams = layoutParams
         imageView.scaleType = ImageView.ScaleType.CENTER_CROP
-        // API 31+ 使用 RenderEffect 实现玻璃效果，不需要设置低透明度
-        // 低版本保持原来的透明度
-        imageView.alpha = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) 0.6f else 0.15f
+        // The artwork is the backdrop of the glass, so it must remain visible.
+        // RenderEffect already softens it on API 31+; lowering the view alpha here
+        // made translucent rows look as though they were sitting on a solid color.
+        imageView.alpha = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) 0.88f else 0.68f
         // 禁用背景ImageView的触摸事件，确保事件传递给上层的RecyclerListView
         imageView.isClickable = false
         imageView.isFocusable = false
