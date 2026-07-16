@@ -4,6 +4,6 @@
     <dimen name="layout_rectangle_height_ipod_3rd">370dp</dimen>
     <!-- Combined with the parent 6dp inset, this gives every player card an 8dp edge. -->
     <dimen name="player_card_horizontal_margin">2dp</dimen>
-    <dimen name="title_bar_height">40dp</dimen>
-    <dimen name="title_bar_height_ipod_3rd">30dp</dimen>
+    <dimen name="title_bar_height">27dp</dimen>
+    <dimen name="title_bar_height_ipod_3rd">20dp</dimen>
 </resources>

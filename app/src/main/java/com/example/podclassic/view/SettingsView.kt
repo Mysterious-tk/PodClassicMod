@@ -7,12 +7,17 @@ import android.os.StatFs
 import android.util.Base64
 import com.example.podclassic.activity.MainActivity
 import com.example.podclassic.base.Core
+import com.example.podclassic.base.Observer
 import com.example.podclassic.base.ScreenView
 import com.example.podclassic.media.PlayMode
 import com.example.podclassic.media.RepeatMode
 import com.example.podclassic.service.MediaPresenter
 import com.example.podclassic.storage.SPManager
 import com.example.podclassic.util.MediaStoreUtil
+import com.example.podclassic.util.ArtworkBackgroundController
+import com.example.podclassic.util.LiveData
+import com.example.podclassic.util.ThreadUtil
+import com.example.podclassic.values.Colors
 import com.example.podclassic.values.Strings
 import com.example.podclassic.values.Values
 import com.example.podclassic.widget.RecyclerListView
@@ -23,6 +28,21 @@ import java.util.*
 class SettingsView(context: Context) : RecyclerListView(context), ScreenView {
     companion object {
         const val about = "感谢您的使用!\n这里本应有个彩蛋, 但是没啥想法, 就这样吧.\n"
+    }
+
+    private val observer = Observer()
+    private val backgroundController = ArtworkBackgroundController(
+        this,
+        Colors.background,
+        artworkStrength = 0.25f
+    )
+    private var backgroundLoadGeneration = 0
+
+    override fun getObserver(): Observer = observer
+
+    override fun onViewRemove() {
+        backgroundLoadGeneration++
+        backgroundController.cancel()
     }
 
     override fun enter(): Boolean {
@@ -42,6 +62,11 @@ class SettingsView(context: Context) : RecyclerListView(context), ScreenView {
     }
 
     init {
+        observer.addLiveData(MediaPresenter.music, object : LiveData.OnDataChangeListener {
+            override fun onStart() = updateArtworkBackground()
+            override fun onDataChange() = updateArtworkBackground()
+        })
+
         itemList = arrayListOf(
             Item(Strings.ABOUT, object : OnItemClickListener {
                 override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
@@ -640,5 +665,17 @@ class SettingsView(context: Context) : RecyclerListView(context), ScreenView {
                 }
             }, true)
         )
+    }
+
+    private fun updateArtworkBackground() {
+        val generation = ++backgroundLoadGeneration
+        val music = MediaPresenter.getCurrent()
+        var scheme: ArtworkBackgroundController.Scheme? = null
+        ThreadUtil.asyncTask({
+            scheme = music?.image?.let(backgroundController::extract)
+        }, {
+            if (generation != backgroundLoadGeneration) return@asyncTask
+            backgroundController.apply(scheme)
+        })
     }
 }

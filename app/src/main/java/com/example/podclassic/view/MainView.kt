@@ -28,6 +28,7 @@ import com.example.podclassic.bean.Music
 import com.example.podclassic.service.MediaPresenter
 import com.example.podclassic.storage.SPManager
 import com.example.podclassic.util.LiveData
+import com.example.podclassic.util.ArtworkBackgroundController
 import com.example.podclassic.util.ThreadUtil
 import com.example.podclassic.util.FileUtil
 import com.example.podclassic.util.MediaStoreUtil
@@ -50,6 +51,7 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
     private val coverImageView = ImageView(context).apply {
         contentDescription = "Animated Album Cover"
     }
+    private val glassOverlayView = MainArtworkGlassView(context)
     // 分割线视图
     private lateinit var dividerView: View
 
@@ -66,6 +68,12 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
     private var coverAnimator: ValueAnimator? = null
     private var isAnimating = false
     private var nextDriftPoint = 0
+    private val menuBackgroundController = ArtworkBackgroundController(
+        listView,
+        Colors.background,
+        artworkStrength = 0.28f
+    )
+    private var artworkLoadGeneration = 0
 
     // iPod photo-style path. Every leg changes both axes, avoiding a horizontal-only pan.
     private val driftPath = arrayOf(
@@ -227,6 +235,13 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
         // stretched, even if a layout update and an image update land in the same frame.
         coverImageView.scaleType = ImageView.ScaleType.CENTER_CROP
         coverContainer.addView(coverImageView)
+        coverContainer.addView(
+            glassOverlayView,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+        )
         android.util.Log.d("MainView", "CoverImageView added to container, width: $savedContainerWidth")
 
         // 设置ListView
@@ -253,21 +268,25 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
                 val width = width.toFloat()
                 val height = height.toFloat()
 
-                // 绘制右侧内阴影（从中间到右边缘，由黑到透明）
+                // A shallow refractive seam separates the menu glass from the artwork.
                 val rightShadow = LinearGradient(
-                    width * 0.1f, 0f,
+                    0f, 0f,
                     width, 0f,
                     intArrayOf(
-                        Color.argb(240, 0, 0, 0),    // 左侧很黑的阴影
-                        Color.argb(120, 0, 0, 0),    // 过渡
-                        Color.argb(40, 0, 0, 0),     // 中间
-                        Color.argb(0, 0, 0, 0)       // 右边缘透明
+                        Color.argb(118, 0, 0, 0),
+                        Color.argb(54, 0, 0, 0),
+                        Color.argb(12, 0, 0, 0),
+                        Color.TRANSPARENT
                     ),
-                    floatArrayOf(0f, 0.3f, 0.6f, 1f),
+                    floatArrayOf(0f, 0.24f, 0.62f, 1f),
                     Shader.TileMode.CLAMP
                 )
                 shadowPaint.shader = rightShadow
-                canvas.drawRect(width * 0.1f, 0f, width, height, shadowPaint)
+                canvas.drawRect(0f, 0f, width, height, shadowPaint)
+
+                linePaint.color = Color.argb(138, 255, 255, 255)
+                linePaint.strokeWidth = resources.displayMetrics.density
+                canvas.drawLine(1f, 0f, 1f, height, linePaint)
             }
         }
         val dividerParams = LayoutParams(48, LayoutParams.MATCH_PARENT)
@@ -703,27 +722,29 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
 
     private fun updateCoverImage() {
         android.util.Log.d("MainView", "updateCoverImage() called")
+        val generation = ++artworkLoadGeneration
         val currentMusic = MediaPresenter.getCurrent()
         android.util.Log.d("MainView", "currentMusic: ${currentMusic?.title}")
         if (currentMusic != null) {
-            // 使用 MediaUtil.getMusicImage 获取不带倒影的原图
-            val coverBitmap = com.example.podclassic.util.MediaUtil.getMusicImage(currentMusic)
-            android.util.Log.d("MainView", "coverBitmap: ${coverBitmap != null}, size: ${coverBitmap?.width}x${coverBitmap?.height}")
-            if (coverBitmap != null) {
-                coverImageView.setImageBitmap(coverBitmap)
-                android.util.Log.d("MainView", "Bitmap set to coverImageView, scheduling resetCoverPosition after layout")
-                // 使用 waitForLayout 替代 postDelayed，确保布局完成后再重置位置
-                waitForLayout {
-                    android.util.Log.d("MainView", "Layout completed, executing resetCoverPosition()...")
-                    resetCoverPosition()
+            var coverBitmap: Bitmap? = null
+            var backgroundScheme: ArtworkBackgroundController.Scheme? = null
+            ThreadUtil.asyncTask({
+                // Use the square source image: it is ideal for both display and palette sampling.
+                coverBitmap = com.example.podclassic.util.MediaUtil.getMusicImage(currentMusic)
+                backgroundScheme = coverBitmap?.let(menuBackgroundController::extract)
+            }, {
+                if (generation != artworkLoadGeneration) return@asyncTask
+                menuBackgroundController.apply(backgroundScheme)
+                android.util.Log.d("MainView", "coverBitmap: ${coverBitmap != null}, size: ${coverBitmap?.width}x${coverBitmap?.height}")
+                if (coverBitmap != null) {
+                    coverImageView.setImageBitmap(coverBitmap)
+                    waitForLayout { resetCoverPosition() }
+                } else {
+                    setRandomCover()
                 }
-            } else {
-                // 随机选一个图片当封面
-                android.util.Log.d("MainView", "No cover bitmap, using random cover")
-                setRandomCover()
-            }
+            })
         } else {
-            // 随机选一个图片当封面
+            menuBackgroundController.apply(null)
             android.util.Log.d("MainView", "No current music, using random cover")
             setRandomCover()
         }
@@ -870,6 +891,8 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
 
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
+        artworkLoadGeneration++
+        menuBackgroundController.cancel()
         stopCoverDrift()
     }
 
@@ -889,11 +912,59 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
     }
 
     override fun onViewRemove() {
+        artworkLoadGeneration++
+        menuBackgroundController.cancel()
         // 清理方向变化处理器
         orientationChangeHandler?.let {
             handler?.removeCallbacks(it)
             orientationChangeHandler = null
         }
         stopCoverDrift()
+    }
+}
+
+/** Static optical layers over the moving artwork; no per-frame bitmap blur is required. */
+private class MainArtworkGlassView(context: Context) : View(context) {
+    private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { isDither = true }
+    private val edgePaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private var sideShade: Shader? = null
+    private var bottomShade: Shader? = null
+    private var diagonalSheen: Shader? = null
+
+    init {
+        isClickable = false
+        importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
+    }
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        if (w <= 0 || h <= 0) return
+        sideShade = LinearGradient(
+            0f, 0f, w * 0.34f, 0f,
+            intArrayOf(Color.argb(72, 4, 8, 16), Color.argb(18, 4, 8, 16), Color.TRANSPARENT),
+            floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP
+        )
+        bottomShade = LinearGradient(
+            0f, h * 0.58f, 0f, h.toFloat(),
+            intArrayOf(Color.TRANSPARENT, Color.argb(18, 0, 0, 0), Color.argb(72, 0, 0, 0)),
+            floatArrayOf(0f, 0.58f, 1f), Shader.TileMode.CLAMP
+        )
+        diagonalSheen = LinearGradient(
+            -w * 0.08f, 0f, w * 0.82f, h * 0.72f,
+            intArrayOf(Color.argb(48, 255, 255, 255), Color.argb(12, 255, 255, 255), Color.TRANSPARENT),
+            floatArrayOf(0f, 0.36f, 1f), Shader.TileMode.CLAMP
+        )
+    }
+
+    override fun onDraw(canvas: Canvas) {
+        paint.shader = diagonalSheen
+        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
+        paint.shader = sideShade
+        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
+        paint.shader = bottomShade
+        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
+
+        edgePaint.color = Color.argb(82, 255, 255, 255)
+        edgePaint.strokeWidth = resources.displayMetrics.density
+        canvas.drawLine(0.5f, 0f, 0.5f, height.toFloat(), edgePaint)
     }
 }

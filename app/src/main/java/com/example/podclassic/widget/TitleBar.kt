@@ -8,6 +8,9 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.LinearGradient
+import android.graphics.RectF
+import android.graphics.Shader
 import android.os.BatteryManager
 import android.util.AttributeSet
 import android.view.Gravity
@@ -30,12 +33,17 @@ class TitleBar : FrameLayout {
     constructor(context: Context) : super(context)
     constructor(context: Context, attributeSet: AttributeSet) : super(context, attributeSet)
 
-    private val paint = Paint()
+    private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { isDither = true }
+    private val edgePaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val statusPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { isDither = true }
+    private val statusRect = RectF()
+    private var glassShader: Shader? = null
+    private var glossShader: Shader? = null
     private val density = resources.displayMetrics.density
     private val isIpod3rdTheme =
         SPManager.getInt(SPManager.Theme.SP_NAME) == SPManager.Theme.IPOD_3RD.id
     private val batteryVerticalInset =
-        if (isIpod3rdTheme) (3f * density).toInt() else DEFAULT_PADDING / 2
+        if (isIpod3rdTheme) (2f * density).toInt() else (2f * density).toInt()
     private val batteryWidthRatio = if (isIpod3rdTheme) 2.2f else 1.8f
 
     private val title = TextView(context)
@@ -52,11 +60,12 @@ class TitleBar : FrameLayout {
     init {
         // 玻璃效果下使用透明背景
         setBackgroundColor(android.graphics.Color.TRANSPARENT)
-        // 时间左对齐，紧贴左边
+        setWillNotDraw(false)
+        // A full-width label can center screen titles while the clock remains left aligned.
         addView(
             title,
-            LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply {
-                gravity = Gravity.START or Gravity.CENTER_VERTICAL
+            LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT).apply {
+                gravity = Gravity.CENTER
                 setMargins(0, 0, 0, 0)
             })
         // 电池在右边
@@ -75,16 +84,13 @@ class TitleBar : FrameLayout {
             })
 
         // iPod Classic 风格的标题文字
-        title.textSize = if (isIpod3rdTheme) 15f else 17f
+        title.textSize = if (isIpod3rdTheme) 12.5f else 15f
         title.setTextColor(Colors.text)
-        title.setPadding(
-            DEFAULT_PADDING,
-            if (isIpod3rdTheme) 0 else DEFAULT_PADDING / 2,
-            DEFAULT_PADDING,
-            if (isIpod3rdTheme) 0 else DEFAULT_PADDING / 2
-        )
-        // 添加微妙的阴影效果
-        title.setShadowLayer(0.5f, 0f, 1f, Colors.white)
+        title.ellipsize = android.text.TextUtils.TruncateAt.END
+        title.setShadowLayer(0.7f, 0f, density * 0.5f, Color.argb(190, 255, 255, 255))
+        playState.scaleType = ImageView.ScaleType.CENTER_INSIDE
+        playState.setPadding((2f * density).toInt(), (2f * density).toInt(), (2f * density).toInt(), (2f * density).toInt())
+        playState.imageAlpha = 220
 
         MediaPresenter.playState.addObserver(observer, onDataChangeListener)
         observer.enable = true
@@ -114,6 +120,31 @@ class TitleBar : FrameLayout {
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
         updatePlayStateMargin(h)
+        if (w <= 0 || h <= 0) return
+        glassShader = LinearGradient(
+            0f, 0f, 0f, h.toFloat(),
+            if (isIpod3rdTheme) {
+                intArrayOf(
+                    Color.argb(202, 255, 255, 255),
+                    Color.argb(154, 248, 250, 253),
+                    Color.argb(128, 228, 233, 241)
+                )
+            } else {
+                intArrayOf(
+                    Color.argb(184, 255, 255, 255),
+                    Color.argb(132, 248, 250, 253),
+                    Color.argb(108, 224, 231, 241)
+                )
+            },
+            floatArrayOf(0f, 0.46f, 1f),
+            Shader.TileMode.CLAMP
+        )
+        glossShader = LinearGradient(
+            -w * 0.08f, 0f, w * 0.72f, h.toFloat(),
+            intArrayOf(Color.argb(118, 255, 255, 255), Color.argb(30, 255, 255, 255), Color.TRANSPARENT),
+            floatArrayOf(0f, 0.38f, 1f),
+            Shader.TileMode.CLAMP
+        )
     }
 
     /** Keep the playback state immediately to the left of the variable-width battery. */
@@ -146,12 +177,17 @@ class TitleBar : FrameLayout {
 
     fun showTime() {
         showTime = true
+        title.gravity = Gravity.START or Gravity.CENTER_VERTICAL
+        title.setPadding(DEFAULT_PADDING, 0, (84f * density).toInt(), 0)
         registerTimeBroadcastReceiver()
     }
 
     fun showTitle(title: String) {
         showTime = false
         unregisterTimeBroadcastReceiver()
+        this.title.gravity = Gravity.CENTER
+        val reservedStatusWidth = (78f * density).toInt()
+        this.title.setPadding(reservedStatusWidth, 0, reservedStatusWidth, 0)
         this.title.text = title
     }
 
@@ -197,27 +233,45 @@ class TitleBar : FrameLayout {
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        // iPod Classic 风格：银色金属质感渐变
-        paint.shader = Colors.getShader(
-            0f,
-            0f,
-            0f,
-            height.toFloat(),
-            Colors.background_light,  // 顶部亮银
-            Colors.background_dark_1  // 底部稍暗
-        )
+        if (width <= 0 || height <= 0) return
+
+        // Translucent material with a directional highlight instead of an opaque metal strip.
+        paint.shader = glassShader
+        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
+        paint.shader = glossShader
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
         paint.shader = null
-        
-        // 顶部高光线
-        paint.color = Colors.white
-        canvas.drawRect(0f, 0f, width.toFloat(), 1f, paint)
-        
-        // 底部分隔线 - iPod Classic 风格的双线
-        paint.color = Colors.background_dark_2
-        canvas.drawRect(0f, height - 2f, width.toFloat(), height - 1f, paint)
-        paint.color = Colors.divider_light
-        canvas.drawRect(0f, height - 1f, width.toFloat(), height.toFloat(), paint)
+
+        // The transport and battery read as one compact floating status surface.
+        val capsuleInset = 2f * density
+        statusRect.set(
+            width - 76f * density,
+            capsuleInset,
+            width - 4f * density,
+            height - capsuleInset
+        )
+        statusPaint.shader = LinearGradient(
+            statusRect.left, statusRect.top, statusRect.left, statusRect.bottom,
+            Color.argb(76, 255, 255, 255), Color.argb(34, 210, 220, 234), Shader.TileMode.CLAMP
+        )
+        canvas.drawRoundRect(statusRect, statusRect.height() / 2f, statusRect.height() / 2f, statusPaint)
+        statusPaint.shader = null
+        statusPaint.style = Paint.Style.STROKE
+        statusPaint.strokeWidth = 0.65f * density
+        statusPaint.color = Color.argb(110, 255, 255, 255)
+        statusRect.inset(0.35f * density, 0.35f * density)
+        canvas.drawRoundRect(statusRect, statusRect.height() / 2f, statusRect.height() / 2f, statusPaint)
+        statusPaint.style = Paint.Style.FILL
+
+        edgePaint.color = Color.argb(176, 255, 255, 255)
+        canvas.drawRect(0f, 0f, width.toFloat(), 0.65f * density, edgePaint)
+        edgePaint.shader = LinearGradient(
+            0f, 0f, width.toFloat(), 0f,
+            intArrayOf(Color.TRANSPARENT, Color.argb(96, 64, 78, 96), Color.TRANSPARENT),
+            floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP
+        )
+        canvas.drawRect(0f, height - 0.75f * density, width.toFloat(), height.toFloat(), edgePaint)
+        edgePaint.shader = null
     }
 
     private fun registerBatteryBroadcastReceiver() {
@@ -278,12 +332,19 @@ class TitleBar : FrameLayout {
 
             val padding = height * if (compact) 0.27f else 0.2f
 
-            paint.color = Colors.line
-            paint.shader =
-                null//Colors.getShader(width / 2f, 0f, width / 2f, height.toFloat(), Colors.line, Colors.line)
+            val batteryBodyRight = width - padding * 3
+            val radius = (height - padding * 2f) * 0.25f
+            paint.shader = null
+            paint.style = Paint.Style.FILL
+            paint.color = Color.argb(42, 20, 28, 38)
+            canvas.drawRoundRect(0f, padding, batteryBodyRight, height - padding, radius, radius, paint)
 
-
-            canvas.drawRoundRect(0f, padding, width - padding * 3, height - padding, 4f, 4f, paint)
+            paint.style = Paint.Style.STROKE
+            paint.strokeWidth = (height * 0.07f).coerceAtLeast(1f)
+            paint.color = Color.argb(175, 52, 61, 72)
+            canvas.drawRoundRect(0f, padding, batteryBodyRight, height - padding, radius, radius, paint)
+            paint.style = Paint.Style.FILL
+            paint.color = Color.argb(160, 52, 61, 72)
             canvas.drawRoundRect(
                 width - padding * 3 - 2f,
                 padding * 1.5f,
@@ -293,9 +354,6 @@ class TitleBar : FrameLayout {
                 4f,
                 paint
             )
-            //canvas?.drawRoundRect(0f, PADDING, width - PADDING * 5, measuredHeight - PADDING, 4f, 4f, paint)
-            //canvas?.drawRoundRect(measuredWidth - PADDING * 5 - 2, PADDING * 1.5f, measuredWidth - PADDING * 6 - 2, measuredHeight - PADDING * 1.5f, 4f, 4f, paint)
-            val batteryBodyRight = width - padding * 3
             val batteryWidth = batteryLevel.coerceIn(0, 100) * batteryBodyRight / 100f
 
             paint.shader = when {
@@ -335,6 +393,18 @@ class TitleBar : FrameLayout {
                     paint
                 )
             }
+
+            paint.shader = null
+            paint.color = Color.argb(128, 255, 255, 255)
+            canvas.drawRoundRect(
+                2f,
+                padding + 2f,
+                (batteryWidth - 2f).coerceAtLeast(2f),
+                padding + (height - padding * 2f) * 0.34f,
+                radius,
+                radius,
+                paint
+            )
 
             if (isCharging) {
                 drawChargingIndicator(canvas, batteryBodyRight, padding)

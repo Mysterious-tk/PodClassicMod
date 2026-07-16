@@ -30,7 +30,7 @@ class Screen(context: Context, attributeSet: AttributeSet?) : LinearLayout(conte
     private val density = resources.displayMetrics.density
     private val isIpod3rdTheme =
         SPManager.getInt(SPManager.Theme.SP_NAME) == SPManager.Theme.IPOD_3RD.id
-    private val cornerRadius = if (isIpod3rdTheme) 18f * density else 24f
+    private val cornerRadius = if (isIpod3rdTheme) 18f * density else 16f * density
     private val isGlassEffectSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
 
     // 渐变画笔 - 用于光泽效果
@@ -83,8 +83,14 @@ class Screen(context: Context, attributeSet: AttributeSet?) : LinearLayout(conte
             )
             addView(screenLayout, LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f))
         } else {
-            addView(titleBar, LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f))
-            addView(screenLayout, LayoutParams(LayoutParams.MATCH_PARENT, 0, 9f))
+            addView(
+                titleBar,
+                LayoutParams(
+                    LayoutParams.MATCH_PARENT,
+                    resources.getDimensionPixelSize(R.dimen.title_bar_height)
+                )
+            )
+            addView(screenLayout, LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f))
         }
 
         // 设置圆角裁剪
@@ -174,9 +180,9 @@ class Screen(context: Context, attributeSet: AttributeSet?) : LinearLayout(conte
             0f, 0f,
             0f, height * 0.35f,
             intArrayOf(
-                Color.argb((255 * 0.50).toInt(), 255, 255, 255),
-                Color.argb((255 * 0.20).toInt(), 255, 255, 255),
-                Color.argb((255 * 0.05).toInt(), 255, 255, 255),
+                Color.argb(82, 255, 255, 255),
+                Color.argb(38, 255, 255, 255),
+                Color.argb(10, 255, 255, 255),
                 Color.argb(0, 255, 255, 255)
             ),
             floatArrayOf(0f, 0.3f, 0.6f, 1f),
@@ -189,6 +195,16 @@ class Screen(context: Context, attributeSet: AttributeSet?) : LinearLayout(conte
             cornerRadius, cornerRadius,
             glossPaint
         )
+
+        // A soft edge caustic gives the card thickness without whitening its content.
+        val sideRefraction = LinearGradient(
+            0f, 0f, width * 0.18f, 0f,
+            intArrayOf(Color.argb(48, 255, 255, 255), Color.argb(14, 255, 255, 255), Color.TRANSPARENT),
+            floatArrayOf(0f, 0.58f, 1f),
+            Shader.TileMode.CLAMP
+        )
+        glossPaint.shader = sideRefraction
+        canvas.drawRoundRect(0f, 0f, width, height, cornerRadius, cornerRadius, glossPaint)
 
         // 对角线光泽 - 增加立体感
         val diagonalGloss = LinearGradient(

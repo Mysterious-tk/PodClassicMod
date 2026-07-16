@@ -24,6 +24,7 @@ import com.example.podclassic.media.RepeatMode
 import com.example.podclassic.service.MediaPresenter
 import com.example.podclassic.storage.SPManager
 import com.example.podclassic.util.LiveData
+import com.example.podclassic.util.ArtworkBackgroundController
 import com.example.podclassic.util.ThreadUtil
 import com.example.podclassic.util.VolumeUtil
 import com.example.podclassic.values.Colors
@@ -92,10 +93,17 @@ class MusicPlayerView3rd(context: Context) : FrameLayout(context), ScreenView {
 
     private val container: ViewGroup
     private val progressContainer: ViewGroup
+    private val backgroundController: ArtworkBackgroundController
+    private var imageLoadGeneration = 0
 
     init {
         Log.d("MusicPlayerView3rd", "Init started")
         val view = LayoutInflater.from(context).inflate(R.layout.view_player_ipod3rd, this, true)
+        backgroundController = ArtworkBackgroundController(
+            view.findViewById(R.id.player_background),
+            Color.TRANSPARENT,
+            artworkStrength = 0.22f
+        )
         album = view.findViewById(R.id.tv_album)
         artist = view.findViewById(R.id.tv_artist)
         title = view.findViewById(R.id.tv_title)
@@ -366,6 +374,8 @@ class MusicPlayerView3rd(context: Context) : FrameLayout(context), ScreenView {
     }
 
     override fun onViewRemove() {
+        imageLoadGeneration++
+        backgroundController.cancel()
         if (broadcastReceiverRegistered) {
             context.unregisterReceiver(volumeBroadcastReceiver)
             broadcastReceiverRegistered = false
@@ -497,7 +507,9 @@ class MusicPlayerView3rd(context: Context) : FrameLayout(context), ScreenView {
 
     private fun loadImage(music: Music) {
         Log.d("MusicPlayerView3rd", "loadImage() started for music: ${music.title}")
+        val generation = ++imageLoadGeneration
         var bitmap: Bitmap? = null
+        var backgroundScheme: ArtworkBackgroundController.Scheme? = null
 
         // 先显示占位图或保持可见
         Log.d("MusicPlayerView3rd", "Setting image visibility to VISIBLE")
@@ -506,9 +518,14 @@ class MusicPlayerView3rd(context: Context) : FrameLayout(context), ScreenView {
         image.setImageBitmap(empty)
 
         ThreadUtil.asyncTask({
-            bitmap = music.image?.let(::cropArtworkReflection)
+            bitmap = music.image?.let { source ->
+                backgroundScheme = backgroundController.extract(source)
+                cropArtworkReflection(source)
+            }
             Log.d("MusicPlayerView3rd", "Bitmap loaded: ${bitmap != null}")
         }, {
+            if (generation != imageLoadGeneration) return@asyncTask
+            backgroundController.apply(backgroundScheme)
             Log.d("MusicPlayerView3rd", "Image load callback: bitmap=$bitmap")
             if (bitmap == null) {
                 Log.d("MusicPlayerView3rd", "Bitmap is null, using default placeholder")

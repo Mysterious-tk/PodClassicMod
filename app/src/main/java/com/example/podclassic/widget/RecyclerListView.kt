@@ -929,6 +929,10 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
             strokeWidth = density
         }
         private val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+        private val specularPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = density * 0.75f
+        }
         private val rect = android.graphics.RectF()
         private val glossRect = android.graphics.RectF()
 
@@ -949,9 +953,9 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
                 rect.right,
                 rect.bottom,
                 intArrayOf(
-                    Color.argb(92, 22, 118, 224),
-                    Color.argb(64, 56, 181, 246),
-                    Color.argb(104, 0, 76, 184)
+                    Color.argb(82, 28, 128, 230),
+                    Color.argb(54, 82, 190, 246),
+                    Color.argb(94, 0, 76, 184)
                 ),
                 floatArrayOf(0f, 0.52f, 1f),
                 Shader.TileMode.CLAMP
@@ -985,6 +989,17 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
 
             canvas.drawRoundRect(glossRect, radius, radius, glossPaint)
 
+            specularPaint.shader = LinearGradient(
+                rect.left,
+                rect.top,
+                rect.right,
+                rect.top,
+                intArrayOf(Color.TRANSPARENT, Color.argb(210, 255, 255, 255), Color.argb(72, 255, 255, 255), Color.TRANSPARENT),
+                floatArrayOf(0f, 0.18f, 0.72f, 1f),
+                Shader.TileMode.CLAMP
+            )
+            canvas.drawLine(rect.left + radius, rect.top + density, rect.right - radius, rect.top + density, specularPaint)
+
             edgePaint.color = Color.argb(132, 225, 248, 255)
             rect.inset(density * 0.5f, density * 0.5f)
             canvas.drawRoundRect(rect, radius, radius, edgePaint)
@@ -997,6 +1012,7 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
             glossPaint.alpha = alpha
             edgePaint.alpha = alpha
             shadowPaint.alpha = alpha
+            specularPaint.alpha = alpha
             invalidateSelf()
         }
 
@@ -1005,6 +1021,7 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
             glossPaint.colorFilter = colorFilter
             edgePaint.colorFilter = colorFilter
             shadowPaint.colorFilter = colorFilter
+            specularPaint.colorFilter = colorFilter
             invalidateSelf()
         }
 
