@@ -43,6 +43,15 @@ class Screen(context: Context, attributeSet: AttributeSet?) : LinearLayout(conte
     private val glossPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         isDither = true
     }
+    private val ipod3rdLcdTexturePaint by lazy {
+        Paint(Paint.ANTI_ALIAS_FLAG or Paint.DITHER_FLAG).apply {
+            shader = BitmapShader(
+                BitmapFactory.decodeResource(resources, R.drawable.ipod3rd_lcd_pixel_grid),
+                Shader.TileMode.REPEAT,
+                Shader.TileMode.REPEAT
+            )
+        }
+    }
 
     // 边框画笔
     private val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -166,11 +175,52 @@ class Screen(context: Context, attributeSet: AttributeSet?) : LinearLayout(conte
         // 绘制内容（子视图）- 保持清晰
         super.dispatchDraw(canvas)
 
+        if (isIpod3rdTheme) {
+            drawIpod3rdLcdOverlay(canvas)
+        }
+
         // 在内容之上绘制光泽和边框效果
         if (isGlassEffectSupported) {
             drawGlossOverlay(canvas)
             drawBorder(canvas)
         }
+    }
+
+    private fun drawIpod3rdLcdOverlay(canvas: Canvas) {
+        ipod3rdLcdTexturePaint.alpha = IPod3rdSkinTokens.LCD_PIXEL_ALPHA
+        canvas.drawRoundRect(
+            0f,
+            0f,
+            width.toFloat(),
+            height.toFloat(),
+            cornerRadius,
+            cornerRadius,
+            ipod3rdLcdTexturePaint
+        )
+
+        glossPaint.shader = LinearGradient(
+            0f,
+            0f,
+            width * 0.7f,
+            height * 0.55f,
+            intArrayOf(
+                Color.argb(IPod3rdSkinTokens.LCD_REFLECTION_ALPHA, 255, 255, 255),
+                Color.argb(IPod3rdSkinTokens.LCD_REFLECTION_ALPHA / 3, 231, 240, 250),
+                Color.TRANSPARENT
+            ),
+            floatArrayOf(0f, 0.45f, 1f),
+            Shader.TileMode.CLAMP
+        )
+        canvas.drawRoundRect(
+            0f,
+            0f,
+            width.toFloat(),
+            height.toFloat(),
+            cornerRadius,
+            cornerRadius,
+            glossPaint
+        )
+        glossPaint.shader = null
     }
 
     /**

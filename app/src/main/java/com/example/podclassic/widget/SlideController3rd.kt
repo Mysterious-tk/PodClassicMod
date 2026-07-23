@@ -3,6 +3,7 @@ package com.example.podclassic.widget
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.BitmapShader
 import android.graphics.Canvas
 import android.graphics.Color
@@ -17,6 +18,7 @@ import android.os.SystemClock
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
+import com.example.podclassic.R
 import com.example.podclassic.util.ThreadUtil
 import com.example.podclassic.util.VolumeUtil
 import com.example.podclassic.values.Icons
@@ -54,6 +56,15 @@ class SlideController3rd : View {
         )
     }
     private val iconBacklightPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val materialPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.DITHER_FLAG)
+    private val wheelMaterialBitmap = BitmapFactory.decodeResource(
+        resources,
+        R.drawable.ipod3rd_wheel_red_material
+    )
+    private val wheelClearCoatBitmap = BitmapFactory.decodeResource(
+        resources,
+        R.drawable.ipod3rd_wheel_glass_highlight
+    )
     private val acrylicNoisePaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.DITHER_FLAG).apply {
         shader = BitmapShader(
             createAcrylicNoiseTile(),
@@ -74,6 +85,7 @@ class SlideController3rd : View {
     private var buttonBacklightStartedAt = 0L
     private var pressedButtonIndex = -1
     private var centerButtonPressed = false
+    private var wheelPressed = false
 
     var enable = true
         set(value) {
@@ -82,6 +94,7 @@ class SlideController3rd : View {
                 buttonBacklightStartedAt = 0L
                 pressedButtonIndex = -1
                 centerButtonPressed = false
+                wheelPressed = false
                 invalidate()
             }
             field = value
@@ -284,11 +297,18 @@ class SlideController3rd : View {
             return
         }
 
-        val left = centerX - bitmap.width / 2f
-        val top = centerY - bitmap.height / 2f
+        val iconScale = IPod3rdSkinTokens.ICON_SCALE
+        val iconWidth = bitmap.width * iconScale
+        val iconHeight = bitmap.height * iconScale
+        val destination = RectF(
+            centerX - iconWidth / 2f,
+            centerY - iconHeight / 2f,
+            centerX + iconWidth / 2f,
+            centerY + iconHeight / 2f
+        )
         val intensity = currentBacklightIntensity()
         if (intensity <= 0f) {
-            canvas.drawBitmap(bitmap, left, top, iconPaint)
+            canvas.drawBitmap(bitmap, null, destination, iconPaint)
             return
         }
 
@@ -302,7 +322,7 @@ class SlideController3rd : View {
             Color.rgb(red, green, blue),
             PorterDuff.Mode.SRC_IN
         )
-        canvas.drawBitmap(bitmap, left, top, iconBacklightPaint)
+        canvas.drawBitmap(bitmap, null, destination, iconBacklightPaint)
         iconBacklightPaint.colorFilter = null
     }
 
@@ -375,20 +395,82 @@ class SlideController3rd : View {
     }
 
     private fun drawLiquidGlassWheel(canvas: Canvas) {
-        val rimWidth = 6f * density
-        val surfaceRadius = (maxR - rimWidth).coerceAtLeast(0f)
+        val grooveWidth = IPod3rdSkinTokens.WHEEL_GROOVE_DP * density
+        val surfaceRadius = (maxR - grooveWidth).coerceAtLeast(0f)
 
-        // The outer lip belongs to the raised enclosure surrounding the wheel.
+        // Dark red inner wall: the wheel is a cavity in the black shell, not a
+        // glossy disc placed on top of it.
         glassPaint.style = Paint.Style.FILL
-        glassPaint.shader = wheelEdgeShader
+        glassPaint.shader = LinearGradient(
+            centerX - maxR,
+            centerY - maxR,
+            centerX + maxR,
+            centerY + maxR,
+            intArrayOf(
+                Color.argb(250, 20, 0, 5),
+                Color.argb(244, 43, 0, 10),
+                Color.argb(218, 151, 10, 34)
+            ),
+            floatArrayOf(0f, 0.54f, 1f),
+            Shader.TileMode.CLAMP
+        )
         canvas.drawCircle(centerX, centerY, maxR, glassPaint)
 
-        glassPaint.shader = wheelBaseShader
+        // The code-drawn base carries the color and remains fully deterministic.
+        // The reusable raster contributes only optical variation above it.
+        glassPaint.shader = LinearGradient(
+            centerX - surfaceRadius,
+            centerY - surfaceRadius,
+            centerX + surfaceRadius,
+            centerY + surfaceRadius,
+            intArrayOf(
+                IPod3rdSkinTokens.wheelUnderlayTop,
+                IPod3rdSkinTokens.wheelUnderlayMiddle,
+                IPod3rdSkinTokens.wheelUnderlayBottom
+            ),
+            floatArrayOf(0f, 0.56f, 1f),
+            Shader.TileMode.CLAMP
+        )
         canvas.drawCircle(centerX, centerY, surfaceRadius, glassPaint)
-        glassPaint.shader = wheelReflectionShader
-        canvas.drawCircle(centerX, centerY, surfaceRadius, glassPaint)
-        glassPaint.shader = wheelDepthShader
-        canvas.drawCircle(centerX, centerY, surfaceRadius, glassPaint)
+
+        drawCircularMaterial(
+            canvas,
+            wheelMaterialBitmap,
+            centerX,
+            centerY,
+            surfaceRadius,
+            IPod3rdSkinTokens.WHEEL_MATERIAL_ALPHA,
+            IPod3rdSkinTokens.WHEEL_TEXTURE_OVERSCAN
+        )
+        drawCircularMaterial(
+            canvas,
+            wheelClearCoatBitmap,
+            centerX,
+            centerY,
+            surfaceRadius,
+            IPod3rdSkinTokens.WHEEL_CLEAR_COAT_ALPHA,
+            IPod3rdSkinTokens.WHEEL_TEXTURE_OVERSCAN
+        )
+
+        if (wheelPressed) {
+            glassPaint.shader = RadialGradient(
+                centerX,
+                centerY,
+                surfaceRadius,
+                intArrayOf(
+                    Color.argb(
+                        IPod3rdSkinTokens.WHEEL_PRESSED_GLOW_ALPHA,
+                        Color.red(IPod3rdSkinTokens.pressedGlow),
+                        Color.green(IPod3rdSkinTokens.pressedGlow),
+                        Color.blue(IPod3rdSkinTokens.pressedGlow)
+                    ),
+                    Color.TRANSPARENT
+                ),
+                floatArrayOf(0.28f, 1f),
+                Shader.TileMode.CLAMP
+            )
+            canvas.drawCircle(centerX, centerY, surfaceRadius, glassPaint)
+        }
         glassPaint.shader = null
 
         val rimBounds = RectF(
@@ -398,11 +480,11 @@ class SlideController3rd : View {
             centerY + maxR - density
         )
         edgePaint.shader = null
-        edgePaint.strokeWidth = 1.6f * density
-        edgePaint.color = Color.argb(190, 255, 184, 194)
-        canvas.drawArc(rimBounds, 185f, 170f, false, edgePaint)
-        edgePaint.color = Color.argb(190, 22, 0, 4)
-        canvas.drawArc(rimBounds, 5f, 170f, false, edgePaint)
+        edgePaint.strokeWidth = 1.05f * density
+        edgePaint.color = Color.argb(150, 13, 0, 3)
+        canvas.drawArc(rimBounds, 184f, 171f, false, edgePaint)
+        edgePaint.color = Color.argb(78, 239, 50, 78)
+        canvas.drawArc(rimBounds, 4f, 171f, false, edgePaint)
 
         val insetBounds = RectF(
             centerX - surfaceRadius,
@@ -410,128 +492,182 @@ class SlideController3rd : View {
             centerX + surfaceRadius,
             centerY + surfaceRadius
         )
-        edgePaint.strokeWidth = 4.2f * density
-        edgePaint.color = Color.argb(150, 38, 0, 7)
-        canvas.drawArc(insetBounds, 180f, 180f, false, edgePaint)
-        edgePaint.strokeWidth = 1.15f * density
-        edgePaint.color = Color.argb(122, 255, 125, 140)
-        canvas.drawArc(insetBounds, 0f, 180f, false, edgePaint)
+        edgePaint.strokeWidth = 2.2f * density
+        edgePaint.color = Color.argb(132, 31, 0, 7)
+        canvas.drawArc(insetBounds, 184f, 171f, false, edgePaint)
+        edgePaint.strokeWidth = 0.65f * density
+        edgePaint.color = Color.argb(54, 248, 64, 91)
+        canvas.drawArc(insetBounds, 4f, 171f, false, edgePaint)
     }
 
     private fun drawRecessedCenterButton(canvas: Canvas) {
-        val lipWidth = 3.5f * density
+        val lipWidth = 3f * density
+        val press = if (centerButtonPressed) 1f else 0f
         glassPaint.style = Paint.Style.FILL
+
+        // Concave cavity wall: the top half is occluded by the shell while the
+        // lower-right edge receives a small amount of transmitted red light.
         glassPaint.shader = LinearGradient(
-            centerX,
-            centerY - minR - lipWidth,
-            centerX,
-            centerY + minR + lipWidth,
-            Color.argb(210, 255, 112, 126),
-            Color.argb(230, 48, 0, 8),
+            centerX - minR,
+            centerY - minR,
+            centerX + minR,
+            centerY + minR,
+            intArrayOf(
+                Color.rgb(0, 0, 2),
+                Color.rgb(5, 5, 8),
+                Color.rgb(62, 5, 17)
+            ),
+            floatArrayOf(0f, 0.58f, 1f),
             Shader.TileMode.CLAMP
         )
         canvas.drawCircle(centerX, centerY, minR + lipWidth, glassPaint)
+
+        // A stable smoked floor with darkened edges reads as a touch well,
+        // without a bright center or complete glossy rim.
         glassPaint.shader = RadialGradient(
-            centerX + minR * 0.18f,
-            centerY + minR * 0.22f,
-            minR * 1.25f,
-            Color.argb(255, 28, 29, 33),
-            colorButton,
+            centerX,
+            centerY,
+            minR,
+            intArrayOf(
+                Color.rgb((15 - 3f * press).toInt(), (17 - 3f * press).toInt(), (23 - 3f * press).toInt()),
+                Color.rgb((13 - 3f * press).toInt(), (15 - 3f * press).toInt(), (21 - 3f * press).toInt()),
+                Color.rgb((4 - 2f * press).toInt(), (5 - 2f * press).toInt(), (8 - 2f * press).toInt())
+            ),
+            floatArrayOf(0f, 0.72f, 1f),
             Shader.TileMode.CLAMP
         )
         canvas.drawCircle(centerX, centerY, minR, glassPaint)
         glassPaint.shader = null
 
         val bounds = RectF(centerX - minR, centerY - minR, centerX + minR, centerY + minR)
-        edgePaint.strokeWidth = 3.2f * density
-        edgePaint.color = Color.argb(190, 0, 0, 0)
-        canvas.drawArc(bounds, 180f, 180f, false, edgePaint)
-        edgePaint.strokeWidth = density
-        edgePaint.color = Color.argb(105, 255, 255, 255)
-        canvas.drawArc(bounds, 0f, 180f, false, edgePaint)
+        edgePaint.shader = null
+        edgePaint.strokeWidth = 1.35f * density
+        edgePaint.color = Color.argb((214 + 20f * press).toInt(), 0, 0, 1)
+        canvas.drawArc(bounds, 184f, 171f, false, edgePaint)
+        edgePaint.strokeWidth = 0.65f * density
+        edgePaint.color = Color.argb((72 + 24f * press).toInt(), 218, 37, 62)
+        canvas.drawArc(bounds, 4f, 171f, false, edgePaint)
     }
 
     private fun drawGlassButton(canvas: Canvas, x: Float, y: Float) {
-        val rimWidth = 3.5f * density
+        val index = ((x / width * 5f) - 1f).toInt().coerceIn(0, 3)
+        val press = if (pressedButtonIndex == index) 1f else 0f
+        val rimWidth = IPod3rdSkinTokens.BUTTON_RIM_DP * density
         val surfaceRadius = buttonRadius - rimWidth
 
-        // A restrained raised lip surrounds the lower glass face. The broad
-        // radial transition avoids a metallic, cut-out looking ring.
-        glassPaint.shader = RadialGradient(
-            x - buttonRadius * 0.22f,
-            y - buttonRadius * 0.26f,
-            buttonRadius * 1.48f,
+        // Recessed cavity copied from the lighting logic of the accepted white
+        // theme: dark upper wall, quiet lower/right transmission, no outer drop
+        // shadow and no complete bright outline.
+        glassPaint.shader = LinearGradient(
+            x - buttonRadius,
+            y - buttonRadius,
+            x + buttonRadius,
+            y + buttonRadius,
             intArrayOf(
-                Color.argb(112, 232, 236, 243),
-                Color.argb(82, 99, 106, 119),
-                Color.argb(132, 18, 20, 26)
+                Color.rgb(0, 0, 2),
+                Color.rgb(6, 6, 9),
+                Color.rgb(
+                    (52 + 18f * press).toInt(),
+                    (5 + 3f * press).toInt(),
+                    (15 + 5f * press).toInt()
+                )
             ),
-            floatArrayOf(0f, 0.56f, 1f),
+            floatArrayOf(0f, 0.55f, 1f),
             Shader.TileMode.CLAMP
         )
         canvas.drawCircle(x, y, buttonRadius, glassPaint)
 
-        // One continuous concave surface: dark center, softly lifted shoulder,
-        // then a darker inner wall. There is no 50% horizontal color stop.
+        // Nearly planar smoked-acrylic floor. The perimeter darkens inward,
+        // reversing the convex cue that the generated button image introduced.
         glassPaint.shader = RadialGradient(
             x,
-            y + surfaceRadius * 0.08f,
-            surfaceRadius * 1.05f,
+            y,
+            surfaceRadius,
             intArrayOf(
-                Color.argb(224, 18, 21, 29),
-                Color.argb(214, 31, 35, 45),
-                Color.argb(188, 62, 68, 81),
-                Color.argb(226, 25, 28, 36)
+                Color.rgb((17 - 4f * press).toInt(), (19 - 4f * press).toInt(), (26 - 4f * press).toInt()),
+                Color.rgb((15 - 4f * press).toInt(), (17 - 4f * press).toInt(), (23 - 4f * press).toInt()),
+                Color.rgb((3 - 2f * press).toInt(), (4 - 2f * press).toInt(), (7 - 2f * press).toInt())
             ),
-            floatArrayOf(0f, 0.38f, 0.74f, 1f),
+            floatArrayOf(0f, 0.7f, 1f),
             Shader.TileMode.CLAMP
         )
         canvas.drawCircle(x, y, surfaceRadius, glassPaint)
 
-        // Soft upper reflection fades through the entire face instead of ending
-        // at the equator as the previous semicircular highlight did.
-        glassPaint.shader = RadialGradient(
+        // A very weak clear top layer remains inside the well; it is broad and
+        // low contrast so it reads as acrylic, not as a raised glossy cap.
+        glassPaint.shader = LinearGradient(
             x,
-            y - surfaceRadius * 0.76f,
-            surfaceRadius * 1.28f,
+            y - surfaceRadius,
+            x,
+            y + surfaceRadius,
             intArrayOf(
-                Color.argb(58, 255, 255, 255),
-                Color.argb(20, 255, 255, 255),
+                Color.argb(9, 206, 216, 231),
+                Color.argb(3, 197, 207, 221),
                 Color.TRANSPARENT
             ),
-            floatArrayOf(0f, 0.46f, 1f),
-            Shader.TileMode.CLAMP
-        )
-        canvas.drawCircle(x, y, surfaceRadius, glassPaint)
-
-        // A low, diffuse shadow supplies depth without a straight lower edge.
-        glassPaint.shader = RadialGradient(
-            x,
-            y + surfaceRadius * 1.12f,
-            surfaceRadius * 1.18f,
-            intArrayOf(
-                Color.argb(72, 0, 0, 0),
-                Color.argb(24, 0, 0, 0),
-                Color.TRANSPARENT
-            ),
-            floatArrayOf(0f, 0.48f, 1f),
+            floatArrayOf(0f, 0.32f, 0.72f),
             Shader.TileMode.CLAMP
         )
         canvas.drawCircle(x, y, surfaceRadius, glassPaint)
         glassPaint.shader = null
 
-        // Complete circular edges stay continuous at the left and right sides.
-        edgePaint.shader = null
-        edgePaint.strokeWidth = 1.15f * density
-        edgePaint.color = Color.argb(92, 214, 220, 230)
-        canvas.drawCircle(x, y, buttonRadius - edgePaint.strokeWidth / 2f, edgePaint)
+        if (press > 0f) {
+            glassPaint.shader = RadialGradient(
+                x,
+                y,
+                surfaceRadius,
+                Color.argb(IPod3rdSkinTokens.BUTTON_PRESSED_GLOW_ALPHA, 255, 65, 30),
+                Color.TRANSPARENT,
+                Shader.TileMode.CLAMP
+            )
+            canvas.drawCircle(x, y, surfaceRadius, glassPaint)
+            glassPaint.shader = null
+        }
 
-        edgePaint.strokeWidth = 2.4f * density
-        edgePaint.color = Color.argb(76, 5, 7, 11)
-        canvas.drawCircle(x, y, surfaceRadius - edgePaint.strokeWidth / 2f, edgePaint)
+        val faceBounds = RectF(
+            x - surfaceRadius,
+            y - surfaceRadius,
+            x + surfaceRadius,
+            y + surfaceRadius
+        )
+        edgePaint.shader = null
+        edgePaint.strokeWidth = 1.3f * density
+        edgePaint.color = Color.argb((218 + 18f * press).toInt(), 0, 0, 1)
+        canvas.drawArc(faceBounds, 184f, 171f, false, edgePaint)
         edgePaint.strokeWidth = 0.65f * density
-        edgePaint.color = Color.argb(54, 238, 242, 248)
-        canvas.drawCircle(x, y, surfaceRadius - edgePaint.strokeWidth / 2f, edgePaint)
+        edgePaint.color = Color.argb((62 + 22f * press).toInt(), 218, 37, 62)
+        canvas.drawArc(faceBounds, 4f, 171f, false, edgePaint)
+    }
+
+    private fun drawCircularMaterial(
+        canvas: Canvas,
+        bitmap: Bitmap,
+        x: Float,
+        y: Float,
+        radius: Float,
+        alpha: Int,
+        overscan: Float
+    ) {
+        if (bitmap.width <= 0 || bitmap.height <= 0 || radius <= 0f || alpha <= 0) return
+        val destinationRadius = radius * overscan
+        val saveCount = canvas.save()
+        canvas.clipPath(android.graphics.Path().apply {
+            addCircle(x, y, radius, android.graphics.Path.Direction.CW)
+        })
+        materialPaint.alpha = alpha.coerceIn(0, 255)
+        materialPaint.colorFilter = null
+        canvas.drawBitmap(
+            bitmap,
+            null,
+            RectF(
+                x - destinationRadius,
+                y - destinationRadius,
+                x + destinationRadius,
+                y + destinationRadius
+            ),
+            materialPaint
+        )
+        canvas.restoreToCount(saveCount)
     }
 
     private fun drawClassicTouchWheel(canvas: Canvas) {
@@ -888,6 +1024,7 @@ class SlideController3rd : View {
                     startPoint = curPoint
                     prevPoint.clear()
                     centerButtonPressed = curPoint.inCenter
+                    wheelPressed = curPoint.inCircle
                     setTimer(curPoint)
                     postInvalidateOnAnimation()
                 }
@@ -919,6 +1056,7 @@ class SlideController3rd : View {
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                     cancelTimer()
                     centerButtonPressed = false
+                    wheelPressed = false
                     postInvalidateOnAnimation()
                     if (startPoint.slided) {
                         return true
@@ -940,6 +1078,7 @@ class SlideController3rd : View {
         if (event.action == MotionEvent.ACTION_UP || event.action == MotionEvent.ACTION_CANCEL) {
             pressedButtonIndex = -1
             centerButtonPressed = false
+            wheelPressed = false
             postInvalidateOnAnimation()
         }
         return false
@@ -966,6 +1105,7 @@ class SlideController3rd : View {
         buttonBacklightStartedAt = 0L
         pressedButtonIndex = -1
         centerButtonPressed = false
+        wheelPressed = false
     }
 
     private fun emptyTouchPoint(): TouchPoint = TouchPoint(0f, 0f, 0L)

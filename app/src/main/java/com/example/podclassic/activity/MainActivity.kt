@@ -27,6 +27,7 @@ import com.example.podclassic.values.Values
 import com.example.podclassic.view.MusicPlayerView
 import com.example.podclassic.view.MusicPlayerView3rd
 import com.example.podclassic.widget.IPod3GClassicShellDrawable
+import com.example.podclassic.widget.IPod3rdBlackRedShellDrawable
 import com.example.podclassic.widget.SlideController3rd
 
 class MainActivity : AppCompatActivity() {
@@ -344,10 +345,11 @@ class MainActivity : AppCompatActivity() {
             slideController3gClassic.visibility =
                 if (isClassic3gTheme) View.VISIBLE else View.GONE
             linearLayout.setBackgroundResource(
-                if (isClassic3gTheme) {
-                    R.drawable.ipod_3g_screen_bezel
-                } else {
-                    R.drawable.round_rectangle
+                when {
+                    isClassic3gTheme -> R.drawable.ipod_3g_screen_bezel
+                    themeId == SPManager.Theme.IPOD_3RD.id ->
+                        R.drawable.ipod_3rd_black_red_screen_bezel
+                    else -> R.drawable.round_rectangle
                 }
             )
         }
@@ -392,11 +394,14 @@ class MainActivity : AppCompatActivity() {
         window.statusBarColor = color
         window.navigationBarColor = color
         findViewById<View>(R.id.main_layout)?.let { mainLayout ->
-            if (SPManager.Theme.isClassic3g(SPManager.getInt(SPManager.Theme.SP_NAME))) {
-                mainLayout.background =
-                    IPod3GClassicShellDrawable(resources)
-            } else {
-                mainLayout.setBackgroundColor(color)
+            when (SPManager.getInt(SPManager.Theme.SP_NAME)) {
+                SPManager.Theme.WHITE.id -> {
+                    mainLayout.background = IPod3GClassicShellDrawable(resources)
+                }
+                SPManager.Theme.IPOD_3RD.id -> {
+                    mainLayout.background = IPod3rdBlackRedShellDrawable(resources)
+                }
+                else -> mainLayout.setBackgroundColor(color)
             }
         }
     }
