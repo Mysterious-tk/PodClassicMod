@@ -30,7 +30,7 @@ class Screen(context: Context, attributeSet: AttributeSet?) : LinearLayout(conte
     private val density = resources.displayMetrics.density
     private val themeId get() = SPManager.getInt(SPManager.Theme.SP_NAME)
     private val isIpod3rdTheme get() = themeId == SPManager.Theme.IPOD_3RD.id
-    private val isClassic3gTheme get() = themeId == SPManager.Theme.IPOD_3G_CLASSIC.id
+    private val isClassic3gTheme get() = SPManager.Theme.isClassic3g(themeId)
     private val cornerRadius
         get() = when {
             isClassic3gTheme -> 5f * density
@@ -56,10 +56,10 @@ class Screen(context: Context, attributeSet: AttributeSet?) : LinearLayout(conte
         when {
             isClassic3gTheme -> {
             intArrayOf(
-                Color.rgb(194, 213, 210),
-                Color.rgb(179, 202, 200),
-                Color.rgb(163, 190, 188),
-                Color.rgb(151, 179, 178)
+                Color.rgb(162, 207, 234),
+                Color.rgb(139, 192, 225),
+                Color.rgb(116, 174, 213),
+                Color.rgb(96, 155, 199)
             )
             }
             isIpod3rdTheme -> {
@@ -187,7 +187,7 @@ class Screen(context: Context, attributeSet: AttributeSet?) : LinearLayout(conte
      */
     private fun drawNormalBackground(canvas: Canvas) {
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-        paint.color = if (isClassic3gTheme) Color.rgb(177, 201, 199) else Color.WHITE
+        paint.color = if (isClassic3gTheme) Color.rgb(127, 184, 219) else Color.WHITE
         canvas.drawRoundRect(
             0f, 0f, width.toFloat(), height.toFloat(),
             cornerRadius, cornerRadius, paint
@@ -382,14 +382,18 @@ class Screen(context: Context, attributeSet: AttributeSet?) : LinearLayout(conte
         val width = width.toFloat()
         val height = height.toFloat()
 
+        // The content is rendered first, then optically filtered into the same
+        // blue monochrome response as the reference backlit LCD.
+        canvas.drawColor(Color.rgb(126, 188, 226), PorterDuff.Mode.MULTIPLY)
+
         glossPaint.shader = LinearGradient(
             0f,
             0f,
             width * 0.78f,
             height,
             intArrayOf(
-                Color.argb(48, 255, 255, 245),
-                Color.argb(10, 255, 255, 245),
+                Color.argb(42, 220, 244, 255),
+                Color.argb(12, 194, 226, 246),
                 Color.TRANSPARENT
             ),
             floatArrayOf(0f, 0.42f, 1f),
@@ -398,22 +402,43 @@ class Screen(context: Context, attributeSet: AttributeSet?) : LinearLayout(conte
         canvas.drawRoundRect(0f, 0f, width, height, cornerRadius, cornerRadius, glossPaint)
         glossPaint.shader = null
 
-        // Extremely faint horizontal rows keep the display from reading as a modern panel.
-        glossPaint.color = Color.argb(10, 48, 68, 66)
-        glossPaint.strokeWidth = 0.45f * density
-        val rowSpacing = 3f * density
+        // A restrained pixel matrix keeps the panel from reading as a modern OLED.
+        glossPaint.color = Color.argb(15, 15, 64, 101)
+        glossPaint.strokeWidth = 0.4f * density
+        val rowSpacing = 2.4f * density
         var y = rowSpacing
         while (y < height) {
             canvas.drawLine(0f, y, width, y, glossPaint)
             y += rowSpacing
         }
+
+        glossPaint.color = Color.argb(8, 20, 71, 108)
+        val columnSpacing = 3.1f * density
+        var x = columnSpacing
+        while (x < width) {
+            canvas.drawLine(x, 0f, x, height, glossPaint)
+            x += columnSpacing
+        }
+
+        // Slightly darker lower/right falloff suggests depth beneath the LCD cover.
+        glossPaint.shader = LinearGradient(
+            0f,
+            0f,
+            width,
+            height,
+            intArrayOf(Color.TRANSPARENT, Color.argb(24, 19, 70, 108)),
+            floatArrayOf(0.55f, 1f),
+            Shader.TileMode.CLAMP
+        )
+        canvas.drawRoundRect(0f, 0f, width, height, cornerRadius, cornerRadius, glossPaint)
+        glossPaint.shader = null
     }
 
     private fun drawClassicLcdBorder(canvas: Canvas, width: Float, height: Float) {
         val inset = 0.65f * density
         borderPaint.shader = null
         borderPaint.strokeWidth = 1.1f * density
-        borderPaint.color = Color.argb(138, 57, 67, 64)
+        borderPaint.color = Color.argb(190, 16, 42, 64)
         canvas.drawRoundRect(
             inset,
             inset,
@@ -425,7 +450,7 @@ class Screen(context: Context, attributeSet: AttributeSet?) : LinearLayout(conte
         )
 
         borderPaint.strokeWidth = 0.65f * density
-        borderPaint.color = Color.argb(142, 238, 245, 236)
+        borderPaint.color = Color.argb(158, 215, 239, 250)
         canvas.drawLine(
             2f * density,
             1.5f * density,

@@ -42,7 +42,7 @@ class TitleBar : FrameLayout {
     private val density = resources.displayMetrics.density
     private val themeId get() = SPManager.getInt(SPManager.Theme.SP_NAME)
     private val isIpod3rdTheme get() = themeId == SPManager.Theme.IPOD_3RD.id
-    private val isClassic3gTheme get() = themeId == SPManager.Theme.IPOD_3G_CLASSIC.id
+    private val isClassic3gTheme get() = SPManager.Theme.isClassic3g(themeId)
     private val usesThirdGenerationLayout
         get() = SPManager.Theme.usesThirdGenerationLayout(themeId)
     private val batteryVerticalInset
@@ -98,7 +98,7 @@ class TitleBar : FrameLayout {
         playState.setPadding((2f * density).toInt(), (2f * density).toInt(), (2f * density).toInt(), (2f * density).toInt())
         playState.imageAlpha = 220
         if (isClassic3gTheme) {
-            playState.setColorFilter(Color.rgb(34, 56, 54))
+            playState.setColorFilter(Color.rgb(9, 39, 67))
         }
 
         MediaPresenter.playState.addObserver(observer, onDataChangeListener)
@@ -138,9 +138,9 @@ class TitleBar : FrameLayout {
             0f, 0f, 0f, h.toFloat(),
             if (isClassic3gTheme) {
                 intArrayOf(
-                    Color.rgb(205, 221, 216),
-                    Color.rgb(179, 202, 199),
-                    Color.rgb(159, 187, 185)
+                    Color.rgb(169, 211, 236),
+                    Color.rgb(139, 193, 226),
+                    Color.rgb(112, 171, 211)
                 )
             } else if (isIpod3rdTheme) {
                 intArrayOf(
@@ -171,7 +171,7 @@ class TitleBar : FrameLayout {
         title.setTextColor(Colors.text)
         if (isClassic3gTheme) {
             title.setShadowLayer(0f, 0f, 0f, Color.TRANSPARENT)
-            playState.setColorFilter(Color.rgb(34, 56, 54))
+            playState.setColorFilter(Color.rgb(9, 39, 67))
         } else {
             title.setShadowLayer(
                 0.7f,
@@ -325,9 +325,9 @@ class TitleBar : FrameLayout {
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
         paint.shader = null
 
-        edgePaint.color = Color.argb(88, 238, 246, 236)
+        edgePaint.color = Color.argb(110, 218, 242, 252)
         canvas.drawRect(0f, 0f, width.toFloat(), 0.55f * density, edgePaint)
-        edgePaint.color = Color.argb(132, 53, 70, 68)
+        edgePaint.color = Color.argb(190, 9, 42, 70)
         canvas.drawRect(
             0f,
             height - 0.8f * density,
@@ -401,21 +401,30 @@ class TitleBar : FrameLayout {
         override fun onDraw(canvas: Canvas) {
             super.onDraw(canvas)
 
+            val classic3g = SPManager.Theme.isClassic3g(
+                SPManager.getInt(SPManager.Theme.SP_NAME)
+            )
             val padding = height * if (compact) 0.27f else 0.2f
 
             val batteryBodyRight = width - padding * 3
             val radius = (height - padding * 2f) * 0.25f
             paint.shader = null
             paint.style = Paint.Style.FILL
-            paint.color = Color.argb(42, 20, 28, 38)
+            paint.color =
+                if (classic3g) Color.argb(20, 4, 30, 52)
+                else Color.argb(42, 20, 28, 38)
             canvas.drawRoundRect(0f, padding, batteryBodyRight, height - padding, radius, radius, paint)
 
             paint.style = Paint.Style.STROKE
             paint.strokeWidth = (height * 0.07f).coerceAtLeast(1f)
-            paint.color = Color.argb(175, 52, 61, 72)
+            paint.color =
+                if (classic3g) Color.rgb(6, 34, 58)
+                else Color.argb(175, 52, 61, 72)
             canvas.drawRoundRect(0f, padding, batteryBodyRight, height - padding, radius, radius, paint)
             paint.style = Paint.Style.FILL
-            paint.color = Color.argb(160, 52, 61, 72)
+            paint.color =
+                if (classic3g) Color.rgb(6, 34, 58)
+                else Color.argb(160, 52, 61, 72)
             canvas.drawRoundRect(
                 width - padding * 3 - 2f,
                 padding * 1.5f,
@@ -427,7 +436,9 @@ class TitleBar : FrameLayout {
             )
             val batteryWidth = batteryLevel.coerceIn(0, 100) * batteryBodyRight / 100f
 
-            paint.shader = when {
+            paint.shader = if (classic3g) {
+                null
+            } else when {
                 (batteryLevel <= 20) -> Colors.getShader(
                     0f,
                     0f,
@@ -453,6 +464,9 @@ class TitleBar : FrameLayout {
                     Colors.battery_green
                 )
             }
+            if (classic3g) {
+                paint.color = Color.rgb(7, 39, 66)
+            }
             if (batteryWidth > 4f) {
                 canvas.drawRoundRect(
                     2f,
@@ -466,7 +480,9 @@ class TitleBar : FrameLayout {
             }
 
             paint.shader = null
-            paint.color = Color.argb(128, 255, 255, 255)
+            paint.color =
+                if (classic3g) Color.argb(38, 207, 235, 249)
+                else Color.argb(128, 255, 255, 255)
             canvas.drawRoundRect(
                 2f,
                 padding + 2f,

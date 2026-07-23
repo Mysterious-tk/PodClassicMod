@@ -58,7 +58,7 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
     private var liquidGlassHighlightRequested = true
     var liquidGlassHighlightEnabled: Boolean
         get() = liquidGlassHighlightRequested &&
-            SPManager.getInt(SPManager.Theme.SP_NAME) != SPManager.Theme.IPOD_3G_CLASSIC.id
+            !SPManager.Theme.isClassic3g(SPManager.getInt(SPManager.Theme.SP_NAME))
         set(value) {
             if (liquidGlassHighlightRequested == value) return
             liquidGlassHighlightRequested = value
@@ -784,8 +784,20 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
         private val highlightDrawable by lazy {
             GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE
-                cornerRadius = 8f * context.resources.displayMetrics.density
-                setColor(Colors.main)
+                if (SPManager.Theme.isClassic3g(
+                        SPManager.getInt(SPManager.Theme.SP_NAME)
+                    )
+                ) {
+                    cornerRadius = 1.5f * context.resources.displayMetrics.density
+                    colors = intArrayOf(
+                        Color.rgb(26, 83, 132),
+                        Color.rgb(18, 63, 108)
+                    )
+                    orientation = GradientDrawable.Orientation.TOP_BOTTOM
+                } else {
+                    cornerRadius = 8f * context.resources.displayMetrics.density
+                    setColor(Colors.main)
+                }
             }
         }
 

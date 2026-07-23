@@ -70,24 +70,21 @@ object Colors {
         get() = when (SPManager.getInt(SPManager.Theme.SP_NAME)) {
             SPManager.Theme.RED.id -> theme_red
             SPManager.Theme.BLACK.id -> theme_black
-            SPManager.Theme.WHITE.id -> theme_white
-            SPManager.Theme.IPOD_3G_CLASSIC.id -> 0xFFF0EFE7.toInt()
+            SPManager.Theme.WHITE.id -> 0xFFF0EFE7.toInt()
             else -> theme_red
         }
 
     val screen: Int
         get() = when (SPManager.getInt(SPManager.Theme.SP_NAME)) {
             SPManager.Theme.RED.id or SPManager.Theme.BLACK.id -> black
-            SPManager.Theme.WHITE.id -> white
-            SPManager.Theme.IPOD_3G_CLASSIC.id -> 0xFFE7E6DD.toInt()
+            SPManager.Theme.WHITE.id -> 0xFF87B9D8.toInt()
             else -> black
         }
 
     val button: Int
         get() = when (SPManager.getInt(SPManager.Theme.SP_NAME)) {
             SPManager.Theme.RED.id or SPManager.Theme.BLACK.id -> black
-            SPManager.Theme.WHITE.id -> white
-            SPManager.Theme.IPOD_3G_CLASSIC.id -> 0xFFE9E8E0.toInt()
+            SPManager.Theme.WHITE.id -> 0xFFE9E8E0.toInt()
             else -> black
         }
 

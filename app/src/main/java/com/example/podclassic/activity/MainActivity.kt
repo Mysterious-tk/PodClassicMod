@@ -66,7 +66,7 @@ class MainActivity : AppCompatActivity() {
         
         val controllerView: View = when (themeId) {
             SPManager.Theme.IPOD_3RD.id -> findViewById(R.id.slide_controller_3rd)
-            SPManager.Theme.IPOD_3G_CLASSIC.id -> {
+            SPManager.Theme.WHITE.id -> {
                 findViewById<SlideController3rd>(R.id.slide_controller_3g_classic).apply {
                     classicMaterial = true
                 }
@@ -282,7 +282,7 @@ class MainActivity : AppCompatActivity() {
         
         val themeId = SPManager.getInt(SPManager.Theme.SP_NAME)
         val usesThirdGenerationLayout = SPManager.Theme.usesThirdGenerationLayout(themeId)
-        val isClassic3gTheme = themeId == SPManager.Theme.IPOD_3G_CLASSIC.id
+        val isClassic3gTheme = SPManager.Theme.isClassic3g(themeId)
         
         // 检查是否是横屏模式且当前显示的是CoverFlowView、MainView或MusicListView
         val isLandscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -392,7 +392,7 @@ class MainActivity : AppCompatActivity() {
         window.statusBarColor = color
         window.navigationBarColor = color
         findViewById<View>(R.id.main_layout)?.let { mainLayout ->
-            if (SPManager.getInt(SPManager.Theme.SP_NAME) == SPManager.Theme.IPOD_3G_CLASSIC.id) {
+            if (SPManager.Theme.isClassic3g(SPManager.getInt(SPManager.Theme.SP_NAME))) {
                 mainLayout.background =
                     IPod3GClassicShellDrawable(resources)
             } else {
@@ -405,7 +405,7 @@ class MainActivity : AppCompatActivity() {
     fun rebindController() {
         val controllerView: View = when (SPManager.getInt(SPManager.Theme.SP_NAME)) {
             SPManager.Theme.IPOD_3RD.id -> findViewById(R.id.slide_controller_3rd)
-            SPManager.Theme.IPOD_3G_CLASSIC.id -> {
+            SPManager.Theme.WHITE.id -> {
                 findViewById<SlideController3rd>(R.id.slide_controller_3g_classic).apply {
                     classicMaterial = true
                 }

@@ -55,7 +55,12 @@ object SPManager {
     }
 
     fun getInt(sp: String?): Int {
-        return sharedPreferences.getInt(sp, 0)
+        val value = sharedPreferences.getInt(sp, 0)
+        if (sp == Theme.SP_NAME && value == Theme.LEGACY_IPOD_3G_CLASSIC_ID) {
+            sharedPreferences.edit().putInt(sp, Theme.WHITE.id).apply()
+            return Theme.WHITE.id
+        }
+        return value
     }
 
     fun setInt(sp: String?, value: Int) {
@@ -155,15 +160,19 @@ object SPManager {
         WHITE(2, R.string.theme_white),
         BLACK(1, R.string.theme_black),
         RED(0, R.string.theme_red),
-        IPOD_3RD(3, R.string.theme_ipod_3rd),
-        IPOD_3G_CLASSIC(4, R.string.theme_ipod_3g_classic);
+        IPOD_3RD(3, R.string.theme_ipod_3rd);
 
         companion object {
             const val SP_NAME = "theme_color"
-            const val values = 5
+            const val values = 4
+            const val LEGACY_IPOD_3G_CLASSIC_ID = 4
 
             fun usesThirdGenerationLayout(id: Int): Boolean {
-                return id == IPOD_3RD.id || id == IPOD_3G_CLASSIC.id
+                return id == IPOD_3RD.id || id == WHITE.id
+            }
+
+            fun isClassic3g(id: Int): Boolean {
+                return id == WHITE.id || id == LEGACY_IPOD_3G_CLASSIC_ID
             }
 
             fun getTitle(id: Int): String {
@@ -172,7 +181,7 @@ object SPManager {
                     BLACK.id -> BLACK.title
                     RED.id -> RED.title
                     IPOD_3RD.id -> IPOD_3RD.title
-                    IPOD_3G_CLASSIC.id -> IPOD_3G_CLASSIC.title
+                    LEGACY_IPOD_3G_CLASSIC_ID -> WHITE.title
                     else -> BLACK.title
                 }
             }

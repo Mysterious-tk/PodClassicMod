@@ -69,7 +69,14 @@ class MusicListView : FrameLayout, ScreenView {
         // The artwork is the backdrop of the glass, so it must remain visible.
         // RenderEffect already softens it on API 31+; lowering the view alpha here
         // made translucent rows look as though they were sitting on a solid color.
-        imageView.alpha = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) 0.88f else 0.68f
+        imageView.alpha =
+            if (SPManager.Theme.isClassic3g(SPManager.getInt(SPManager.Theme.SP_NAME))) {
+                0f
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                0.88f
+            } else {
+                0.68f
+            }
         // 禁用背景ImageView的触摸事件，确保事件传递给上层的RecyclerListView
         imageView.isClickable = false
         imageView.isFocusable = false
@@ -164,6 +171,10 @@ class MusicListView : FrameLayout, ScreenView {
     
     // 加载背景模糊的专辑封面
     private fun loadBackgroundImage() {
+        if (SPManager.Theme.isClassic3g(SPManager.getInt(SPManager.Theme.SP_NAME))) {
+            backgroundImageView.setImageDrawable(null)
+            return
+        }
         if (musicList.isNotEmpty()) {
             val firstMusic = musicList[0]
             val albumId = firstMusic.albumId
