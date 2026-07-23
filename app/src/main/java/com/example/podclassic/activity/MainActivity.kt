@@ -16,6 +16,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.example.podclassic.R
 import com.example.podclassic.base.Core
+import com.example.podclassic.base.ScreenView
 import com.example.podclassic.fragment.SplashFragment
 import com.example.podclassic.service.MediaPresenter
 import com.example.podclassic.service.MediaService
@@ -24,6 +25,9 @@ import com.example.podclassic.util.MediaStoreUtil
 import com.example.podclassic.util.ThreadUtil
 import com.example.podclassic.values.Values
 import com.example.podclassic.view.MusicPlayerView
+import com.example.podclassic.view.MusicPlayerView3rd
+import com.example.podclassic.widget.IPod3GClassicShellDrawable
+import com.example.podclassic.widget.SlideController3rd
 
 class MainActivity : AppCompatActivity() {
 
@@ -42,7 +46,7 @@ class MainActivity : AppCompatActivity() {
             if (music != null) {
                 MediaPresenter.set(music)
                 ThreadUtil.runOnUiThread {
-                    Core.addView(MusicPlayerView(this))
+                    Core.addView(createMusicPlayerView())
                 }
             }
         }
@@ -58,14 +62,19 @@ class MainActivity : AppCompatActivity() {
             SPManager.reset()
         }
         // 根据当前选择的主题来决定绑定哪个SlideController到Core
-        val isIpod3rdTheme = SPManager.getInt(SPManager.Theme.SP_NAME) == SPManager.Theme.IPOD_3RD.id
+        val themeId = SPManager.getInt(SPManager.Theme.SP_NAME)
         
+        val controllerView: View = when (themeId) {
+            SPManager.Theme.IPOD_3RD.id -> findViewById(R.id.slide_controller_3rd)
+            SPManager.Theme.IPOD_3G_CLASSIC.id -> {
+                findViewById<SlideController3rd>(R.id.slide_controller_3g_classic).apply {
+                    classicMaterial = true
+                }
+            }
+            else -> findViewById(R.id.slide_controller)
+        }
         Core.bindActivity(
-            if (isIpod3rdTheme) {
-                findViewById<View>(R.id.slide_controller_3rd)
-            } else {
-                findViewById<View>(R.id.slide_controller)
-            },
+            controllerView,
             findViewById(R.id.screen),
             findViewById(R.id.dark_mode),
             this
@@ -204,10 +213,20 @@ class MainActivity : AppCompatActivity() {
                 MediaPresenter.setStopTime(SPManager.AutoStop.getMinute(autoStop))
             }
             ThreadUtil.runOnUiThread {
-                Core.addView(MusicPlayerView(this))
+                Core.addView(createMusicPlayerView())
             }
         }
     }
+
+    private fun createMusicPlayerView(): ScreenView =
+        if (SPManager.Theme.usesThirdGenerationLayout(
+                SPManager.getInt(SPManager.Theme.SP_NAME)
+            )
+        ) {
+            MusicPlayerView3rd(this)
+        } else {
+            MusicPlayerView(this)
+        }
 
     private fun initScreen() {
         val resourceId: Int = resources.getIdentifier("status_bar_height", "dimen", "android")
@@ -255,10 +274,15 @@ class MainActivity : AppCompatActivity() {
         val layoutParams = (linearLayout.layoutParams as LinearLayout.LayoutParams)
         val slideController = findViewById<View>(R.id.slide_controller)
         val slideController3rd = findViewById<View>(R.id.slide_controller_3rd)
+        val slideController3gClassic =
+            findViewById<SlideController3rd>(R.id.slide_controller_3g_classic).apply {
+                classicMaterial = true
+            }
         val slideControllerParams = (slideController.layoutParams as LinearLayout.LayoutParams)
         
-        // 检查是否选择了iPod 3rd主题
-        val isIpod3rdTheme = SPManager.getInt(SPManager.Theme.SP_NAME) == SPManager.Theme.IPOD_3RD.id
+        val themeId = SPManager.getInt(SPManager.Theme.SP_NAME)
+        val usesThirdGenerationLayout = SPManager.Theme.usesThirdGenerationLayout(themeId)
+        val isClassic3gTheme = themeId == SPManager.Theme.IPOD_3G_CLASSIC.id
         
         // 检查是否是横屏模式且当前显示的是CoverFlowView、MainView或MusicListView
         val isLandscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -283,16 +307,18 @@ class MainActivity : AppCompatActivity() {
             layoutParams.bottomMargin = 0
             slideControllerParams.height = 0
             slideController3rd.layoutParams.height = 0
+            slideController3gClassic.layoutParams.height = 0
             // 高度变为 0 后也隐藏控制器，避免配置切换期间继续触发绘制。
             slideController.visibility = View.GONE
             slideController3rd.visibility = View.GONE
+            slideController3gClassic.visibility = View.GONE
             // 移除 iPod 屏幕容器的圆角底板，避免横屏四周露出黑框。
             linearLayout.background = null
         } else {
             // 其他情况，保持默认布局
             // 使用dp单位设置高度，确保在不同分辨率屏幕上显示一致
             layoutParams.height = resources.getDimensionPixelSize(
-                if (isIpod3rdTheme) {
+                if (usesThirdGenerationLayout) {
                     R.dimen.layout_rectangle_height_ipod_3rd
                 } else {
                     R.dimen.layout_rectangle_height
@@ -309,10 +335,21 @@ class MainActivity : AppCompatActivity() {
             layoutParams.bottomMargin = 0
             slideControllerParams.height = LinearLayout.LayoutParams.MATCH_PARENT
             slideController3rd.layoutParams.height = LinearLayout.LayoutParams.MATCH_PARENT
+            slideController3gClassic.layoutParams.height = LinearLayout.LayoutParams.MATCH_PARENT
             // 非全屏布局只显示当前主题对应的控制器。
-            slideController.visibility = if (isIpod3rdTheme) View.GONE else View.VISIBLE
-            slideController3rd.visibility = if (isIpod3rdTheme) View.VISIBLE else View.GONE
-            linearLayout.setBackgroundResource(R.drawable.round_rectangle)
+            slideController.visibility =
+                if (usesThirdGenerationLayout) View.GONE else View.VISIBLE
+            slideController3rd.visibility =
+                if (themeId == SPManager.Theme.IPOD_3RD.id) View.VISIBLE else View.GONE
+            slideController3gClassic.visibility =
+                if (isClassic3gTheme) View.VISIBLE else View.GONE
+            linearLayout.setBackgroundResource(
+                if (isClassic3gTheme) {
+                    R.drawable.ipod_3g_screen_bezel
+                } else {
+                    R.drawable.round_rectangle
+                }
+            )
         }
 
         // 所有页面隐藏顶部状态栏；CoverFlow 横屏进一步隐藏导航栏进入沉浸式全屏。
@@ -354,16 +391,26 @@ class MainActivity : AppCompatActivity() {
     fun setColor(color: Int) {
         window.statusBarColor = color
         window.navigationBarColor = color
-        findViewById<View>(R.id.main_layout)?.setBackgroundColor(color)
+        findViewById<View>(R.id.main_layout)?.let { mainLayout ->
+            if (SPManager.getInt(SPManager.Theme.SP_NAME) == SPManager.Theme.IPOD_3G_CLASSIC.id) {
+                mainLayout.background =
+                    IPod3GClassicShellDrawable(resources)
+            } else {
+                mainLayout.setBackgroundColor(color)
+            }
+        }
     }
 
     // 重新绑定控制器，确保主题切换后控制器仍然可以触摸
     fun rebindController() {
-        val isIpod3rdTheme = SPManager.getInt(SPManager.Theme.SP_NAME) == SPManager.Theme.IPOD_3RD.id
-        val controllerView = if (isIpod3rdTheme) {
-            findViewById<View>(R.id.slide_controller_3rd)
-        } else {
-            findViewById<View>(R.id.slide_controller)
+        val controllerView: View = when (SPManager.getInt(SPManager.Theme.SP_NAME)) {
+            SPManager.Theme.IPOD_3RD.id -> findViewById(R.id.slide_controller_3rd)
+            SPManager.Theme.IPOD_3G_CLASSIC.id -> {
+                findViewById<SlideController3rd>(R.id.slide_controller_3g_classic).apply {
+                    classicMaterial = true
+                }
+            }
+            else -> findViewById(R.id.slide_controller)
         }
         
         Core.bindActivity(

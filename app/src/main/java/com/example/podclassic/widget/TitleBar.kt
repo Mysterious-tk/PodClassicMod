@@ -40,15 +40,19 @@ class TitleBar : FrameLayout {
     private var glassShader: Shader? = null
     private var glossShader: Shader? = null
     private val density = resources.displayMetrics.density
-    private val isIpod3rdTheme =
-        SPManager.getInt(SPManager.Theme.SP_NAME) == SPManager.Theme.IPOD_3RD.id
-    private val batteryVerticalInset =
+    private val themeId get() = SPManager.getInt(SPManager.Theme.SP_NAME)
+    private val isIpod3rdTheme get() = themeId == SPManager.Theme.IPOD_3RD.id
+    private val isClassic3gTheme get() = themeId == SPManager.Theme.IPOD_3G_CLASSIC.id
+    private val usesThirdGenerationLayout
+        get() = SPManager.Theme.usesThirdGenerationLayout(themeId)
+    private val batteryVerticalInset
+        get() =
         if (isIpod3rdTheme) (2f * density).toInt() else (2f * density).toInt()
-    private val batteryWidthRatio = if (isIpod3rdTheme) 2.2f else 1.8f
+    private val batteryWidthRatio get() = if (usesThirdGenerationLayout) 2.2f else 1.8f
 
     private val title = TextView(context)
     private val playState = ImageView(context)
-    private val battery = BatteryView(context, isIpod3rdTheme)
+    private val battery = BatteryView(context, usesThirdGenerationLayout)
 
     private val observer = Observer()
     private val onDataChangeListener = object : LiveData.OnDataChangeListener {
@@ -84,13 +88,18 @@ class TitleBar : FrameLayout {
             })
 
         // iPod Classic 风格的标题文字
-        title.textSize = if (isIpod3rdTheme) 12.5f else 15f
+        title.textSize = if (usesThirdGenerationLayout) 12.5f else 15f
         title.setTextColor(Colors.text)
         title.ellipsize = android.text.TextUtils.TruncateAt.END
-        title.setShadowLayer(0.7f, 0f, density * 0.5f, Color.argb(190, 255, 255, 255))
+        if (!isClassic3gTheme) {
+            title.setShadowLayer(0.7f, 0f, density * 0.5f, Color.argb(190, 255, 255, 255))
+        }
         playState.scaleType = ImageView.ScaleType.CENTER_INSIDE
         playState.setPadding((2f * density).toInt(), (2f * density).toInt(), (2f * density).toInt(), (2f * density).toInt())
         playState.imageAlpha = 220
+        if (isClassic3gTheme) {
+            playState.setColorFilter(Color.rgb(34, 56, 54))
+        }
 
         MediaPresenter.playState.addObserver(observer, onDataChangeListener)
         observer.enable = true
@@ -120,10 +129,20 @@ class TitleBar : FrameLayout {
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
         updatePlayStateMargin(h)
+        updateShaders(w, h)
+    }
+
+    private fun updateShaders(w: Int, h: Int) {
         if (w <= 0 || h <= 0) return
         glassShader = LinearGradient(
             0f, 0f, 0f, h.toFloat(),
-            if (isIpod3rdTheme) {
+            if (isClassic3gTheme) {
+                intArrayOf(
+                    Color.rgb(205, 221, 216),
+                    Color.rgb(179, 202, 199),
+                    Color.rgb(159, 187, 185)
+                )
+            } else if (isIpod3rdTheme) {
                 intArrayOf(
                     Color.argb(202, 255, 255, 255),
                     Color.argb(154, 248, 250, 253),
@@ -145,6 +164,28 @@ class TitleBar : FrameLayout {
             floatArrayOf(0f, 0.38f, 1f),
             Shader.TileMode.CLAMP
         )
+    }
+
+    fun refreshTheme() {
+        title.textSize = if (usesThirdGenerationLayout) 12.5f else 15f
+        title.setTextColor(Colors.text)
+        if (isClassic3gTheme) {
+            title.setShadowLayer(0f, 0f, 0f, Color.TRANSPARENT)
+            playState.setColorFilter(Color.rgb(34, 56, 54))
+        } else {
+            title.setShadowLayer(
+                0.7f,
+                0f,
+                density * 0.5f,
+                Color.argb(190, 255, 255, 255)
+            )
+            playState.clearColorFilter()
+        }
+        battery.compact = usesThirdGenerationLayout
+        updateLayoutForOrientation()
+        updateShaders(width, height)
+        invalidate()
+        battery.invalidate()
     }
 
     /** Keep the playback state immediately to the left of the variable-width battery. */
@@ -235,6 +276,11 @@ class TitleBar : FrameLayout {
         super.onDraw(canvas)
         if (width <= 0 || height <= 0) return
 
+        if (isClassic3gTheme) {
+            drawClassicLcdTitleBar(canvas)
+            return
+        }
+
         // Translucent material with a directional highlight instead of an opaque metal strip.
         paint.shader = glassShader
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
@@ -272,6 +318,23 @@ class TitleBar : FrameLayout {
         )
         canvas.drawRect(0f, height - 0.75f * density, width.toFloat(), height.toFloat(), edgePaint)
         edgePaint.shader = null
+    }
+
+    private fun drawClassicLcdTitleBar(canvas: Canvas) {
+        paint.shader = glassShader
+        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
+        paint.shader = null
+
+        edgePaint.color = Color.argb(88, 238, 246, 236)
+        canvas.drawRect(0f, 0f, width.toFloat(), 0.55f * density, edgePaint)
+        edgePaint.color = Color.argb(132, 53, 70, 68)
+        canvas.drawRect(
+            0f,
+            height - 0.8f * density,
+            width.toFloat(),
+            height.toFloat(),
+            edgePaint
+        )
     }
 
     private fun registerBatteryBroadcastReceiver() {
@@ -319,7 +382,15 @@ class TitleBar : FrameLayout {
         }
     }
 
-    class BatteryView(context: Context, private val compact: Boolean = false) : View(context) {
+    class BatteryView(context: Context, compact: Boolean = false) : View(context) {
+
+        var compact: Boolean = compact
+            set(value) {
+                if (field == value) return
+                field = value
+                requestLayout()
+                invalidate()
+            }
 
         private val paint by lazy { Paint(Paint.ANTI_ALIAS_FLAG) }
         private val chargingPath = Path()

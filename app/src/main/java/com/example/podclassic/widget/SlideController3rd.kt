@@ -3,6 +3,7 @@ package com.example.podclassic.widget
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BitmapShader
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.LinearGradient
@@ -28,15 +29,12 @@ class SlideController3rd : View {
 
     companion object {
         private const val SLIDE_VAL = 18
-        private var centerX = 0f
-        private var centerY = 0f
-
-        private var minR = 0f
-        private var maxR = 0f
-
         private const val WHEEL_DIAMETER_DP = 217f
+        private const val CLASSIC_WHEEL_DIAMETER_DP = 248f
         private const val WHEEL_BOTTOM_MARGIN_DP = 64f
         private const val CONTROL_BUTTON_DIAMETER_DP = 56f
+        private const val CLASSIC_CONTROL_BUTTON_DIAMETER_DP = 68f
+        private const val CLASSIC_CONTROL_WHEEL_GAP_DP = 12f
         private const val BACKLIGHT_DURATION_MS = 2800L
         private const val BACKLIGHT_HOLD_FRACTION = 0.72f
 
@@ -56,19 +54,34 @@ class SlideController3rd : View {
         )
     }
     private val iconBacklightPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val acrylicNoisePaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.DITHER_FLAG).apply {
+        shader = BitmapShader(
+            createAcrylicNoiseTile(),
+            Shader.TileMode.REPEAT,
+            Shader.TileMode.REPEAT
+        )
+    }
     private var wheelBaseShader: Shader? = null
     private var wheelReflectionShader: Shader? = null
     private var wheelDepthShader: Shader? = null
     private var wheelEdgeShader: Shader? = null
+    private var centerX = 0f
+    private var centerY = 0f
+    private var minR = 0f
+    private var maxR = 0f
     private var buttonRadius = 0f
     private var density = 1f
     private var buttonBacklightStartedAt = 0L
+    private var pressedButtonIndex = -1
+    private var centerButtonPressed = false
 
     var enable = true
         set(value) {
             if (!value) {
                 cancelTimer()
                 buttonBacklightStartedAt = 0L
+                pressedButtonIndex = -1
+                centerButtonPressed = false
                 invalidate()
             }
             field = value
@@ -77,26 +90,62 @@ class SlideController3rd : View {
     var colorController: Int = Color.RED
     var colorButton: Int = Color.BLACK
 
+    /**
+     * The existing iPod 3rd skin keeps its liquid-glass finish. A second controller
+     * instance enables this flag for the separate, historically grounded 3G skin.
+     */
+    var classicMaterial: Boolean = false
+        set(value) {
+            if (field == value) return
+            field = value
+            updateGlassShaders()
+            requestLayout()
+            invalidate()
+        }
+
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec)
         val x = MeasureSpec.getSize(widthMeasureSpec)
         val y = MeasureSpec.getSize(heightMeasureSpec)
         centerX = x / 2f
         density = resources.displayMetrics.density
-        val requestedRadius = WHEEL_DIAMETER_DP * density / 2f
+        val buttonDiameter =
+            if (classicMaterial) CLASSIC_CONTROL_BUTTON_DIAMETER_DP
+            else CONTROL_BUTTON_DIAMETER_DP
+        buttonRadius = buttonDiameter * density / 2f
+
+        val wheelDiameter =
+            if (classicMaterial) CLASSIC_WHEEL_DIAMETER_DP else WHEEL_DIAMETER_DP
+        val requestedRadius = wheelDiameter * density / 2f
         val bottomMargin = WHEEL_BOTTOM_MARGIN_DP * density
+        val controlGap =
+            if (classicMaterial) CLASSIC_CONTROL_WHEEL_GAP_DP * density else 0f
+        val heightLimitedRadius = if (classicMaterial) {
+            // buttonRowY is 0.5R and the wheel occupies another 2R below its
+            // top edge, so reserve 2.5R + button radius + the visible gap.
+            ((y - bottomMargin - buttonRadius - controlGap) / 2.5f)
+                .coerceAtLeast(0f)
+        } else {
+            (y - bottomMargin).coerceAtLeast(0f) / 2f
+        }
 
         // 3G 转盘保持 217dp 直径，以 64dp 底边距为顶部按钮留出更多呼吸空间。
         // 极窄或极矮的窗口中才缩小，避免转盘被裁切。
         maxR = min(
             requestedRadius,
-            min(centerX, (y - bottomMargin).coerceAtLeast(0f) / 2f)
+            min(centerX, heightLimitedRadius)
         )
-        centerY = (y - bottomMargin - maxR).coerceAtLeast(maxR)
+        val bottomAnchoredCenter = (y - bottomMargin - maxR).coerceAtLeast(maxR)
+        val minimumSeparatedCenter = if (classicMaterial) {
+            maxR * 1.5f + buttonRadius + controlGap
+        } else {
+            maxR
+        }
+        centerY = maxOf(bottomAnchoredCenter, minimumSeparatedCenter)
+            .coerceAtMost((y - maxR).coerceAtLeast(maxR))
 
-        minR = maxR / 16 * 5
+        minR = if (classicMaterial) maxR * 0.358f else maxR / 16 * 5
 
-        buttonRadius = CONTROL_BUTTON_DIAMETER_DP * density / 2f
         updateGlassShaders()
 
     }
@@ -171,24 +220,32 @@ class SlideController3rd : View {
         // 收到一次绘制回调，此时 RadialGradient 不接受 0 半径。
         if (maxR <= 0f || minR <= 0f || width <= 0 || height <= 0) return
 
-        drawLiquidGlassWheel(canvas)
-
-        drawRecessedCenterButton(canvas)
+        if (classicMaterial) {
+            drawClassicTouchWheel(canvas)
+            drawClassicCenterButton(canvas)
+        } else {
+            drawLiquidGlassWheel(canvas)
+            drawRecessedCenterButton(canvas)
+        }
 
         // 按钮位置调整：在屏幕顶部，形成一行
         val buttonRowY = maxR * 0.5f // 按钮行位于屏幕顶部，距离圆盘顶部一定距离
-        val buttonSpacing = width / 5f // 按钮之间的间距
+        val button1X = buttonCenterX(0)
+        val button2X = buttonCenterX(1)
+        val button3X = buttonCenterX(2)
+        val button4X = buttonCenterX(3)
 
-        // 计算四个按钮的X坐标，形成一行
-        val button1X = buttonSpacing
-        val button2X = buttonSpacing * 2
-        val button3X = buttonSpacing * 3
-        val button4X = buttonSpacing * 4
-
-        drawGlassButton(canvas, button1X, buttonRowY)
-        drawGlassButton(canvas, button2X, buttonRowY)
-        drawGlassButton(canvas, button3X, buttonRowY)
-        drawGlassButton(canvas, button4X, buttonRowY)
+        if (classicMaterial) {
+            drawClassicTouchButton(canvas, button1X, buttonRowY, 0)
+            drawClassicTouchButton(canvas, button2X, buttonRowY, 1)
+            drawClassicTouchButton(canvas, button3X, buttonRowY, 2)
+            drawClassicTouchButton(canvas, button4X, buttonRowY, 3)
+        } else {
+            drawGlassButton(canvas, button1X, buttonRowY)
+            drawGlassButton(canvas, button2X, buttonRowY)
+            drawGlassButton(canvas, button3X, buttonRowY)
+            drawGlassButton(canvas, button4X, buttonRowY)
+        }
 
         // Keep the existing assets and exact centers; only their finish changes.
         drawBacklitIcon(canvas, Icons.PREV.bitmap, button1X, buttonRowY)
@@ -207,12 +264,26 @@ class SlideController3rd : View {
         postInvalidateOnAnimation()
     }
 
+    private fun buttonCenterX(index: Int): Float {
+        return if (classicMaterial) {
+            // Reference positions: 1/6, 7/18, 11/18 and 5/6 of the body width.
+            width * (1f / 6f + index * 2f / 9f)
+        } else {
+            width * (index + 1) / 5f
+        }
+    }
+
     private fun drawBacklitIcon(
         canvas: Canvas,
         bitmap: Bitmap,
         centerX: Float,
         centerY: Float
     ) {
+        if (classicMaterial) {
+            drawClassicBacklitIcon(canvas, bitmap, centerX, centerY)
+            return
+        }
+
         val left = centerX - bitmap.width / 2f
         val top = centerY - bitmap.height / 2f
         val intensity = currentBacklightIntensity()
@@ -235,6 +306,36 @@ class SlideController3rd : View {
         iconBacklightPaint.colorFilter = null
     }
 
+    private fun drawClassicBacklitIcon(
+        canvas: Canvas,
+        bitmap: Bitmap,
+        centerX: Float,
+        centerY: Float
+    ) {
+        val intensity = currentBacklightIntensity()
+        val iconScale = 0.75f
+        val iconWidth = bitmap.width * iconScale
+        val iconHeight = bitmap.height * iconScale
+        val destination = RectF(
+            centerX - iconWidth / 2f,
+            centerY - iconHeight / 2f,
+            centerX + iconWidth / 2f,
+            centerY + iconHeight / 2f
+        )
+        // The reference keeps the four capacitive legends orange-red even when idle.
+        // Touch feedback only warms and brightens the printed symbol slightly.
+        val red = (226 + 21f * intensity).toInt().coerceIn(0, 255)
+        val green = (78 + 20f * intensity).toInt().coerceIn(0, 255)
+        val blue = (39 + 14f * intensity).toInt().coerceIn(0, 255)
+        iconBacklightPaint.alpha = (238 + 17f * intensity).toInt()
+        iconBacklightPaint.colorFilter = PorterDuffColorFilter(
+            Color.rgb(red, green, blue),
+            PorterDuff.Mode.SRC_IN
+        )
+        canvas.drawBitmap(bitmap, null, destination, iconBacklightPaint)
+        iconBacklightPaint.colorFilter = null
+    }
+
     private fun currentBacklightIntensity(): Float {
         val startedAt = buttonBacklightStartedAt
         if (startedAt == 0L) return 0f
@@ -253,6 +354,24 @@ class SlideController3rd : View {
                 0.88f * (1f - fade) * (1f - fade)
             }
         }
+    }
+
+    private fun createAcrylicNoiseTile(): Bitmap {
+        val size = 64
+        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val pixels = IntArray(size * size)
+        val random = Random(20031016L)
+        for (index in pixels.indices) {
+            val warmth = 238 + random.nextInt(14)
+            pixels[index] = Color.argb(
+                8 + random.nextInt(14),
+                warmth,
+                warmth,
+                (warmth - 5).coerceAtLeast(0)
+            )
+        }
+        bitmap.setPixels(pixels, 0, size, 0, 0, size, size)
+        return bitmap
     }
 
     private fun drawLiquidGlassWheel(canvas: Canvas) {
@@ -415,8 +534,231 @@ class SlideController3rd : View {
         canvas.drawCircle(x, y, surfaceRadius - edgePaint.strokeWidth / 2f, edgePaint)
     }
 
-    private var startPoint: TouchPoint = TouchPoint.emptyTouchPoint()
-    private var prevPoint: TouchPoint = TouchPoint.emptyTouchPoint()
+    private fun drawClassicTouchWheel(canvas: Canvas) {
+        val grooveWidth = 7.6f * density
+        val faceRadius = (maxR - grooveWidth).coerceAtLeast(0f)
+
+        glassPaint.style = Paint.Style.FILL
+        // Layer 5 starts with a recessed circular cavity: the upper-left inner
+        // wall is shaded and the lower-right wall transports light.
+        glassPaint.shader = LinearGradient(
+            centerX - maxR,
+            centerY - maxR,
+            centerX + maxR,
+            centerY + maxR,
+            intArrayOf(
+                Color.argb(148, 137, 134, 126),
+                Color.argb(112, 205, 202, 194),
+                Color.argb(224, 255, 255, 252)
+            ),
+            floatArrayOf(0f, 0.50f, 1f),
+            Shader.TileMode.CLAMP
+        )
+        canvas.drawCircle(centerX, centerY, maxR, glassPaint)
+
+        // The cavity floor is deliberately a little darker than the shell. A
+        // diagonal gradient suggests depth without creating a convex centre.
+        glassPaint.shader = LinearGradient(
+            centerX - faceRadius,
+            centerY - faceRadius,
+            centerX + faceRadius,
+            centerY + faceRadius,
+            intArrayOf(
+                Color.argb(224, 224, 222, 214),
+                Color.argb(218, 235, 233, 226),
+                Color.argb(210, 244, 242, 235)
+            ),
+            floatArrayOf(0f, 0.55f, 1f),
+            Shader.TileMode.CLAMP
+        )
+        canvas.drawCircle(centerX, centerY, faceRadius, glassPaint)
+
+        // Low-contrast sub-surface scatter; there is no central bright spot.
+        glassPaint.shader = LinearGradient(
+            centerX,
+            centerY - faceRadius,
+            centerX,
+            centerY + faceRadius,
+            intArrayOf(
+                Color.argb(28, 255, 255, 252),
+                Color.argb(12, 250, 248, 241),
+                Color.argb(24, 174, 171, 162)
+            ),
+            floatArrayOf(0f, 0.48f, 1f),
+            Shader.TileMode.CLAMP
+        )
+        canvas.drawCircle(centerX, centerY, faceRadius, glassPaint)
+
+        acrylicNoisePaint.alpha = 8
+        canvas.drawCircle(centerX, centerY, faceRadius, acrylicNoisePaint)
+        glassPaint.shader = null
+
+        // A translucent edge ring follows the cavity floor rather than sitting
+        // above it as a raised disc.
+        edgePaint.shader = null
+        edgePaint.strokeWidth = 1.15f * density
+        edgePaint.shader = LinearGradient(
+            centerX - faceRadius,
+            centerY - faceRadius,
+            centerX + faceRadius,
+            centerY + faceRadius,
+            Color.argb(118, 115, 111, 103),
+            Color.argb(198, 255, 255, 252),
+            Shader.TileMode.CLAMP
+        )
+        canvas.drawCircle(centerX, centerY, faceRadius, edgePaint)
+        edgePaint.shader = null
+
+        val faceBounds = RectF(
+            centerX - faceRadius,
+            centerY - faceRadius,
+            centerX + faceRadius,
+            centerY + faceRadius
+        )
+        edgePaint.strokeWidth = 1.25f * density
+        edgePaint.color = Color.argb(78, 77, 74, 68)
+        canvas.drawArc(faceBounds, 184f, 171f, false, edgePaint)
+        edgePaint.strokeWidth = 1.25f * density
+        edgePaint.color = Color.argb(178, 255, 255, 252)
+        canvas.drawArc(faceBounds, 4f, 171f, false, edgePaint)
+    }
+
+    private fun drawClassicCenterButton(canvas: Canvas) {
+        val groove = 2.8f * density
+        val press = if (centerButtonPressed) 1f else 0f
+
+        // The centre key is another shallow well, only slightly clearer than
+        // the wheel floor.
+        glassPaint.shader = LinearGradient(
+            centerX - minR,
+            centerY - minR,
+            centerX + minR,
+            centerY + minR,
+            Color.argb((142 + 22f * press).toInt(), 132, 129, 121),
+            Color.argb((218 - 20f * press).toInt(), 255, 255, 252),
+            Shader.TileMode.CLAMP
+        )
+        canvas.drawCircle(centerX, centerY, minR + groove, glassPaint)
+
+        glassPaint.shader = LinearGradient(
+            centerX - minR,
+            centerY - minR,
+            centerX + minR,
+            centerY + minR,
+            intArrayOf(
+                Color.argb((196 - 14f * press).toInt(), 229, 227, 219),
+                Color.argb((184 - 14f * press).toInt(), 241, 239, 232),
+                Color.argb((174 - 10f * press).toInt(), 248, 246, 239)
+            ),
+            floatArrayOf(0f, 0.54f, 1f),
+            Shader.TileMode.CLAMP
+        )
+        canvas.drawCircle(centerX, centerY, minR, glassPaint)
+
+        acrylicNoisePaint.alpha = 6
+        canvas.drawCircle(centerX, centerY, minR, acrylicNoisePaint)
+        glassPaint.shader = null
+
+        edgePaint.strokeWidth = 0.65f * density
+        edgePaint.color = Color.argb((84 + 24f * press).toInt(), 91, 87, 80)
+        canvas.drawCircle(centerX, centerY, minR, edgePaint)
+
+        val centerBounds = RectF(
+            centerX - minR,
+            centerY - minR,
+            centerX + minR,
+            centerY + minR
+        )
+        edgePaint.strokeWidth = 0.95f * density
+        edgePaint.color = Color.argb((78 + 18f * press).toInt(), 70, 67, 61)
+        canvas.drawArc(centerBounds, 184f, 171f, false, edgePaint)
+        edgePaint.color = Color.argb((164 - 42f * press).toInt(), 255, 255, 252)
+        canvas.drawArc(centerBounds, 4f, 171f, false, edgePaint)
+    }
+
+    private fun drawClassicTouchButton(canvas: Canvas, x: Float, y: Float, index: Int) {
+        val press = if (pressedButtonIndex == index) 1f else 0f
+        val rimWidth = 2.8f * density
+        val faceRadius = buttonRadius - rimWidth
+
+        // Recessed touch well: shaded inner wall at upper-left, translucent rim
+        // at lower-right. The rim does not cast an exterior shadow.
+        glassPaint.shader = LinearGradient(
+            x - buttonRadius,
+            y - buttonRadius,
+            x + buttonRadius,
+            y + buttonRadius,
+            intArrayOf(
+                Color.argb((152 + 20f * press).toInt(), 137, 133, 125),
+                Color.argb(104, 206, 203, 195),
+                Color.argb((218 - 24f * press).toInt(), 255, 255, 252)
+            ),
+            floatArrayOf(0f, 0.50f, 1f),
+            Shader.TileMode.CLAMP
+        )
+        canvas.drawCircle(x, y, buttonRadius, glassPaint)
+
+        // A slightly darker, almost planar cavity floor avoids any neumorphic
+        // convex highlight. Pressing deepens it by changing shader alpha.
+        glassPaint.shader = LinearGradient(
+            x - faceRadius,
+            y - faceRadius,
+            x + faceRadius,
+            y + faceRadius,
+            intArrayOf(
+                Color.argb(
+                    (206 + 10f * press).toInt(),
+                    (226 - 8f * press).toInt(),
+                    (224 - 8f * press).toInt(),
+                    (216 - 8f * press).toInt()
+                ),
+                Color.argb(
+                    (194 + 8f * press).toInt(),
+                    (237 - 7f * press).toInt(),
+                    (235 - 7f * press).toInt(),
+                    (228 - 7f * press).toInt()
+                ),
+                Color.argb(
+                    (184 + 6f * press).toInt(),
+                    (244 - 6f * press).toInt(),
+                    (242 - 6f * press).toInt(),
+                    (235 - 6f * press).toInt()
+                )
+            ),
+            floatArrayOf(0f, 0.56f, 1f),
+            Shader.TileMode.CLAMP
+        )
+        canvas.drawCircle(x, y, faceRadius, glassPaint)
+
+        acrylicNoisePaint.alpha = 6
+        canvas.drawCircle(x, y, faceRadius, acrylicNoisePaint)
+        glassPaint.shader = null
+
+        val faceBounds = RectF(x - faceRadius, y - faceRadius, x + faceRadius, y + faceRadius)
+        edgePaint.strokeWidth = 0.6f * density
+        edgePaint.color = Color.argb((98 + 22f * press).toInt(), 91, 87, 80)
+        canvas.drawCircle(x, y, faceRadius, edgePaint)
+        edgePaint.strokeWidth = 1.0f * density
+        edgePaint.color = Color.argb((82 + 18f * press).toInt(), 70, 67, 61)
+        canvas.drawArc(
+            faceBounds,
+            184f,
+            171f,
+            false,
+            edgePaint
+        )
+        edgePaint.color = Color.argb((164 - 42f * press).toInt(), 255, 255, 252)
+        canvas.drawArc(
+            faceBounds,
+            4f,
+            171f,
+            false,
+            edgePaint
+        )
+    }
+
+    private var startPoint: TouchPoint = emptyTouchPoint()
+    private var prevPoint: TouchPoint = emptyTouchPoint()
     private var touchTimer: Timer? = null
     
     // 用于记录顶部按钮区域的长按状态
@@ -483,18 +825,23 @@ class SlideController3rd : View {
         
         // 检查是否触摸到屏幕顶部的按钮区域
         val buttonRowY = maxR * 0.5f
-        val buttonHeight = maxOf(Icons.MENU.height, Icons.PREV.height, Icons.PAUSE.height, Icons.NEXT.height).toFloat()
+        val iconButtonHeight =
+            maxOf(Icons.MENU.height, Icons.PREV.height, Icons.PAUSE.height, Icons.NEXT.height)
+                .toFloat()
+        val buttonHeight = if (classicMaterial) buttonRadius else iconButtonHeight
         val buttonAreaTop = buttonRowY - buttonHeight
         val buttonAreaBottom = buttonRowY + buttonHeight
         
         if (y >= buttonAreaTop && y <= buttonAreaBottom) {
             // 触摸到了按钮区域
-            val buttonSpacing = width / 5f
-            val button1X = buttonSpacing
-            val button2X = buttonSpacing * 2
-            val button3X = buttonSpacing * 3
-            val button4X = buttonSpacing * 4
-            val buttonWidth = maxOf(Icons.MENU.width, Icons.PREV.width, Icons.PAUSE.width, Icons.NEXT.width).toFloat()
+            val button1X = buttonCenterX(0)
+            val button2X = buttonCenterX(1)
+            val button3X = buttonCenterX(2)
+            val button4X = buttonCenterX(3)
+            val iconButtonWidth =
+                maxOf(Icons.MENU.width, Icons.PREV.width, Icons.PAUSE.width, Icons.NEXT.width)
+                    .toFloat()
+            val buttonWidth = if (classicMaterial) buttonRadius * 2f else iconButtonWidth
             
             // 判断触摸的是哪个按钮
             val touchedButtonIndex = when {
@@ -508,9 +855,11 @@ class SlideController3rd : View {
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
                     if (touchedButtonIndex >= 0) {
+                        pressedButtonIndex = touchedButtonIndex
                         startButtonBacklight()
                         buttonLongClickState = touchedButtonIndex
                         setTimer(curPoint, touchedButtonIndex)
+                        postInvalidateOnAnimation()
                     }
                 }
                 MotionEvent.ACTION_UP -> {
@@ -522,9 +871,13 @@ class SlideController3rd : View {
                         2 -> onPauseClick()
                         3 -> onNextClick()
                     }
+                    pressedButtonIndex = -1
+                    postInvalidateOnAnimation()
                 }
                 MotionEvent.ACTION_CANCEL -> {
                     cancelTimer()
+                    pressedButtonIndex = -1
+                    postInvalidateOnAnimation()
                 }
             }
             return true
@@ -534,14 +887,22 @@ class SlideController3rd : View {
                 MotionEvent.ACTION_DOWN -> {
                     startPoint = curPoint
                     prevPoint.clear()
+                    centerButtonPressed = curPoint.inCenter
                     setTimer(curPoint)
+                    postInvalidateOnAnimation()
                 }
 
                 MotionEvent.ACTION_MOVE -> {
-                    val slideVal = if (prevPoint.isEmpty()) TouchPoint.calcSlideVal(
+                    val shouldShowCenterPress =
+                        startPoint.inCenter && curPoint.inCenter && !startPoint.slided
+                    if (centerButtonPressed != shouldShowCenterPress) {
+                        centerButtonPressed = shouldShowCenterPress
+                        postInvalidateOnAnimation()
+                    }
+                    val slideVal = if (prevPoint.isEmpty()) calcSlideVal(
                         startPoint,
                         curPoint
-                    ) else TouchPoint.calcSlideVal(
+                    ) else calcSlideVal(
                         prevPoint,
                         curPoint
                     )
@@ -557,6 +918,8 @@ class SlideController3rd : View {
 
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                     cancelTimer()
+                    centerButtonPressed = false
+                    postInvalidateOnAnimation()
                     if (startPoint.slided) {
                         return true
                     }
@@ -571,7 +934,14 @@ class SlideController3rd : View {
             }
             return true
         }
-        
+
+        // A finger may leave the visual control before release. Clear the live
+        // material state even when the gesture ends outside every hit region.
+        if (event.action == MotionEvent.ACTION_UP || event.action == MotionEvent.ACTION_CANCEL) {
+            pressedButtonIndex = -1
+            centerButtonPressed = false
+            postInvalidateOnAnimation()
+        }
         return false
     }
 
@@ -594,44 +964,38 @@ class SlideController3rd : View {
         super.onDetachedFromWindow()
         cancelTimer()
         buttonBacklightStartedAt = 0L
+        pressedButtonIndex = -1
+        centerButtonPressed = false
     }
 
-    class TouchPoint constructor(x: Float, y: Float, t: Long) {
+    private fun emptyTouchPoint(): TouchPoint = TouchPoint(0f, 0f, 0L)
 
-        companion object {
-
-            fun emptyTouchPoint(): TouchPoint {
-                return TouchPoint(
-                    0f,
-                    0f,
-                    0L
-                )
-            }
-
-            /**
-             * 大于0：next，等于0：未移动，小于0：prev
-             */
-            private fun calcSlideVal(prevDeg: Int, curDeg: Int): Int {
-                val minus = prevDeg - curDeg
-                if (abs(minus) >= SLIDE_VAL * 4 || minus == 0) {
-                    return 0
-                }
-                if ((prevDeg == 360 - SLIDE_VAL || prevDeg == 360 - SLIDE_VAL * 2 || prevDeg == 360 - SLIDE_VAL * 3) && curDeg == 0) {
-                    return -1
-                } else if (prevDeg == 0 && (curDeg == 360 - SLIDE_VAL || curDeg == 360 - SLIDE_VAL * 2 || curDeg == 360 - SLIDE_VAL * 3)) {
-                    return 1
-                }
-                return if (minus > 0) 1 else -1
-            }
-
-            fun calcSlideVal(prevPoint: TouchPoint, curPoint: TouchPoint): Int {
-
-                return calcSlideVal(
-                    prevPoint.deg,
-                    curPoint.deg
-                )
-            }
+    /**
+     * 大于0：next，等于0：未移动，小于0：prev
+     */
+    private fun calcSlideVal(prevPoint: TouchPoint, curPoint: TouchPoint): Int {
+        val prevDeg = prevPoint.deg
+        val curDeg = curPoint.deg
+        val minus = prevDeg - curDeg
+        if (abs(minus) >= SLIDE_VAL * 4 || minus == 0) {
+            return 0
         }
+        if ((prevDeg == 360 - SLIDE_VAL ||
+                prevDeg == 360 - SLIDE_VAL * 2 ||
+                prevDeg == 360 - SLIDE_VAL * 3) && curDeg == 0
+        ) {
+            return -1
+        } else if (prevDeg == 0 &&
+            (curDeg == 360 - SLIDE_VAL ||
+                curDeg == 360 - SLIDE_VAL * 2 ||
+                curDeg == 360 - SLIDE_VAL * 3)
+        ) {
+            return 1
+        }
+        return if (minus > 0) 1 else -1
+    }
+
+    inner class TouchPoint constructor(x: Float, y: Float, t: Long) {
 
         var x = 0f
         var y = 0f

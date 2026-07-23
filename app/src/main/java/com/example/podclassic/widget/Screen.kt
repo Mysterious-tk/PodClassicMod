@@ -28,9 +28,15 @@ class Screen(context: Context, attributeSet: AttributeSet?) : LinearLayout(conte
 
     // 3G 卡片使用密度无关的大圆角，其他皮肤保持原有外观。
     private val density = resources.displayMetrics.density
-    private val isIpod3rdTheme =
-        SPManager.getInt(SPManager.Theme.SP_NAME) == SPManager.Theme.IPOD_3RD.id
-    private val cornerRadius = if (isIpod3rdTheme) 18f * density else 16f * density
+    private val themeId get() = SPManager.getInt(SPManager.Theme.SP_NAME)
+    private val isIpod3rdTheme get() = themeId == SPManager.Theme.IPOD_3RD.id
+    private val isClassic3gTheme get() = themeId == SPManager.Theme.IPOD_3G_CLASSIC.id
+    private val cornerRadius
+        get() = when {
+            isClassic3gTheme -> 5f * density
+            isIpod3rdTheme -> 18f * density
+            else -> 16f * density
+        }
     private val isGlassEffectSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
 
     // 渐变画笔 - 用于光泽效果
@@ -45,33 +51,45 @@ class Screen(context: Context, attributeSet: AttributeSet?) : LinearLayout(conte
     }
 
     // 背景渐变 - 半透明毛玻璃效果
-    private val glassBackgroundGradient = GradientDrawable(
+    private fun createGlassBackgroundGradient() = GradientDrawable(
         GradientDrawable.Orientation.TOP_BOTTOM,
-        if (isIpod3rdTheme) {
+        when {
+            isClassic3gTheme -> {
+            intArrayOf(
+                Color.rgb(194, 213, 210),
+                Color.rgb(179, 202, 200),
+                Color.rgb(163, 190, 188),
+                Color.rgb(151, 179, 178)
+            )
+            }
+            isIpod3rdTheme -> {
             intArrayOf(
                 Color.argb(224, 252, 252, 255),
                 Color.argb(205, 247, 248, 252),
                 Color.argb(188, 239, 241, 247),
                 Color.argb(176, 232, 235, 243)
             )
-        } else {
+            }
+            else -> {
             intArrayOf(
                 Color.argb((255 * 0.75).toInt(), 250, 250, 252),
                 Color.argb((255 * 0.65).toInt(), 245, 245, 248),
                 Color.argb((255 * 0.60).toInt(), 240, 240, 245),
                 Color.argb((255 * 0.55).toInt(), 235, 235, 242)
             )
+            }
         }
     ).apply {
         cornerRadius = this@Screen.cornerRadius
     }
+    private var glassBackgroundGradient = createGlassBackgroundGradient()
 
     init {
         // 设置背景为透明
         setBackgroundColor(Color.TRANSPARENT)
         orientation = VERTICAL
 
-        if (isIpod3rdTheme) {
+        if (SPManager.Theme.usesThirdGenerationLayout(themeId)) {
             // The 3G status strip is deliberately compact; content receives the
             // remaining height instead of inheriting the old 1:9 proportion.
             addView(
@@ -129,6 +147,14 @@ class Screen(context: Context, attributeSet: AttributeSet?) : LinearLayout(conte
     }
 
     override fun dispatchDraw(canvas: Canvas) {
+        if (isClassic3gTheme) {
+            drawGlassBackground(canvas)
+            super.dispatchDraw(canvas)
+            drawClassicLcdOverlay(canvas)
+            drawBorder(canvas)
+            return
+        }
+
         // 先绘制玻璃背景效果
         if (isGlassEffectSupported) {
             drawGlassBackground(canvas)
@@ -161,7 +187,7 @@ class Screen(context: Context, attributeSet: AttributeSet?) : LinearLayout(conte
      */
     private fun drawNormalBackground(canvas: Canvas) {
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-        paint.color = Color.WHITE
+        paint.color = if (isClassic3gTheme) Color.rgb(177, 201, 199) else Color.WHITE
         canvas.drawRoundRect(
             0f, 0f, width.toFloat(), height.toFloat(),
             cornerRadius, cornerRadius, paint
@@ -253,6 +279,11 @@ class Screen(context: Context, attributeSet: AttributeSet?) : LinearLayout(conte
     private fun drawBorder(canvas: Canvas) {
         val width = width.toFloat()
         val height = height.toFloat()
+
+        if (isClassic3gTheme) {
+            drawClassicLcdBorder(canvas, width, height)
+            return
+        }
 
         if (isIpod3rdTheme) {
             drawModernGlassBorder(canvas, width, height)
@@ -347,6 +378,63 @@ class Screen(context: Context, attributeSet: AttributeSet?) : LinearLayout(conte
         borderPaint.shader = null
     }
 
+    private fun drawClassicLcdOverlay(canvas: Canvas) {
+        val width = width.toFloat()
+        val height = height.toFloat()
+
+        glossPaint.shader = LinearGradient(
+            0f,
+            0f,
+            width * 0.78f,
+            height,
+            intArrayOf(
+                Color.argb(48, 255, 255, 245),
+                Color.argb(10, 255, 255, 245),
+                Color.TRANSPARENT
+            ),
+            floatArrayOf(0f, 0.42f, 1f),
+            Shader.TileMode.CLAMP
+        )
+        canvas.drawRoundRect(0f, 0f, width, height, cornerRadius, cornerRadius, glossPaint)
+        glossPaint.shader = null
+
+        // Extremely faint horizontal rows keep the display from reading as a modern panel.
+        glossPaint.color = Color.argb(10, 48, 68, 66)
+        glossPaint.strokeWidth = 0.45f * density
+        val rowSpacing = 3f * density
+        var y = rowSpacing
+        while (y < height) {
+            canvas.drawLine(0f, y, width, y, glossPaint)
+            y += rowSpacing
+        }
+    }
+
+    private fun drawClassicLcdBorder(canvas: Canvas, width: Float, height: Float) {
+        val inset = 0.65f * density
+        borderPaint.shader = null
+        borderPaint.strokeWidth = 1.1f * density
+        borderPaint.color = Color.argb(138, 57, 67, 64)
+        canvas.drawRoundRect(
+            inset,
+            inset,
+            width - inset,
+            height - inset,
+            cornerRadius - inset,
+            cornerRadius - inset,
+            borderPaint
+        )
+
+        borderPaint.strokeWidth = 0.65f * density
+        borderPaint.color = Color.argb(142, 238, 245, 236)
+        canvas.drawLine(
+            2f * density,
+            1.5f * density,
+            width - 2f * density,
+            1.5f * density,
+            borderPaint
+        )
+    }
+
     private fun setTitle() {
         val title = currentView.getTitle()
         if (title == null) {
@@ -354,6 +442,25 @@ class Screen(context: Context, attributeSet: AttributeSet?) : LinearLayout(conte
         } else {
             titleBar.showTitle(title)
         }
+    }
+
+    fun refreshTheme() {
+        glassBackgroundGradient = createGlassBackgroundGradient()
+        titleBar.refreshTheme()
+
+        val titleHeight = resources.getDimensionPixelSize(
+            if (SPManager.Theme.usesThirdGenerationLayout(themeId)) {
+                R.dimen.title_bar_height_ipod_3rd
+            } else {
+                R.dimen.title_bar_height
+            }
+        )
+        titleBar.layoutParams = (titleBar.layoutParams as LayoutParams).apply {
+            height = titleHeight
+        }
+        invalidateOutline()
+        invalidate()
+        requestLayout()
     }
 
     private fun removeView(): ScreenView? {

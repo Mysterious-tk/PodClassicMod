@@ -325,22 +325,11 @@ class SettingsView(context: Context) : RecyclerListView(context), ScreenView {
                         // 重新绑定控制器，确保主题切换后控制器仍然可以触摸
                         (context as? MainActivity)?.rebindController()
                         listView.getCurrentItem().rightText =
-                            when (SPManager.getInt(SPManager.Theme.SP_NAME)) {
-                                SPManager.Theme.RED.id -> SPManager.Theme.RED.title
-                                SPManager.Theme.BLACK.id -> SPManager.Theme.BLACK.title
-                                SPManager.Theme.WHITE.id -> SPManager.Theme.WHITE.title
-                                SPManager.Theme.IPOD_3RD.id -> SPManager.Theme.IPOD_3RD.title
-                                else -> ""
-                            }
+                            SPManager.Theme.getTitle(SPManager.getInt(SPManager.Theme.SP_NAME))
+                        listView.forceRefresh()
                         return true
                     }
-                }, when (SPManager.getInt(SPManager.Theme.SP_NAME)) {
-                    SPManager.Theme.RED.id -> SPManager.Theme.RED.title
-                    SPManager.Theme.BLACK.id -> SPManager.Theme.BLACK.title
-                    SPManager.Theme.WHITE.id -> SPManager.Theme.WHITE.title
-                    SPManager.Theme.IPOD_3RD.id -> SPManager.Theme.IPOD_3RD.title
-                    else -> ""
-                }
+                }, SPManager.Theme.getTitle(SPManager.getInt(SPManager.Theme.SP_NAME))
             ),
 
             SwitchBar(Strings.SHOW_LYRIC, SPManager.SP_SHOW_LYRIC),

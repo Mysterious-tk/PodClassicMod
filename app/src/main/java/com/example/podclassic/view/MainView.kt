@@ -165,7 +165,10 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
 
     val item = RecyclerListView.Item(Strings.NOW_PLAYING, object : RecyclerListView.OnItemClickListener {
         override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
-            if (SPManager.getInt(SPManager.Theme.SP_NAME) == SPManager.Theme.IPOD_3RD.id) {
+            if (SPManager.Theme.usesThirdGenerationLayout(
+                    SPManager.getInt(SPManager.Theme.SP_NAME)
+                )
+            ) {
                 Core.addView(MusicPlayerView3rd(context))
             } else {
                 Core.addView(MusicPlayerView(context))
@@ -459,7 +462,10 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
                 override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                     MediaPresenter.shufflePlay()
                     // 根据主题选择使用哪个播放器视图
-                    if (SPManager.getInt(SPManager.Theme.SP_NAME) == SPManager.Theme.IPOD_3RD.id) {
+                    if (SPManager.Theme.usesThirdGenerationLayout(
+                            SPManager.getInt(SPManager.Theme.SP_NAME)
+                        )
+                    ) {
                         Core.addView(MusicPlayerView3rd(context))
                     } else {
                         Core.addView(MusicPlayerView(context))

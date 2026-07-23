@@ -200,6 +200,7 @@ object Core {
     }
 
     fun refresh() {
+        screen.refreshTheme()
         // 重新初始化视图，确保主题切换时SlideController的显示状态正确更新
         activity?.initView()
         // 更新控制器颜色和状态
@@ -261,7 +262,10 @@ object Core {
     private var timer = com.example.podclassic.util.Timer(DELAY) {
         if (MediaPresenter.isPlaying() && screen.currentView !is com.example.podclassic.view.MusicPlayerView && screen.currentView !is com.example.podclassic.view.MusicPlayerView3rd && activity != null) {
             ThreadUtil.runOnUiThread {
-                if (SPManager.getInt(SPManager.Theme.SP_NAME) == SPManager.Theme.IPOD_3RD.id) {
+                if (SPManager.Theme.usesThirdGenerationLayout(
+                        SPManager.getInt(SPManager.Theme.SP_NAME)
+                    )
+                ) {
                     addView(com.example.podclassic.view.MusicPlayerView3rd(activity!!))
                 } else {
                     addView(com.example.podclassic.view.MusicPlayerView(activity!!))

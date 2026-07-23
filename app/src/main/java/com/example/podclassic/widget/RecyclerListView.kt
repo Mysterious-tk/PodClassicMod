@@ -23,6 +23,7 @@ import androidx.core.view.isVisible
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.podclassic.util.ThreadUtil
+import com.example.podclassic.storage.SPManager
 import com.example.podclassic.values.Colors
 import com.example.podclassic.values.Values
 import com.example.podclassic.values.Values.DEFAULT_PADDING
@@ -54,10 +55,13 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
      * Enables the liquid-glass selection shared by all iPod-style menus. Individual
      * screens can still opt out when a classic solid highlight is required.
      */
-    var liquidGlassHighlightEnabled = true
+    private var liquidGlassHighlightRequested = true
+    var liquidGlassHighlightEnabled: Boolean
+        get() = liquidGlassHighlightRequested &&
+            SPManager.getInt(SPManager.Theme.SP_NAME) != SPManager.Theme.IPOD_3G_CLASSIC.id
         set(value) {
-            if (field == value) return
-            field = value
+            if (liquidGlassHighlightRequested == value) return
+            liquidGlassHighlightRequested = value
             refreshList()
         }
 
@@ -710,7 +714,7 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
         companion object {
             // Settings values such as "iPod 3rd" must remain readable even
             // with a larger system font scale.
-            private const val RIGHT_TEXT_MAX_WIDTH_DP = 96f
+            private const val RIGHT_TEXT_MAX_WIDTH_DP = 132f
         }
         
         var onItemClickListener: OnItemClickListener? = null

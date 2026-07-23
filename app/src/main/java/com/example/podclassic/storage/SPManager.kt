@@ -152,17 +152,27 @@ object SPManager {
     }
 
     enum class Theme(val id: Int, private val titleId: Int) {
-        WHITE(2, R.string.theme_white), BLACK(1, R.string.theme_black), RED(0, R.string.theme_red), IPOD_3RD(3, R.string.theme_ipod_3rd);
+        WHITE(2, R.string.theme_white),
+        BLACK(1, R.string.theme_black),
+        RED(0, R.string.theme_red),
+        IPOD_3RD(3, R.string.theme_ipod_3rd),
+        IPOD_3G_CLASSIC(4, R.string.theme_ipod_3g_classic);
 
         companion object {
             const val SP_NAME = "theme_color"
-            const val values = 4
+            const val values = 5
+
+            fun usesThirdGenerationLayout(id: Int): Boolean {
+                return id == IPOD_3RD.id || id == IPOD_3G_CLASSIC.id
+            }
+
             fun getTitle(id: Int): String {
                 return when (id) {
                     WHITE.id -> WHITE.title
                     BLACK.id -> BLACK.title
                     RED.id -> RED.title
                     IPOD_3RD.id -> IPOD_3RD.title
+                    IPOD_3G_CLASSIC.id -> IPOD_3G_CLASSIC.title
                     else -> BLACK.title
                 }
             }
