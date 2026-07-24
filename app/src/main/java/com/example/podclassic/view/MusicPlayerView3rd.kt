@@ -87,8 +87,15 @@ class MusicPlayerView3rd(context: Context) : FrameLayout(context), ScreenView {
     private val icon2: AppCompatImageView
     private val icon3: AppCompatImageView
     private var imageCenter = 0;
+    private var uiActive = false
 
-    private val progressTimer = com.example.podclassic.util.Timer(500L) { a -> ThreadUtil.runOnUiThread { onProgress(a.toInt()) } }
+    private val progressTimer = com.example.podclassic.util.Timer(500L) { progress ->
+        ThreadUtil.runOnUiThread {
+            if (uiActive) {
+                onProgress(progress.toInt())
+            }
+        }
+    }
 
 
     private val container: ViewGroup
@@ -312,6 +319,7 @@ class MusicPlayerView3rd(context: Context) : FrameLayout(context), ScreenView {
     private val intentFilter = IntentFilter("android.media.VOLUME_CHANGED_ACTION")
 
     override fun onViewAdd() {
+        activateUi()
         Log.d("MusicPlayerView3rd", "========== onViewAdd() started (instance #$instanceId) ==========")
         Log.d("MusicPlayerView3rd", "MusicPlayerView3rd width=$width, height=$height, instanceId=$instanceId")
         Log.d("MusicPlayerView3rd", "MusicPlayerView3rd measuredWidth=$measuredWidth, measuredHeight=$measuredHeight")
@@ -342,12 +350,6 @@ class MusicPlayerView3rd(context: Context) : FrameLayout(context), ScreenView {
         Log.d("MusicPlayerView3rd", "currentTime y=${currentTime.y}, top=${currentTime.top}")
         Log.d("MusicPlayerView3rd", "remainingTime y=${remainingTime.y}, top=${remainingTime.top}")
         
-        if (!broadcastReceiverRegistered) {
-            context.registerReceiver(volumeBroadcastReceiver, intentFilter)
-            broadcastReceiverRegistered = true
-            Log.d("MusicPlayerView3rd", "Broadcast receiver registered")
-        }
-        
         // 延迟执行布局检查
         post {
             Log.d("MusicPlayerView3rd", "---------- post() callback ----------")
@@ -374,8 +376,38 @@ class MusicPlayerView3rd(context: Context) : FrameLayout(context), ScreenView {
     }
 
     override fun onViewRemove() {
+        deactivateUi()
         imageLoadGeneration++
         backgroundController.cancel()
+    }
+
+    override fun onHostStart() {
+        activateUi()
+        onProgress(MediaPresenter.getProgress())
+        onPlayStateChange()
+    }
+
+    override fun onHostStop() {
+        deactivateUi()
+    }
+
+    private fun activateUi() {
+        if (!Core.isHostActive) {
+            return
+        }
+        uiActive = true
+        if (!broadcastReceiverRegistered) {
+            context.registerReceiver(volumeBroadcastReceiver, intentFilter)
+            broadcastReceiverRegistered = true
+        }
+    }
+
+    private fun deactivateUi() {
+        uiActive = false
+        progressTimer.pause()
+        timer?.cancel()
+        timer?.purge()
+        timer = null
         if (broadcastReceiverRegistered) {
             context.unregisterReceiver(volumeBroadcastReceiver)
             broadcastReceiverRegistered = false
@@ -408,7 +440,9 @@ class MusicPlayerView3rd(context: Context) : FrameLayout(context), ScreenView {
                 timer?.schedule(object : TimerTask() {
                     override fun run() {
                         ThreadUtil.runOnUiThread {
-                            setSeekBar(progressBar)
+                            if (uiActive) {
+                                setSeekBar(progressBar)
+                            }
                         }
                     }
                 }, 2000)
@@ -581,7 +615,7 @@ class MusicPlayerView3rd(context: Context) : FrameLayout(context), ScreenView {
     private fun onPlayStateChange() {
         val progress = MediaPresenter.getProgress()
         progressBar.set(progress, MediaPresenter.getDuration())
-        if (MediaPresenter.isPlaying()) {
+        if (uiActive && MediaPresenter.isPlaying()) {
             progressTimer.start(progress.toLong())
         } else {
             progressTimer.pause()

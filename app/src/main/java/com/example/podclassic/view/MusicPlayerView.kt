@@ -76,9 +76,16 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
     private val icon2: androidx.appcompat.widget.AppCompatImageView
     private val icon3: androidx.appcompat.widget.AppCompatImageView
     private var imageCenter = 0;
+    private var uiActive = false
 
     private val progressTimer =
-        com.example.podclassic.util.Timer(500L) { a -> ThreadUtil.runOnUiThread { onProgress(a.toInt()) } }
+        com.example.podclassic.util.Timer(500L) { progress ->
+            ThreadUtil.runOnUiThread {
+                if (uiActive) {
+                    onProgress(progress.toInt())
+                }
+            }
+        }
 
     
 
@@ -285,16 +292,11 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
     private val intentFilter = IntentFilter("android.media.VOLUME_CHANGED_ACTION")
 
     override fun onViewAdd() {
+        activateUi()
         Log.d("MusicPlayerView", "========== onViewAdd() started ==========")
         Log.d("MusicPlayerView", "MusicPlayerView width=$width, height=$height")
         Log.d("MusicPlayerView", "MusicPlayerView measuredWidth=$measuredWidth, measuredHeight=$measuredHeight")
         Log.d("MusicPlayerView", "Parent=${parent?.javaClass?.simpleName}, Parent size=${(parent as? ViewGroup)?.width}x${(parent as? ViewGroup)?.height}")
-        
-        if (!broadcastReceiverRegistered) {
-            context.registerReceiver(volumeBroadcastReceiver, intentFilter)
-            broadcastReceiverRegistered = true
-            Log.d("MusicPlayerView", "Broadcast receiver registered")
-        }
         
         // 获取根视图并记录其状态
         val rootView = getChildAt(0)
@@ -351,8 +353,38 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
     }
 
     override fun onViewRemove() {
+        deactivateUi()
         imageLoadGeneration++
         backgroundController.cancel()
+    }
+
+    override fun onHostStart() {
+        activateUi()
+        onProgress(MediaPresenter.getProgress())
+        onPlayStateChange()
+    }
+
+    override fun onHostStop() {
+        deactivateUi()
+    }
+
+    private fun activateUi() {
+        if (!Core.isHostActive) {
+            return
+        }
+        uiActive = true
+        if (!broadcastReceiverRegistered) {
+            context.registerReceiver(volumeBroadcastReceiver, intentFilter)
+            broadcastReceiverRegistered = true
+        }
+    }
+
+    private fun deactivateUi() {
+        uiActive = false
+        progressTimer.pause()
+        timer?.cancel()
+        timer?.purge()
+        timer = null
         if (broadcastReceiverRegistered) {
             context.unregisterReceiver(volumeBroadcastReceiver)
             broadcastReceiverRegistered = false
@@ -385,7 +417,9 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
                 timer?.schedule(object : TimerTask() {
                     override fun run() {
                         ThreadUtil.runOnUiThread {
-                            setSeekBar(progressBar)
+                            if (uiActive) {
+                                setSeekBar(progressBar)
+                            }
                         }
                     }
                 }, 2000)
@@ -555,7 +589,7 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
     private fun onPlayStateChange() {
         val progress = MediaPresenter.getProgress()
         progressBar.set(progress, MediaPresenter.getDuration())
-        if (MediaPresenter.isPlaying()) {
+        if (uiActive && MediaPresenter.isPlaying()) {
             progressTimer.start(progress.toLong())
         } else {
             progressTimer.pause()

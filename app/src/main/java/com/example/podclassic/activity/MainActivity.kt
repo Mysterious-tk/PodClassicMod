@@ -1,6 +1,7 @@
 package com.example.podclassic.activity
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Configuration
@@ -168,6 +169,7 @@ class MainActivity : AppCompatActivity() {
 
      */
 
+    @SuppressLint("MissingSuperCall")
     override fun onBackPressed() {
         if (Values.LAUNCHER) {
             if (Core.lock) {
@@ -186,6 +188,16 @@ class MainActivity : AppCompatActivity() {
         if (hasFocus) {
             Core.setNightMode()
         }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        Core.onHostStart()
+    }
+
+    override fun onStop() {
+        Core.onHostStop()
+        super.onStop()
     }
 
     private fun initMediaPlayer() {

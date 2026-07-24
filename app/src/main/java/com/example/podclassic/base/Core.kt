@@ -31,6 +31,11 @@ object Core {
     private lateinit var screen: Screen
     private lateinit var nightMode: View
     private var activity: MainActivity? = null
+    @Volatile
+    private var hostActive = false
+
+    val isHostActive: Boolean
+        get() = hostActive
 
     fun bindActivity(
         controller: View,
@@ -57,7 +62,9 @@ object Core {
             }
         }
         activity?.setColor(Colors.screen)
-        wake()
+        if (hostActive) {
+            wake()
+        }
 
     }
 
@@ -259,24 +266,32 @@ object Core {
 
     private const val DELAY = 120000L  // 2 minutes
 
-    private var timer = com.example.podclassic.util.Timer(DELAY) {
-        if (MediaPresenter.isPlaying() && screen.currentView !is com.example.podclassic.view.MusicPlayerView && screen.currentView !is com.example.podclassic.view.MusicPlayerView3rd && activity != null) {
-            ThreadUtil.runOnUiThread {
-                if (SPManager.Theme.usesThirdGenerationLayout(
-                        SPManager.getInt(SPManager.Theme.SP_NAME)
-                    )
-                ) {
-                    addView(com.example.podclassic.view.MusicPlayerView3rd(activity!!))
-                } else {
-                    addView(com.example.podclassic.view.MusicPlayerView(activity!!))
-                }
+    private val timer = com.example.podclassic.util.Timer(DELAY, once = true) {
+        if (!hostActive || !MediaPresenter.isPlaying()) return@Timer
+        ThreadUtil.runOnUiThread {
+            val currentActivity = activity
+            if (!hostActive ||
+                currentActivity == null ||
+                !MediaPresenter.isPlaying() ||
+                screen.currentView is com.example.podclassic.view.MusicPlayerView ||
+                screen.currentView is com.example.podclassic.view.MusicPlayerView3rd
+            ) {
+                return@runOnUiThread
+            }
+            if (SPManager.Theme.usesThirdGenerationLayout(
+                    SPManager.getInt(SPManager.Theme.SP_NAME)
+                )
+            ) {
+                addView(com.example.podclassic.view.MusicPlayerView3rd(currentActivity))
+            } else {
+                addView(com.example.podclassic.view.MusicPlayerView(currentActivity))
             }
         }
     }
 
     private var prevTimerSetTime = 0L
     fun wake() {
-        if (!MediaPresenter.isPlaying()) {
+        if (!hostActive || !MediaPresenter.isPlaying()) {
             return
         }
         val currentMillis = System.currentTimeMillis()
@@ -285,6 +300,30 @@ object Core {
         }
         prevTimerSetTime = currentMillis
         timer.start(0L)
+    }
+
+    fun onHostStart() {
+        if (hostActive || activity == null || !::screen.isInitialized) {
+            return
+        }
+        hostActive = true
+        screen.get().onHostStart()
+        if (MediaPresenter.isPlaying()) {
+            // Do not let the touch debounce suppress lifecycle resumption.
+            prevTimerSetTime = System.currentTimeMillis()
+            timer.start(0L)
+        }
+    }
+
+    fun onHostStop() {
+        if (!hostActive) {
+            return
+        }
+        hostActive = false
+        timer.pause()
+        if (::screen.isInitialized) {
+            screen.get().onHostStop()
+        }
     }
 
     fun reboot() {
@@ -301,6 +340,7 @@ object Core {
     }
 
     fun exit() {
+        onHostStop()
         if (Values.LAUNCHER) {
             MediaPresenter.stop()
         } else {

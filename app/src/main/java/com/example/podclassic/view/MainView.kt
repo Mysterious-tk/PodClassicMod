@@ -67,6 +67,8 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
     // 动画相关
     private var coverAnimator: ValueAnimator? = null
     private var isAnimating = false
+    private var isCurrentScreen = false
+    private var driftResumeGeneration = 0
     private var nextDriftPoint = 0
     private val menuBackgroundController = ArtworkBackgroundController(
         listView,
@@ -574,6 +576,7 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
     }
 
     override fun onViewAdd() {
+        isCurrentScreen = true
         android.util.Log.d("MainView", "onViewAdd() called")
 
         if (MediaPresenter.getCurrent() == null) {
@@ -801,7 +804,15 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
     }
 
     private fun startCoverDrift() {
-        if (!isShown || coverContainer.width <= 0 || coverContainer.height <= 0) return
+        if (!Core.isHostActive ||
+            !isCurrentScreen ||
+            windowVisibility != View.VISIBLE ||
+            !isShown ||
+            coverContainer.width <= 0 ||
+            coverContainer.height <= 0
+        ) {
+            return
+        }
         isAnimating = true
         animateToNextDriftPoint()
     }
@@ -843,6 +854,7 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
     }
 
     private fun stopCoverDrift() {
+        driftResumeGeneration++
         isAnimating = false
         coverAnimator?.removeAllListeners()
         coverAnimator?.cancel()
@@ -905,19 +917,42 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
     override fun onWindowVisibilityChanged(visibility: Int) {
         super.onWindowVisibilityChanged(visibility)
         if (visibility == View.VISIBLE) {
-            // Insets and available window bounds may settle only after returning from the
-            // background. Re-read the laid-out container instead of reusing saved dimensions.
-            coverContainer.postOnAnimation {
-                if (coverContainer.width > 0 && coverContainer.height > 0 &&
-                    coverImageView.drawable != null
-                ) {
-                    resetCoverPosition()
-                }
+            resumeCoverDrift()
+        } else {
+            stopCoverDrift()
+        }
+    }
+
+    override fun onHostStart() {
+        resumeCoverDrift()
+    }
+
+    override fun onHostStop() {
+        stopCoverDrift()
+    }
+
+    private fun resumeCoverDrift() {
+        if (!Core.isHostActive || !isCurrentScreen || windowVisibility != View.VISIBLE) {
+            return
+        }
+        val generation = ++driftResumeGeneration
+        // Insets and available bounds may settle after returning from the background.
+        coverContainer.postOnAnimation {
+            if (generation == driftResumeGeneration &&
+                Core.isHostActive &&
+                isCurrentScreen &&
+                windowVisibility == View.VISIBLE &&
+                coverContainer.width > 0 &&
+                coverContainer.height > 0 &&
+                coverImageView.drawable != null
+            ) {
+                resetCoverPosition()
             }
         }
     }
 
     override fun onViewRemove() {
+        isCurrentScreen = false
         artworkLoadGeneration++
         menuBackgroundController.cancel()
         // 清理方向变化处理器

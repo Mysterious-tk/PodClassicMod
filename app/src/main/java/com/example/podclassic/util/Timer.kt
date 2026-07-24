@@ -1,7 +1,7 @@
 package com.example.podclassic.util
 
-import java.util.*
-import java.util.Timer
+import java.util.Timer as JavaTimer
+import java.util.TimerTask
 
 
 //一个可以暂停的Timer
@@ -11,16 +11,24 @@ class Timer {
     private val task: Task?
     private val function: ((Long) -> Unit)?
 
-    private val timerTask: TimerTask
-        get() {
-            return object : TimerTask() {
-                override fun run() {
+    private fun timerTask(generation: Long): TimerTask {
+        return object : TimerTask() {
+            override fun run() {
+                val nextTime = synchronized(this@Timer) {
+                    if (generation != timerGeneration) {
+                        return
+                    }
                     timeCount += freq
-                    task?.apply { run(timeCount) }
-                    function?.let { it(timeCount) }
+                    if (once) {
+                        timer = null
+                    }
+                    timeCount
                 }
+                task?.apply { run(nextTime) }
+                function?.let { it(nextTime) }
             }
         }
+    }
 
     constructor(freq: Long, once: Boolean = false, task: Task) {
         this.freq = freq
@@ -42,7 +50,8 @@ class Timer {
 
     var timeCount = 0L
 
-    private var timer: Timer? = null
+    private var timer: JavaTimer? = null
+    private var timerGeneration = 0L
 
 
     @Synchronized
@@ -52,25 +61,34 @@ class Timer {
 
     @Synchronized
     fun start(timeCount: Long) {
-        timer?.cancel()
+        cancelTimer()
         this.timeCount = timeCount
-        timer = Timer().apply {
+        val generation = ++timerGeneration
+        timer = JavaTimer("PodClassicTimer", true).apply {
             if (once) {
-                schedule(timerTask, freq)
+                schedule(timerTask(generation), freq)
             } else {
-                schedule(timerTask, freq, freq)
+                schedule(timerTask(generation), freq, freq)
             }
         }
     }
 
+    @Synchronized
     fun pause() {
-        timer?.cancel()
-        timer = null
+        timerGeneration++
+        cancelTimer()
     }
 
+    @Synchronized
     fun reset() {
-        timer?.cancel()
-        timer = null
+        timerGeneration++
+        cancelTimer()
         timeCount = 0L
+    }
+
+    private fun cancelTimer() {
+        timer?.cancel()
+        timer?.purge()
+        timer = null
     }
 }

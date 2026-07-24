@@ -25,6 +25,14 @@ interface ScreenView {
 
     fun onViewRemove() {}
 
+    /**
+     * Host lifecycle callbacks are separate from the custom screen stack callbacks.
+     * Backgrounding the Activity must not change onViewAdd/onViewRemove semantics.
+     */
+    fun onHostStart() {}
+
+    fun onHostStop() {}
+
     fun getObserver(): Observer? {
         return null
     }

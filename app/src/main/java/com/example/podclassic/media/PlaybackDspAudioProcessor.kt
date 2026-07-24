@@ -10,7 +10,12 @@ import androidx.media3.common.audio.BaseAudioProcessor
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
-/** Media3 bridge that guarantees decoded 16-bit PCM passes through the app DSP chain. */
+/**
+ * Media3 bridge for the app DSP chain.
+ *
+ * When every effect is disabled this processor reports itself as inactive. Media3 can then skip
+ * PCM processing entirely (and, when supported by the device/format, use audio offload).
+ */
 class PlaybackDspAudioProcessor : BaseAudioProcessor() {
     val tube = TubeAmpDsp()
     val normalizer = VolumeNormalizerDsp()
@@ -24,6 +29,9 @@ class PlaybackDspAudioProcessor : BaseAudioProcessor() {
     private var encoding = C.ENCODING_PCM_16BIT
 
     override fun onConfigure(inputAudioFormat: AudioProcessor.AudioFormat): AudioProcessor.AudioFormat {
+        if (!hasActiveEffects()) {
+            return AudioProcessor.AudioFormat.NOT_SET
+        }
         if (inputAudioFormat.encoding != C.ENCODING_PCM_16BIT &&
             inputAudioFormat.encoding != C.ENCODING_PCM_FLOAT) {
             throw AudioProcessor.UnhandledAudioFormatException(inputAudioFormat)
@@ -41,6 +49,14 @@ class PlaybackDspAudioProcessor : BaseAudioProcessor() {
     }
 
     override fun queueInput(inputBuffer: ByteBuffer) {
+        if (!hasActiveEffects()) {
+            // Normally unreachable because an inactive BaseAudioProcessor is omitted from the
+            // chain. Keep direct calls bit-transparent without doing a per-sample float roundtrip.
+            val output = replaceOutputBuffer(inputBuffer.remaining())
+            output.put(inputBuffer)
+            output.flip()
+            return
+        }
         val output = replaceOutputBuffer(inputBuffer.remaining()).order(ByteOrder.nativeOrder())
         inputBuffer.order(ByteOrder.nativeOrder())
         val frame = FloatArray(channelCount)
@@ -50,17 +66,16 @@ class PlaybackDspAudioProcessor : BaseAudioProcessor() {
                 frame[channel] = if (encoding == C.ENCODING_PCM_FLOAT) inputBuffer.float
                 else inputBuffer.short / 32768f
             }
-            val active = hasActiveEffects()
             normalizer.processFrame(frame)
             nightVolume.processFrame(frame)
             equalizer.processFrame(frame)
             clearBass.processFrame(frame)
             tube.processFrame(frame)
             crossfeed.processFrame(frame)
-            if (active) limiter.processFrame(frame)
+            limiter.processFrame(frame)
             for (sample in frame) {
                 if (encoding == C.ENCODING_PCM_FLOAT) {
-                    output.putFloat(if (active) sample.coerceIn(-1f, 1f) else sample)
+                    output.putFloat(sample.coerceIn(-1f, 1f))
                 }
                 else output.putShort((sample.coerceIn(-1f, 0.9999695f) * 32768f).toInt().toShort())
             }
@@ -83,7 +98,7 @@ class PlaybackDspAudioProcessor : BaseAudioProcessor() {
         limiter.reset()
     }
 
-    private fun hasActiveEffects(): Boolean = normalizer.parameters.enabled ||
+    internal fun hasActiveEffects(): Boolean = normalizer.parameters.enabled ||
         nightVolume.parameters.enabled || equalizer.parameters.enabled ||
         clearBass.parameters.enabled || tube.parameters.enabled || crossfeed.parameters.enabled
 }

@@ -36,33 +36,55 @@ object MediaPresenter {
             return field
         }
 
-    fun init() {
+    private val serviceConnection = object : ServiceConnection {
+        override fun onServiceConnected(componentName: ComponentName?, binder: IBinder?) {
+            val serviceBinder = binder as? MediaService.ServiceBinder
+            mediaController = serviceBinder?.mediaController
+            connectionState =
+                if (mediaController != null) STATE_CONNECTED else STATE_UNCONNECTED
+        }
 
-        //connectService()
+        override fun onServiceDisconnected(componentName: ComponentName?) {
+            mediaController = null
+            connectionState = STATE_UNCONNECTED
+        }
     }
 
+    fun init() {
+        connect()
+    }
+
+    @Synchronized
     private fun connect() {
-        if (connectionState == STATE_CONNECTING) {
+        if (connectionState != STATE_UNCONNECTED) {
             return
         }
         connectionState = STATE_CONNECTING
 
         val context = BaseApplication.context
         val intent = Intent(context, MediaService::class.java)
+        if (!context.bindService(intent, serviceConnection, BIND_AUTO_CREATE)) {
+            connectionState = STATE_UNCONNECTED
+        }
+    }
 
-        context.bindService(intent, object : ServiceConnection {
-            override fun onServiceConnected(p0: ComponentName?, p1: IBinder?) {
-                val binder = p1 as MediaService.ServiceBinder
-                mediaController = binder.mediaController
-                connectionState = STATE_CONNECTED
-            }
-
-            override fun onServiceDisconnected(p0: ComponentName?) {
-                mediaController = null
-                connectionState = STATE_UNCONNECTED
-            }
-
-        }, BIND_AUTO_CREATE)
+    /**
+     * Releases the application-context binding when playback is stopped.
+     * Without this, MediaService remains alive after stopSelf() because BIND_AUTO_CREATE
+     * keeps a permanent client binding for the lifetime of the app process.
+     */
+    @Synchronized
+    fun disconnect() {
+        if (connectionState == STATE_UNCONNECTED) {
+            return
+        }
+        try {
+            BaseApplication.context.unbindService(serviceConnection)
+        } catch (_: IllegalArgumentException) {
+            // The system may already have removed a failed or dead binding.
+        }
+        mediaController = null
+        connectionState = STATE_UNCONNECTED
     }
 
 

@@ -13,6 +13,7 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.TrackSelectionParameters.AudioOffloadPreferences
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.audio.AudioSink
@@ -55,6 +56,7 @@ class MediaPlayer<E>(context: Context, private val mediaAdapter: MediaAdapter<E>
         .setAudioAttributes(audioAttributes, true)
         .setHandleAudioBecomingNoisy(true)
         .build()
+        .apply { updateAudioOffloadPreference(this, dsp.hasActiveEffects()) }
 
     private var playState = PlayState.STATE_STOP
     private var released = false
@@ -126,6 +128,19 @@ class MediaPlayer<E>(context: Context, private val mediaAdapter: MediaAdapter<E>
 
     fun setCrossfeed(enabled: Boolean, level: CrossfeedLevel) {
         dsp.crossfeed.parameters = CrossfeedDsp.Parameters(enabled, level)
+    }
+
+    /**
+     * Reconfigures the Media3 audio path after a batch of DSP setting changes.
+     *
+     * Track reselection preserves the current media item, position and play/pause state. With no
+     * active DSP, offload is enabled where the device and media format support it; otherwise Media3
+     * automatically falls back to the normal decoded path. Active DSP always disables offload so
+     * decoded PCM continues through [PlaybackDspAudioProcessor].
+     */
+    fun refreshAudioPipeline() = onPlayerThread {
+        if (released) return@onPlayerThread
+        updateAudioOffloadPreference(player, dsp.hasActiveEffects())
     }
 
     var tubeAmpEnabled: Boolean
@@ -460,6 +475,24 @@ class MediaPlayer<E>(context: Context, private val mediaAdapter: MediaAdapter<E>
         val task = FutureTask(block)
         mainHandler.post(task)
         return task.get()
+    }
+
+    private fun updateAudioOffloadPreference(player: ExoPlayer, effectsEnabled: Boolean) {
+        val offloadMode = if (effectsEnabled) {
+            AudioOffloadPreferences.AUDIO_OFFLOAD_MODE_DISABLED
+        } else {
+            AudioOffloadPreferences.AUDIO_OFFLOAD_MODE_ENABLED
+        }
+        if (player.trackSelectionParameters.audioOffloadPreferences.audioOffloadMode == offloadMode) {
+            return
+        }
+        val preferences = AudioOffloadPreferences.Builder()
+            .setAudioOffloadMode(offloadMode)
+            .build()
+        player.trackSelectionParameters = player.trackSelectionParameters
+            .buildUpon()
+            .setAudioOffloadPreferences(preferences)
+            .build()
     }
 
     interface MediaAdapter<E> {

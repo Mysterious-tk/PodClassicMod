@@ -4,8 +4,6 @@ import android.app.Notification
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.graphics.Bitmap
-import android.os.Build
 import android.support.v4.media.session.MediaSessionCompat
 import androidx.core.app.NotificationChannelCompat
 import androidx.core.app.NotificationCompat
@@ -20,12 +18,16 @@ import com.example.podclassic.values.Icons
 
 /**
  * 增强型通知管理器
- * 提供完整的媒体控制通知功能，包括播放控制、进度显示和歌曲信息展示
+ * 提供媒体控制通知，包括播放控制和歌曲信息展示。
+ * 实时进度由 MediaSession 状态交给系统推算，避免周期性重建通知。
  */
 class NotificationManager(context: Context, sessionToken: MediaSessionCompat.Token) {
 
     companion object {
-        const val CHANNEL_ID = "media_playback_channel"
+        // Android does not allow changing an existing channel's importance. Use a
+        // new id so users upgrading from the old high-importance channel receive
+        // the intended low-interruption media playback behaviour.
+        const val CHANNEL_ID = "media_playback_channel_v2"
         const val CHANNEL_NAME = "媒体播放"
         const val NOTIFICATION_ID = 1
         
@@ -49,14 +51,13 @@ class NotificationManager(context: Context, sessionToken: MediaSessionCompat.Tok
      * 创建通知渠道（Android 8.0+ 必需）
      */
     private fun createNotificationChannel() {
-        val channel = NotificationChannelCompat.Builder(CHANNEL_ID, NotificationManagerCompat.IMPORTANCE_HIGH)
+        val channel = NotificationChannelCompat.Builder(CHANNEL_ID, NotificationManagerCompat.IMPORTANCE_LOW)
             .setName(CHANNEL_NAME)
             .setDescription("音乐播放控制通知")
-            .setShowBadge(true)
-            .setLightColor(Colors.color_primary)
+            .setShowBadge(false)
             .build()
         systemNotificationManagerCompat.createNotificationChannel(channel)
-        android.util.Log.d("NotificationManager", "Notification channel created: $CHANNEL_ID with IMPORTANCE_HIGH")
+        android.util.Log.d("NotificationManager", "Notification channel created: $CHANNEL_ID with IMPORTANCE_LOW")
     }
 
     /**
@@ -141,7 +142,7 @@ class NotificationManager(context: Context, sessionToken: MediaSessionCompat.Tok
      * 基础通知构建器配置
      */
     private val notificationBuilder = NotificationCompat.Builder(appContext, CHANNEL_ID)
-        .setPriority(NotificationCompat.PRIORITY_HIGH)
+        .setPriority(NotificationCompat.PRIORITY_LOW)
         .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
         .setSmallIcon(R.drawable.ic_play_arrow_grey_800_36dp)
         .setShowWhen(false)
@@ -164,14 +165,12 @@ class NotificationManager(context: Context, sessionToken: MediaSessionCompat.Tok
      * 
      * @param music 当前播放的音乐
      * @param isPlaying 是否正在播放
-     * @param position 当前播放位置（毫秒）
      * @param duration 总时长（毫秒）
      * @return 构建好的通知对象
      */
     fun buildNotification(
         music: Music,
         isPlaying: Boolean,
-        position: Int = 0,
         duration: Int = 0
     ): Notification {
         android.util.Log.d("NotificationManager", "Building notification: ${music.title} - ${music.artist}, isPlaying=$isPlaying")
@@ -206,12 +205,8 @@ class NotificationManager(context: Context, sessionToken: MediaSessionCompat.Tok
             .setContentText("${music.artist} - ${music.album}")
             .setSubText(formatDuration(duration))
             .setOngoing(true) // 始终保持为持续通知
-            .setProgress(duration, position, false) // 添加进度条
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
             .build()
-
-        // 设置通知标志 - 始终保持为持续事件
-        notification.flags = Notification.FLAG_ONGOING_EVENT or Notification.FLAG_FOREGROUND_SERVICE
 
         return notification
     }
@@ -226,16 +221,4 @@ class NotificationManager(context: Context, sessionToken: MediaSessionCompat.Tok
         return String.format("%02d:%02d", minutes, seconds)
     }
 
-    /**
-     * 更新通知进度
-     * 用于实时更新播放进度
-     */
-    fun updateNotificationProgress(
-        music: Music,
-        isPlaying: Boolean,
-        position: Int,
-        duration: Int
-    ): Notification {
-        return buildNotification(music, isPlaying, position, duration)
-    }
 }
